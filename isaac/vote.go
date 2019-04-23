@@ -1,14 +1,24 @@
-package common
+package isaac
 
 import "encoding/json"
 
-type Vote int
+type Vote uint
 
 const (
-	VoteNOP    Vote = -1
-	VoteNONE   Vote = 0
-	VoteYES    Vote = 1
-	VoteEXPIRE Vote = 2
+	VoteNONE Vote = iota
+	VoteYES
+	VoteNOP
+	VoteEXPIRE
+)
+
+type VoteResult uint
+
+const (
+	VoteResultNotYet VoteResult = iota
+	VoteResultYES
+	VoteResultNOP
+	VoteResultEXPIRE
+	VoteResultDRAW
 )
 
 func (v Vote) String() string {
@@ -24,7 +34,7 @@ func (v Vote) String() string {
 	}
 }
 
-func (v Vote) MarshalText() ([]byte, error) {
+func (v Vote) MarshalJSON() ([]byte, error) {
 	if v == VoteNONE {
 		return nil, InvalidVoteError
 	}
@@ -32,7 +42,7 @@ func (v Vote) MarshalText() ([]byte, error) {
 	return json.Marshal(v.String())
 }
 
-func (v *Vote) UnmarshalText(b []byte) error {
+func (v *Vote) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err

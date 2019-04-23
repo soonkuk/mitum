@@ -1,4 +1,6 @@
-package common
+package isaac
+
+import "encoding/json"
 
 type VoteStage uint
 
@@ -23,6 +25,32 @@ func (s VoteStage) String() string {
 	default:
 		return ""
 	}
+}
+
+func (s VoteStage) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s *VoteStage) UnmarshalJSON(b []byte) error {
+	var n string
+	if err := json.Unmarshal(b, &n); err != nil {
+		return err
+	}
+
+	switch n {
+	case "INIT":
+		*s = VoteStageINIT
+	case "SIGN":
+		*s = VoteStageSIGN
+	case "ACCEPT":
+		*s = VoteStageACCEPT
+	case "ALLCONFIRM":
+		*s = VoteStageALLCONFIRM
+	default:
+		return InvalidVoteStageError
+	}
+
+	return nil
 }
 
 func (s VoteStage) IsValid() bool {

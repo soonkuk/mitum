@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding"
 	"encoding/json"
-	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -78,6 +77,17 @@ func (h Hash) Body() [32]byte {
 	return h.b
 }
 
+func (h Hash) Empty() bool {
+	if h.b == emptyRawHash {
+		return true
+	}
+	if len(h.h) < 1 {
+		return true
+	}
+
+	return false
+}
+
 func (h Hash) Bytes() []byte {
 	return h.b[:]
 }
@@ -91,7 +101,7 @@ func (h Hash) Equal(n Hash) bool {
 }
 
 func (h Hash) MarshalBinary() ([]byte, error) {
-	if h.b == emptyRawHash {
+	if h.Empty() {
 		return nil, EmptyHashError
 	}
 
@@ -110,26 +120,24 @@ func (h *Hash) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (h Hash) MarshalText() ([]byte, error) {
-	if h.b == emptyRawHash {
+func (h Hash) MarshalJSON() ([]byte, error) {
+	if h.Empty() {
 		return nil, EmptyHashError
 	}
 
 	return json.Marshal(h.String())
 }
 
-func (h *Hash) UnmarshalText(b []byte) error {
+func (h *Hash) UnmarshalJSON(b []byte) error {
 	var n string
 	if err := json.Unmarshal(b, &n); err != nil {
 		return err
 	}
-
-	s := strings.SplitN(n, "-", 2)
-	if len(s) != 2 || len(s[0]) < 1 || len(s[1]) < 1 {
+	if len(n) < 4 {
 		return InvalidHashError
 	}
 
-	decoded := base58.Decode(s[1])
+	decoded := base58.Decode(string(n[3:]))
 	if len(decoded) != 32 {
 		return InvalidHashError
 	}
@@ -137,7 +145,7 @@ func (h *Hash) UnmarshalText(b []byte) error {
 	var a [32]byte
 	copy(a[:], decoded)
 
-	h.h = s[0]
+	h.h = string(n[:2])
 	h.b = a
 
 	return nil
@@ -151,16 +159,15 @@ func NewSignature(networkID NetworkID, seed Seed, hash Hash) (Signature, error) 
 	return seed.Sign(append(networkID, hash.Bytes()...))
 }
 
-func (s Signature) MarshalText() ([]byte, error) {
+func (s Signature) MarshalJSON() ([]byte, error) {
 	return json.Marshal(base58.Encode(s[:]))
 }
 
-func (s *Signature) UnmarshalText(b []byte) error {
+func (s *Signature) UnmarshalJSON(b []byte) error {
 	var n string
 	if err := json.Unmarshal(b, &n); err != nil {
 		return err
 	}
-
 	*s = Signature(base58.Decode(n))
 
 	return nil

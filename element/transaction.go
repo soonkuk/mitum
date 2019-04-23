@@ -3,12 +3,11 @@ package element
 import (
 	"encoding/json"
 
-	"github.com/Masterminds/semver"
 	"github.com/spikeekips/mitum/common"
 )
 
 var (
-	CurrentTransactionVersion semver.Version = *semver.MustParse("0.1.0-proto")
+	CurrentTransactionVersion common.Version = common.MustParseVersion("0.1.0-proto")
 )
 
 func NewTransactionHash(t Transaction) (common.Hash, error) {
@@ -16,7 +15,7 @@ func NewTransactionHash(t Transaction) (common.Hash, error) {
 }
 
 type Transaction struct {
-	Version    semver.Version
+	Version    common.Version
 	Source     common.Address
 	Checkpoint []byte // NOTE account state root
 	Fee        common.Big
@@ -39,9 +38,9 @@ func (t Transaction) Hash() (common.Hash, error) {
 	return NewTransactionHash(t)
 }
 
-func (t Transaction) MarshalText() ([]byte, error) {
+func (t Transaction) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
-		"version":    &t.Version,
+		"version":    t.Version,
 		"source":     t.Source,
 		"checkpoint": t.Checkpoint,
 		"created_at": t.CreatedAt,
@@ -55,13 +54,13 @@ func (t Transaction) MarshalText() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func (t *Transaction) UnmarshalText(b []byte) error {
+func (t *Transaction) UnmarshalJSON(b []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 
-	var version semver.Version
+	var version common.Version
 	if err := json.Unmarshal(raw["version"], &version); err != nil {
 		return err
 	}

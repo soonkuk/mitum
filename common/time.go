@@ -25,15 +25,19 @@ type Time struct {
 	time.Time
 }
 
+func (t Time) UTC() Time {
+	return Time{Time: t.Time.UTC()}
+}
+
 func (t Time) String() string {
 	return FormatISO8601(t.Time)
 }
 
-func (t Time) MarshalText() ([]byte, error) {
+func (t Time) MarshalJSON() ([]byte, error) {
 	return json.Marshal(FormatISO8601(t.Time))
 }
 
-func (t *Time) UnmarshalText(b []byte) error {
+func (t *Time) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err

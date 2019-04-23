@@ -1,30 +1,41 @@
 package element
 
 import (
+	"encoding"
+	"encoding/json"
+
 	"github.com/spikeekips/mitum/common"
 )
 
 type OperationType interface {
-	common.BinaryEncoder
-	common.TextEncoder
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+	json.Marshaler
+	json.Unmarshaler
 }
 
 type OperationValue interface {
-	common.BinaryEncoder
-	common.TextEncoder
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+	json.Marshaler
+	json.Unmarshaler
 }
 
 type OperationOptions interface {
-	common.BinaryEncoder
-	common.TextEncoder
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+	json.Marshaler
+	json.Unmarshaler
 
 	Get(string) interface{}
 	Set(string) interface{}
 }
 
 type Operation interface {
-	common.BinaryEncoder
-	common.TextEncoder
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+	json.Marshaler
+	json.Unmarshaler
 
 	Type() OperationType
 	Value() OperationValue

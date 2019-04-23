@@ -6,5 +6,6 @@ type Consensus interface {
 	Name() string
 	Start() error
 	Stop() error
-	Receive(common.Seal) error
+	Receiver() <-chan common.Seal
+	RegisterSendFunc(func(common.Node, common.Seal) error) error
 }

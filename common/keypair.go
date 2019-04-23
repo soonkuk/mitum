@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/stellar/go/keypair"
 )
@@ -10,6 +11,10 @@ type Address string
 
 func (a Address) IsValid() (keypair.KP, error) {
 	return keypair.Parse(string(a))
+}
+
+func (a Address) Alias() string {
+	return fmt.Sprintf("%s.%s", a[:4], a[len(a)-4:])
 }
 
 func (a Address) Verify(input []byte, sig []byte) error {
@@ -21,21 +26,22 @@ func (a Address) Verify(input []byte, sig []byte) error {
 	return kp.Verify(input, sig)
 }
 
-func (a Address) MarshalText() ([]byte, error) {
+func (a Address) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(a))
 }
 
-func (a *Address) UnmarshalText(b []byte) error {
+func (a *Address) UnmarshalJSON(b []byte) error {
 	var n string
 	if err := json.Unmarshal(b, &n); err != nil {
 		return err
 	}
 
-	if _, err := Address(n).IsValid(); err != nil {
+	na := Address(n)
+	if _, err := na.IsValid(); err != nil {
 		return err
 	}
 
-	*a = Address(n)
+	*a = na
 	return nil
 }
 

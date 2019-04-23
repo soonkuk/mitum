@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"math"
 	"math/big"
 	"testing"
@@ -122,6 +123,37 @@ func (t *testBig) TestDiv() {
 		t.False(ok)
 		t.Equal("0", c.Int.String())
 	}
+}
+
+func (t *testBig) TestJson() {
+	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+
+	var b []byte
+	b, err := json.Marshal(a)
+	t.NoError(err)
+	t.Equal("340282366920938463426481119284349108225", string(b))
+
+	var n Big
+	{
+		err := json.Unmarshal(b, &n)
+		t.NoError(err)
+	}
+
+	t.Equal(0, a.Cmp(n))
+}
+
+func (t *testBig) TestEncodeDecode() {
+	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+
+	var b []byte
+	b, err := Encode(a)
+	t.NoError(err)
+
+	var n Big
+	err = Decode(b, &n)
+	t.NoError(err)
+
+	t.Equal(0, a.Cmp(n))
 }
 
 func TestBig(t *testing.T) {

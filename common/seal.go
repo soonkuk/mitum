@@ -4,93 +4,116 @@ import (
 	"encoding"
 	"encoding/base64"
 	"encoding/json"
+	"reflect"
 
-	"github.com/Masterminds/semver"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var (
-	CurrentSealVersion semver.Version = *semver.MustParse("0.1.0-proto")
+	CurrentSealVersion Version = MustParseVersion("0.1.0-proto")
 )
 
-type SealType uint
+type SealType string
 
-const (
-	_ SealType = iota
-	SealedSeal
-	BallotSeal
-	TransactionSeal
-)
+func NewSealType(t string) SealType {
+	return SealType(t)
+}
 
-func (s SealType) String() string {
-	switch s {
-	case SealedSeal:
-		return "sealed"
-	case BallotSeal:
-		return "ballot"
-	case TransactionSeal:
-		return "transaction"
-	default:
-		return ""
+type Seal struct {
+	Version   Version
+	Type      SealType
+	hash      Hash
+	Source    Address
+	Signature Signature
+	bodyHash  Hash
+	Body      []byte
+	CreatedAt Time
+
+	encoded []byte
+	body    interface{}
+}
+
+func NewSeal(t SealType, body Hasher) (Seal, error) {
+	bodyHash, encoded, err := body.Hash()
+	if err != nil {
+		return Seal{}, err
 	}
+
+	s := Seal{
+		Type:     t,
+		Version:  CurrentSealVersion,
+		bodyHash: bodyHash,
+		Body:     encoded,
+	}
+
+	return s, nil
 }
 
-func (s SealType) MarshalText() ([]byte, error) {
-	return json.Marshal(s.String())
+func (s Seal) makeHash() (Hash, []byte, error) {
+	encoded, err := s.MarshalBinary()
+	if err != nil {
+		return Hash{}, nil, err
+	}
+
+	hash, err := NewHash("sl", encoded)
+	if err != nil {
+		return Hash{}, nil, err
+	}
+
+	return hash, encoded, nil
 }
 
-func (s *SealType) UnmarshalText(b []byte) error {
-	var i string
-	if err := json.Unmarshal(b, &i); err != nil {
+func (s Seal) Hash() (Hash, []byte, error) {
+	if s.hash.Empty() {
+		return s.makeHash()
+	}
+
+	return s.hash, s.encoded, nil
+}
+
+func (s Seal) BodyHash() Hash {
+	return s.bodyHash
+}
+
+func (s *Seal) Sign(networkID NetworkID, seed Seed) error {
+	signature, err := NewSignature(networkID, seed, s.bodyHash)
+	if err != nil {
 		return err
 	}
 
-	switch i {
-	case "sealed":
-		*s = SealedSeal
-	case "ballot":
-		*s = BallotSeal
-	case "transaction":
-		*s = TransactionSeal
-	default:
-		return UnknownSealTypeError
+	s.Source = seed.Address()
+	s.Signature = signature
+	s.CreatedAt = Now()
+
+	hash, encoded, err := s.makeHash()
+	if err != nil {
+		return err
+	}
+	s.hash = hash
+	s.encoded = encoded
+
+	return nil
+}
+
+func (s Seal) CheckSignature(networkID NetworkID) error {
+	err := s.Source.Verify(
+		append(networkID, s.bodyHash.Bytes()...),
+		[]byte(s.Signature),
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-type Seal struct {
-	Version   semver.Version
-	Type      SealType
-	Source    Address
-	Signature Signature
-	hash      Hash
-	Body      []byte
-}
-
-func NewSeal(t SealType, body Hasher) (Seal, error) {
-	hash, encoded, err := body.Hash()
-	if err != nil {
-		return Seal{}, err
-	}
-
-	return Seal{
-		Type:    t,
-		Version: CurrentSealVersion,
-		hash:    hash,
-		Body:    encoded,
-	}, nil
-}
-
 func (s Seal) MarshalBinary() ([]byte, error) {
-	var err error
-
-	version, err := json.Marshal(&s.Version)
+	version, err := s.Version.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
 
-	hash, err := s.hash.MarshalBinary()
+	bodyHash, err := s.bodyHash.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +123,9 @@ func (s Seal) MarshalBinary() ([]byte, error) {
 		s.Type,
 		s.Source,
 		s.Signature,
-		hash,
+		bodyHash,
 		s.Body,
+		s.CreatedAt,
 	})
 }
 
@@ -111,12 +135,12 @@ func (s *Seal) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	var version *semver.Version
+	var version Version
 	{
 		var vs []byte
 		if err := Decode(m[0], &vs); err != nil {
 			return err
-		} else if err := json.Unmarshal(vs, &version); err != nil {
+		} else if err := version.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
@@ -136,12 +160,12 @@ func (s *Seal) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	var hash Hash
+	var bodyHash Hash
 	{
 		var vs []byte
 		if err := Decode(m[4], &vs); err != nil {
 			return err
-		} else if err := hash.UnmarshalBinary(vs); err != nil {
+		} else if err := bodyHash.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
@@ -151,70 +175,49 @@ func (s *Seal) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	s.Version = *version
-	s.hash = hash
+	var createdAt Time
+	if err := Decode(m[6], &createdAt); err != nil {
+		return err
+	}
+
+	s.Version = version
 	s.Type = sealType
 	s.Signature = signature
 	s.Source = source
 	s.Body = body
+	s.bodyHash = bodyHash
+	s.CreatedAt = createdAt
 
-	return nil
-}
-
-func (s Seal) Hash() (Hash, []byte, error) {
-	encoded, err := s.MarshalBinary()
-	if err != nil {
-		return Hash{}, nil, err
-	}
-
-	hash, err := NewHash("sl", encoded)
-	if err != nil {
-		return Hash{}, nil, err
-	}
-	return hash, encoded, nil
-}
-
-func (s *Seal) Sign(networkID NetworkID, seed Seed) error {
-	signature, err := NewSignature(networkID, seed, s.hash)
+	hash, encoded, err := s.makeHash()
 	if err != nil {
 		return err
 	}
-
-	s.Source = seed.Address()
-	s.Signature = signature
-	return nil
-}
-
-func (s Seal) CheckSignature(networkID NetworkID) error {
-	err := s.Source.Verify(
-		append(networkID, s.hash.Bytes()...),
-		[]byte(s.Signature),
-	)
-	if err != nil {
-		return err
-	}
+	s.hash = hash
+	s.encoded = encoded
 
 	return nil
 }
 
-func (s Seal) MarshalText() ([]byte, error) {
+func (s Seal) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"version":   &s.Version,
-		"type":      s.Type,
-		"source":    s.Source,
-		"signature": s.Signature,
-		"hash":      s.hash,
-		"body":      base64.StdEncoding.EncodeToString(s.Body),
+		"version":    s.Version,
+		"type":       s.Type,
+		"hash":       s.hash,
+		"source":     s.Source,
+		"signature":  s.Signature,
+		"body_hash":  s.bodyHash,
+		"body":       base64.StdEncoding.EncodeToString(s.Body),
+		"created_at": s.CreatedAt,
 	})
 }
 
-func (s *Seal) UnmarshalText(b []byte) error {
+func (s *Seal) UnmarshalJSON(b []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 
-	var version semver.Version
+	var version Version
 	if err := json.Unmarshal(raw["version"], &version); err != nil {
 		return err
 	}
@@ -239,6 +242,11 @@ func (s *Seal) UnmarshalText(b []byte) error {
 		return err
 	}
 
+	var bodyHash Hash
+	if err := json.Unmarshal(raw["body_hash"], &bodyHash); err != nil {
+		return err
+	}
+
 	var body []byte
 	{
 		var c string
@@ -251,21 +259,50 @@ func (s *Seal) UnmarshalText(b []byte) error {
 		}
 	}
 
+	var createdAt Time
+	if err := json.Unmarshal(raw["created_at"], &createdAt); err != nil {
+		return err
+	}
+
 	s.Version = version
 	s.Type = sealType
+	s.hash = hash
 	s.Source = source
 	s.Signature = signature
-	s.hash = hash
+	s.bodyHash = bodyHash
 	s.Body = body
+	s.CreatedAt = createdAt
+
+	{
+		hash, encoded, err := s.makeHash()
+		if err != nil {
+			return err
+		}
+		if !s.hash.Equal(hash) {
+			return HashDoesNotMatchError
+		}
+
+		s.encoded = encoded
+	}
 
 	return nil
 }
 
-func (s Seal) UnmarshalBody(i encoding.BinaryUnmarshaler) error {
-	return i.UnmarshalBinary(s.Body)
+func (s *Seal) UnmarshalBody(i encoding.BinaryUnmarshaler) error {
+	if s.body == nil {
+		if err := i.UnmarshalBinary(s.Body); err != nil {
+			return err
+		}
+
+		s.body = reflect.ValueOf(i).Elem().Interface()
+	} else {
+		reflect.ValueOf(i).Elem().Set(reflect.ValueOf(s.body))
+	}
+
+	return nil
 }
 
 func (s Seal) String() string {
-	b, _ := json.MarshalIndent(s, "", "  ")
+	b, _ := json.Marshal(s)
 	return string(b)
 }

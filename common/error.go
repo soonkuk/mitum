@@ -7,18 +7,18 @@ import (
 )
 
 type Error struct {
-	code    string `json:"code"`
-	message string `json:"message"`
+	code    string
+	message string
 }
 
-func (e Error) MarshalText() ([]byte, error) {
+func (e Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
 		"code":    e.code,
 		"message": e.message,
 	})
 }
 
-func (e *Error) UnmarshalText(b []byte) error {
+func (e *Error) UnmarshalJSON(b []byte) error {
 	var m map[string]string
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err

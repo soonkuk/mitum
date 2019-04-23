@@ -20,19 +20,27 @@ func NewBig(i uint64) Big {
 	return Big{Int: a}
 }
 
-func (a Big) MarshalText() ([]byte, error) {
-	return json.Marshal(a.Bytes())
+func ParseBig(s string) (Big, error) {
+	var a big.Int
+	err := a.UnmarshalText([]byte(s))
+	if err != nil {
+		return Big{}, err
+	}
+
+	return Big{Int: a}, nil
 }
 
-func (a *Big) UnmarshalText(b []byte) error {
-	var n []byte
+func (a Big) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&a.Int)
+}
+
+func (a *Big) UnmarshalJSON(b []byte) error {
+	var n big.Int
 	if err := json.Unmarshal(b, &n); err != nil {
 		return err
 	}
 
-	i := new(big.Int).SetBytes(n)
-
-	*a = Big{Int: *i}
+	*a = Big{Int: n}
 	return nil
 }
 
@@ -78,4 +86,8 @@ func (a Big) Mul(n Big) Big {
 
 func (a Big) IsZero() bool {
 	return a.Int.Cmp(ZeroBigInt) == 0
+}
+
+func (a Big) Cmp(b Big) int {
+	return a.Int.Cmp(&b.Int)
 }

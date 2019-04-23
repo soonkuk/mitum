@@ -1,16 +1,15 @@
 package isaac
 
 import (
-	"github.com/Masterminds/semver"
 	"github.com/spikeekips/mitum/common"
 )
 
 var (
-	CurrentBlockVersion semver.Version = *semver.MustParse("0.1.0-proto")
+	CurrentBlockVersion common.Version = common.MustParseVersion("0.1.0-proto")
 )
 
 type Block struct {
-	version semver.Version
+	version common.Version
 
 	hash     common.Hash
 	prevHash common.Hash
@@ -25,7 +24,7 @@ type Block struct {
 	transactions []common.Hash
 }
 
-func (b Block) Version() semver.Version {
+func (b Block) Version() common.Version {
 	return b.version
 }
 
