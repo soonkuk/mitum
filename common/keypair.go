@@ -23,7 +23,13 @@ func (a Address) Verify(input []byte, sig []byte) error {
 		return err
 	}
 
-	return kp.Verify(input, sig)
+	err = kp.Verify(input, sig)
+	switch err {
+	case keypair.ErrInvalidSignature:
+		err = SignatureVerificationFailedError
+	}
+
+	return err
 }
 
 func (a Address) MarshalJSON() ([]byte, error) {

@@ -57,8 +57,14 @@ func formatLogJSONValue(value interface{}) (result interface{}) {
 	}()
 
 	switch v := value.(type) {
-	case json.Marshaler, *errors.Error:
+	case json.Marshaler:
 		return v
+	case *errors.Error:
+		return v
+	case Hasher: // TODO monkey patch for jsonable, but it does not have `MarshalJSON()`
+		return v
+	case Time:
+		return v.String()
 	case time.Time:
 		return FormatISO8601(v)
 	case error:

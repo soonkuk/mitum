@@ -7,18 +7,22 @@ const (
 	InvalidSealTypeCode
 	InvalidVoteCode
 	InvalidVoteStageCode
-	RunningRoundAlreadyExistsCode
-	RunningRoundNotFoundCode
 	VotingProposalAlreadyStartedCode
-	VotingRoundAlreadyStartedCode
+	VotingProposalNotFoundCode
+	KnownSealFoundCode
+	SomethingWrongVotingCode
+	ProposeBallotNotWellformedCode
+	VoteBallotNotWellformedCode
 )
 
 var (
 	InvalidSealTypeError              common.Error = common.NewError("isaac", InvalidSealTypeCode, "invalid SealType")
 	InvalidVoteError                  common.Error = common.NewError("isaac", InvalidVoteCode, "invalid vote found")
 	InvalidVoteStageError             common.Error = common.NewError("isaac", InvalidVoteStageCode, "invalid vote stage found")
-	RunningRoundAlreadyExistsError    common.Error = common.NewError("isaac", RunningRoundAlreadyExistsCode, "RunningRound already exists")
-	RunningRoundNotFoundError         common.Error = common.NewError("isaac", RunningRoundNotFoundCode, "RunningRound not found")
 	VotingProposalAlreadyStartedError common.Error = common.NewError("isaac", VotingProposalAlreadyStartedCode, "VotingProposal already started")
-	VotingRoundAlreadyStartedError    common.Error = common.NewError("isaac", VotingRoundAlreadyStartedCode, "VotingRound already started")
+	VotingProposalNotFoundError       common.Error = common.NewError("isaac", VotingProposalNotFoundCode, "VotingProposal not found")
+	KnownSealFoundError               common.Error = common.NewError("isaac", KnownSealFoundCode, "know seal found")
+	SomethingWrongVotingError         common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
+	ProposeBallotNotWellformedError   common.Error = common.NewError("isaac", ProposeBallotNotWellformedCode, "")
+	VoteBallotNotWellformedError      common.Error = common.NewError("isaac", VoteBallotNotWellformedCode, "")
 )

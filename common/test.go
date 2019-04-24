@@ -3,6 +3,9 @@
 package common
 
 import (
+	"reflect"
+	"runtime"
+
 	"github.com/inconshreveable/log15"
 )
 
@@ -17,4 +20,23 @@ func SetTestLogger(logger log15.Logger) {
 
 func init() {
 	InTest = true
+}
+
+func NewRandomHash(hint string) Hash {
+	h, _ := NewHash(hint, []byte(RandomUUID()))
+	return h
+}
+
+func FuncName(f interface{}) string {
+	v := reflect.ValueOf(f)
+	if v.Kind() != reflect.Func {
+		return v.String()
+	}
+
+	rf := runtime.FuncForPC(v.Pointer())
+	if rf == nil {
+		return v.String()
+	}
+
+	return rf.Name()
 }

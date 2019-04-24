@@ -56,8 +56,8 @@ func (e Error) Message() string {
 	return e.message
 }
 
-func (e Error) SetMessage(m string) Error {
-	return Error{code: e.code, message: m}
+func (e Error) SetMessage(format string, args ...interface{}) Error {
+	return Error{code: e.code, message: fmt.Sprintf(format, args...)}
 }
 
 func (e Error) Equal(n error) bool {

@@ -2,15 +2,6 @@ package isaac
 
 import "encoding/json"
 
-type Vote uint
-
-const (
-	VoteNONE Vote = iota
-	VoteYES
-	VoteNOP
-	VoteEXPIRE
-)
-
 type VoteResult uint
 
 const (
@@ -19,6 +10,15 @@ const (
 	VoteResultNOP
 	VoteResultEXPIRE
 	VoteResultDRAW
+)
+
+type Vote uint
+
+const (
+	VoteNONE Vote = iota
+	VoteYES
+	VoteNOP
+	VoteEXPIRE
 )
 
 func (v Vote) String() string {
@@ -60,4 +60,27 @@ func (v *Vote) UnmarshalJSON(b []byte) error {
 	}
 
 	return nil
+}
+
+func (s Vote) IsValid() bool {
+	switch s {
+	case VoteNONE:
+	case VoteYES:
+	case VoteNOP:
+	case VoteEXPIRE:
+	default:
+		return false
+	}
+
+	return true
+}
+
+func (s Vote) CanVote() bool {
+	switch s {
+	case VoteNONE:
+	default:
+		return true
+	}
+
+	return false
 }

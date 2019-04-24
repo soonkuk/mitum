@@ -115,6 +115,14 @@ func (t *testConsensus) newSeal(c uint64) common.Seal {
 	return seal
 }
 
+func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state []byte) *Consensus {
+	consensusState := &ConsensusState{height: height, block: block, state: state}
+	consensus, err := NewConsensus(consensusState)
+	t.NoError(err)
+
+	return consensus
+}
+
 func (t *testConsensus) TestNew() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -126,8 +134,7 @@ func (t *testConsensus) TestNew() {
 	networkID := []byte("this-is-test-network")
 
 	network := newNodeTestNetwork()
-	consensus, err := NewConsensus()
-	t.NoError(err)
+	consensus := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
 	defer consensus.Stop()
 	defer network.Stop()
 

@@ -1,7 +1,6 @@
 package isaac
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -25,9 +24,9 @@ func (t *testVotingStage) newSealHash() common.Hash {
 	return hash
 }
 
-func (t *testVotingStage) makeNodes(c int) []common.Seed {
+func (t *testVotingStage) makeNodes(c uint) []common.Seed {
 	var nodes []common.Seed
-	for i := 0; i < c; i++ {
+	for i := 0; i < int(c); i++ {
 		nodes = append(nodes, t.newSeed())
 	}
 
@@ -37,7 +36,7 @@ func (t *testVotingStage) makeNodes(c int) []common.Seed {
 func (t *testVotingStage) TestVote() {
 	st := NewVotingStage()
 
-	nodeCount := 5
+	var nodeCount uint = 5
 	nodes := t.makeNodes(nodeCount)
 
 	{
@@ -58,7 +57,7 @@ func (t *testVotingStage) TestVote() {
 func (t *testVotingStage) TestMultipleVote() {
 	st := NewVotingStage()
 
-	nodeCount := 5
+	var nodeCount uint = 5
 	nodes := t.makeNodes(nodeCount)
 
 	{ // node3 vote again with same vote
@@ -101,8 +100,8 @@ func (t *testVotingStage) TestMultipleVote() {
 func (t *testVotingStage) TestCanCount() {
 	st := NewVotingStage()
 
-	total := 5
-	threshold := int(math.Round(float64(5) * float64(0.67)))
+	var total uint = 5
+	threshold := uint(math.Round(float64(5) * float64(0.67)))
 	nodes := t.makeNodes(total)
 
 	{ // under threshold
@@ -152,30 +151,124 @@ func TestVotingStage(t *testing.T) {
 	suite.Run(t, new(testVotingStage))
 }
 
-type testRoundVotingManager struct {
+type testRoundVoting struct {
 	suite.Suite
 }
 
-func (t *testRoundVotingManager) TestNew() {
-	vm := NewRoundVotingManager()
-
-	var proposeBallotSeal common.Seal
-	{
-		var err error
-		proposerSeed := common.RandomSeed()
-		_, proposeBallotSeal, err = NewTestSealProposeBallot(proposerSeed.Address(), nil)
-		t.NoError(err)
-		err = proposeBallotSeal.Sign(common.TestNetworkID, proposerSeed)
-		t.NoError(err)
-	}
-
-	fmt.Println(proposeBallotSeal)
-
-	vp, err := vm.NewRound(proposeBallotSeal)
+func (t *testRoundVoting) newProposeBallotSeal(seed common.Seed) (common.Seal, ProposeBallot) {
+	proposeBallot, proposeBallotSeal, err := NewTestSealProposeBallot(seed.Address(), nil)
 	t.NoError(err)
-	t.NotEmpty(vp)
+	err = proposeBallotSeal.Sign(common.TestNetworkID, seed)
+	t.NoError(err)
+
+	return proposeBallotSeal, proposeBallot
 }
 
-func TestRoundVotingManager(t *testing.T) {
-	suite.Run(t, new(testRoundVotingManager))
+func (t *testRoundVoting) TestNew() {
+	vm := NewRoundVoting()
+
+	proposerSeed := common.RandomSeed()
+	proposeBallotSeal, proposeBallot := t.newProposeBallotSeal(proposerSeed)
+	t.Equal(1, proposeBallot.Block.Height.Cmp(common.NewBig(0)))
+
+	vp, _, err := vm.Open(proposeBallotSeal)
+	t.NoError(err)
+	t.NotEmpty(vp)
+	t.Equal(proposeBallot.Block.Height, vp.height)
+
+	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
+	t.True(vm.IsRunning(proposeBallotSealHash))
+}
+
+func (t *testRoundVoting) TestNewRoundSignVote() {
+	vm := NewRoundVoting()
+
+	proposerSeed := common.RandomSeed()
+	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
+
+	vp, _, err := vm.Open(proposeBallotSeal)
+	t.NoError(err)
+	t.NotEmpty(vp)
+
+	var vote Vote
+	var voted bool
+
+	vote, voted = vp.Stage(VoteStageINIT).Voted(proposerSeed.Address())
+	t.Equal(VoteNONE, vote)
+	t.False(voted)
+
+	// ProposeBallot will be automatically voted in sign stage
+	vote, voted = vp.Stage(VoteStageSIGN).Voted(proposerSeed.Address())
+	t.Equal(VoteYES, vote)
+	t.True(voted)
+
+	vote, voted = vp.Stage(VoteStageACCEPT).Voted(proposerSeed.Address())
+	t.Equal(VoteNONE, vote)
+	t.False(voted)
+}
+
+func (t *testRoundVoting) TestVoteBeforePropose() {
+	vm := NewRoundVoting()
+
+	proposerSeed := common.RandomSeed()
+	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
+	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
+	t.NoError(err)
+
+	voteSeed := common.RandomSeed()
+	voteBallot, _, err := NewTestSealVoteBallot(
+		proposeBallotSealHash,
+		voteSeed.Address(),
+		VoteStageSIGN,
+		VoteYES,
+	)
+	t.NoError(err)
+
+	_, _, err = vm.Vote(voteBallot)
+	t.True(VotingProposalNotFoundError.Equal(err))
+}
+
+func (t *testRoundVoting) TestVote() {
+	vm := NewRoundVoting()
+
+	proposerSeed := common.RandomSeed()
+	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
+	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
+	t.NoError(err)
+
+	vp, _, err := vm.Open(proposeBallotSeal)
+	t.NoError(err)
+
+	voteSeed := common.RandomSeed()
+	voteBallot, _, err := NewTestSealVoteBallot(
+		proposeBallotSealHash,
+		voteSeed.Address(),
+		VoteStageSIGN,
+		VoteYES,
+	)
+	t.NoError(err)
+
+	_, _, err = vm.Vote(voteBallot)
+	t.NoError(err)
+
+	stage := vp.Stage(voteBallot.Stage)
+	var vote Vote
+	var voted bool
+
+	vote, voted = stage.Voted(proposerSeed.Address())
+	t.Equal(VoteYES, vote)
+	t.True(voted)
+
+	vote, voted = stage.Voted(voteSeed.Address())
+	t.Equal(VoteYES, vote)
+	t.True(voted)
+
+	unknownSeed := common.RandomSeed()
+	vote, voted = stage.Voted(unknownSeed.Address())
+	t.Equal(VoteNONE, vote)
+	t.False(voted)
+}
+
+func TestRoundVoting(t *testing.T) {
+	suite.Run(t, new(testRoundVoting))
 }

@@ -16,7 +16,9 @@ func NewTestSealProposeBallot(proposer common.Address, transactions []common.Has
 	}
 
 	ballot := ProposeBallot{
-		Version: CurrentBallotVersion,
+		Version:  CurrentBallotVersion,
+		Proposer: proposer,
+		Round:    0,
 		Block: BallotBlock{
 			Height:  common.NewBig(99),
 			Current: currentBlockHash,
@@ -35,13 +37,12 @@ func NewTestSealProposeBallot(proposer common.Address, transactions []common.Has
 }
 
 func NewTestSealVoteBallot(proposeBallotSealHash common.Hash, source common.Address, stage VoteStage, vote Vote) (VoteBallot, common.Seal, error) {
-
 	ballot := VoteBallot{
 		Version:           CurrentBallotVersion,
+		Source:            source,
 		ProposeBallotSeal: proposeBallotSealHash,
 		Stage:             stage,
 		Vote:              vote,
-		Round:             0,
 		VotedAt:           common.Now(),
 	}
 

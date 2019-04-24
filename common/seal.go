@@ -13,6 +13,10 @@ var (
 	CurrentSealVersion Version = MustParseVersion("0.1.0-proto")
 )
 
+type WellformChecker interface {
+	Wellformed() error
+}
+
 type SealType string
 
 func NewSealType(t string) SealType {
@@ -305,4 +309,36 @@ func (s *Seal) UnmarshalBody(i encoding.BinaryUnmarshaler) error {
 func (s Seal) String() string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+
+func (s Seal) Wellformed() error {
+	if _, err := s.Source.IsValid(); err != nil {
+		return err
+	}
+
+	if len(s.Signature) < 1 {
+		return SealNotWellformedError.SetMessage("Seal.Signature is empty")
+	}
+
+	if s.hash.Empty() {
+		return EmptyHashError.SetMessage("Seal.hash is empty")
+	}
+
+	if s.bodyHash.Empty() {
+		return EmptyHashError.SetMessage("Seal.bodyHash is empty")
+	}
+
+	if len(s.Body) < 1 {
+		return SealNotWellformedError.SetMessage("Seal.Body is empty")
+	}
+
+	hash, _, err := s.makeHash()
+	if err != nil {
+		return err
+	}
+	if !s.hash.Equal(hash) {
+		return SealNotWellformedError.SetMessage("Seal.hash does not match")
+	}
+
+	return nil
 }
