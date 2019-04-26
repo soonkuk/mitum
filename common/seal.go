@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -13,11 +14,15 @@ var (
 	CurrentSealVersion Version = MustParseVersion("0.1.0-proto")
 )
 
+type SealType string
+
+var (
+	SealedSealType SealType = "sealed-seal"
+)
+
 type WellformChecker interface {
 	Wellformed() error
 }
-
-type SealType string
 
 func NewSealType(t string) SealType {
 	return SealType(t)
@@ -308,7 +313,7 @@ func (s *Seal) UnmarshalBody(i encoding.BinaryUnmarshaler) error {
 
 func (s Seal) String() string {
 	b, _ := json.Marshal(s)
-	return string(b)
+	return strings.Replace(string(b), "\"", "'", -1)
 }
 
 func (s Seal) Wellformed() error {

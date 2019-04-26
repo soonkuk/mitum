@@ -62,11 +62,11 @@ func (e Error) SetMessage(format string, args ...interface{}) Error {
 
 func (e Error) Equal(n error) bool {
 	ne, found := n.(Error)
-	if found {
-		return e.Code() == ne.Code()
+	if !found {
+		return false
 	}
 
-	return false
+	return e.Code() == ne.Code()
 }
 
 func NewError(name string, number uint, message string) Error {

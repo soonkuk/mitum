@@ -14,6 +14,8 @@ const (
 	SealNotWellformedCode
 	ContextValueNotFoundCode
 	SignatureVerificationFailedCode
+	InvalidAddressCode
+	InvalidNetAddrCode
 )
 
 var (
@@ -29,4 +31,6 @@ var (
 	SealNotWellformedError           Error = NewError("common", SealNotWellformedCode, "seal is not wellformed")
 	ContextValueNotFoundError        Error = NewError("common", ContextValueNotFoundCode, "value not found in context")
 	SignatureVerificationFailedError Error = NewError("common", SignatureVerificationFailedCode, "signature verification failed")
+	InvalidAddressError              Error = NewError("common", InvalidAddressCode, "invalid Address")
+	InvalidNetAddrError              Error = NewError("common", InvalidNetAddrCode, "invalid NetAddr")
 )

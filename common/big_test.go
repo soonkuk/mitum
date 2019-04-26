@@ -40,7 +40,7 @@ func (t *testBig) TestAdd() {
 		t.True(ok)
 		t.Equal("36893488147419103230", c.Int.String())
 
-		t.Equal(a.Int, *c.Sub(&c.Int, &b.Int))
+		t.Equal(a.Int, c.Sub(b))
 		t.Equal("18446744073709551615", b.Int.String())
 	}
 }

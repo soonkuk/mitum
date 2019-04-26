@@ -12,6 +12,23 @@ const (
 	VoteResultDRAW
 )
 
+func (v VoteResult) String() string {
+	switch v {
+	case VoteResultNotYet:
+		return "not-yet"
+	case VoteResultNOP:
+		return "nop"
+	case VoteResultYES:
+		return "yes"
+	case VoteResultEXPIRE:
+		return "exp"
+	case VoteResultDRAW:
+		return "draw"
+	default:
+		return ""
+	}
+}
+
 type Vote uint
 
 const (

@@ -110,6 +110,39 @@ func (t *testChain) TestStopError() {
 	t.Nil(checker.Context().Value("2nd"))
 }
 
+func (t *testChain) TestChainCheckerChained() {
+	ctx := context.Background()
+	checker := NewChainChecker(
+		"showme-checker",
+		ctx,
+		func(c *ChainChecker) error {
+			c.SetContext("1st", true)
+
+			chained := NewChainChecker(
+				"chained-checker",
+				c.Context(),
+				func(c *ChainChecker) error {
+					c.SetContext("3rd", true)
+					return nil
+				},
+			)
+
+			return chained
+		},
+		func(c *ChainChecker) error {
+			c.SetContext("2nd", true)
+			return nil
+		},
+	)
+
+	err := checker.Check()
+	t.NoError(err)
+
+	t.Equal(true, checker.Context().Value("1st"))
+	t.Nil(checker.Context().Value("2nd"))
+	t.Equal(true, checker.Context().Value("3rd"))
+}
+
 func TestChain(t *testing.T) {
 	suite.Run(t, new(testChain))
 }

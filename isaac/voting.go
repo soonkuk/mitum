@@ -1,7 +1,9 @@
 package isaac
 
 import (
+	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/spikeekips/mitum/common"
@@ -129,6 +131,30 @@ func (r *RoundVoting) Vote(voteBallot VoteBallot) (*VotingProposal, *VotingStage
 	return vp, stage, nil
 }
 
+// Agreed clean up the other proposals except agreed proposal
+func (r *RoundVoting) Agreed(proposeBallotSealHash common.Hash) error {
+	if !r.IsRunning(proposeBallotSealHash) {
+		return VotingProposalNotFoundError
+	}
+
+	r.Lock()
+	defer r.Unlock()
+
+	for k, _ := range r.proposals {
+		if k.Equal(proposeBallotSealHash) {
+			continue
+		}
+		log.Debug(
+			"voting agreed; the other proposals will be removed",
+			"agreed-seal", proposeBallotSealHash,
+			"proposal", k,
+		)
+		delete(r.proposals, k)
+	}
+
+	return nil
+}
+
 type VotingProposal struct {
 	height      common.Big
 	StageINIT   *VotingStage
@@ -162,14 +188,16 @@ func (r *VotingProposal) Stage(stage VoteStage) *VotingStage {
 }
 
 func (r *VotingProposal) String() string {
-	b := map[string]interface{}{
-		"height":                 r.height,
-		VoteStageINIT.String():   r.StageINIT,
-		VoteStageSIGN.String():   r.StageSIGN,
-		VoteStageACCEPT.String(): r.StageACCEPT,
-	}
+	b, _ := json.Marshal(map[string]interface{}{
+		"height": r.height,
+		"stages": map[string]interface{}{
+			VoteStageINIT.String():   r.StageINIT.String(),
+			VoteStageSIGN.String():   r.StageSIGN.String(),
+			VoteStageACCEPT.String(): r.StageACCEPT.String(),
+		},
+	})
 
-	return common.PrettyMap(b)
+	return strings.Replace(string(b), "\"", "'", -1)
 }
 
 type VotingStage struct {
@@ -199,13 +227,13 @@ func (r *VotingStage) String() string {
 		exp = append(exp, k.Alias())
 	}
 
-	b := map[string]interface{}{
+	b, _ := json.Marshal(map[string]interface{}{
 		"yes": []interface{}{len(yes), yes},
 		"nop": []interface{}{len(nop), nop},
 		"exp": []interface{}{len(exp), exp},
-	}
+	})
 
-	return common.PrettyMap(b)
+	return strings.Replace(string(b), "\"", "'", -1)
 }
 
 func (r *VotingStage) YES() map[common.Address]common.Hash {
@@ -286,59 +314,79 @@ func (r *VotingStage) CanCount(total, threshold uint) bool {
 	r.RLock()
 	defer r.RUnlock()
 
+	return canCountVoting(total, threshold, len(r.yes), len(r.nop), len(r.exp))
+}
+
+func (r *VotingStage) Majority(total, threshold uint) VoteResult {
+	r.RLock()
+	defer r.RUnlock()
+
+	return majority(total, threshold, len(r.yes), len(r.nop), len(r.exp))
+}
+
+func canCountVoting(total, threshold uint, yes, nop, exp int) bool {
+	if threshold > total {
+		return false
+	}
+
 	to := int(total)
+	count := yes + nop + exp
+	if count >= to {
+		return true
+	}
+
 	th := int(threshold)
 
 	margin := to - th
 
 	// check majority
-	yes := len(r.yes)
 	if yes >= th || yes > margin {
 		return true
 	}
 
-	nop := len(r.nop)
 	if nop >= th || nop > margin {
 		return true
 	}
 
-	exp := len(r.exp)
 	if exp >= th || exp > margin {
 		return true
 	}
 
 	// draw
-	count := r.Count()
-	if count == to {
-		return true
-	}
-
 	var voted = []int{yes, nop, exp}
 	sort.Ints(voted)
 
-	if voted[len(voted)-1]+to-count < th {
+	major := voted[len(voted)-1]
+
+	if major+to-count < th {
 		return true
 	}
 
 	return false
 }
 
-func (r *VotingStage) Majority(total, threshold uint) VoteResult {
-	if !r.CanCount(total, threshold) {
+func majority(total, threshold uint, yes, nop, exp int) VoteResult {
+	if !canCountVoting(total, threshold, yes, nop, exp) {
 		return VoteResultNotYet // not yet
+	}
+
+	to := int(total)
+	count := yes + nop + exp
+	if count > to {
+		return VoteResultDRAW
 	}
 
 	th := int(threshold)
 
-	if len(r.yes) >= th {
-		return VoteResultYES
-	}
-
-	if len(r.nop) >= th {
+	if nop >= th {
 		return VoteResultNOP
 	}
 
-	if len(r.exp) >= th {
+	if yes >= th {
+		return VoteResultYES
+	}
+
+	if exp >= th {
 		return VoteResultEXPIRE
 	}
 

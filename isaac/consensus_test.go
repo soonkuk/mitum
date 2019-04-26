@@ -1,173 +1,74 @@
 package isaac
 
 import (
-	"runtime/debug"
-	"strconv"
-	"sync"
 	"testing"
-	"unsafe"
+	"time"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/network"
-	"github.com/stretchr/testify/suite"
 )
-
-type testHash struct {
-	I uint64
-}
-
-func (t testHash) MarshalBinary() ([]byte, error) {
-	return []byte(strconv.FormatUint(t.I, 10)), nil
-}
-
-func (t *testHash) UnmarshalBinary(b []byte) error {
-	i, err := strconv.ParseUint(string(b), 10, 64)
-	if err != nil {
-		return err
-	}
-
-	t.I = i
-	return nil
-}
-
-func (t testHash) Hash() (common.Hash, []byte, error) {
-	encoded, err := t.MarshalBinary()
-	if err != nil {
-		return common.Hash{}, nil, err
-	}
-
-	hash, _ := common.NewHash("th", encoded)
-	return hash, encoded, nil
-}
-
-type nodeTestNetwork struct {
-	sync.RWMutex
-	chans map[int64]chan<- common.Seal
-}
-
-func newNodeTestNetwork() *nodeTestNetwork {
-	return &nodeTestNetwork{
-		chans: map[int64]chan<- common.Seal{},
-	}
-}
-
-func (n *nodeTestNetwork) Start() error {
-	return nil
-}
-
-func (n *nodeTestNetwork) Stop() error {
-	return nil
-}
-
-func (n *nodeTestNetwork) addSeal(seal common.Seal) error {
-	n.RLock()
-	defer n.RUnlock()
-
-	if len(n.chans) < 1 {
-		return network.NoReceiversError
-	}
-
-	for _, c := range n.chans {
-		c <- seal
-	}
-
-	return nil
-}
-
-func (n *nodeTestNetwork) RegisterReceiver(c chan<- common.Seal) error {
-	n.Lock()
-	defer n.Unlock()
-
-	p := *(*int64)(unsafe.Pointer(&c))
-	if _, found := n.chans[p]; found {
-		return network.ReceiverAlreadyRegisteredError
-	}
-
-	n.chans[p] = c
-	return nil
-}
-
-func (n *nodeTestNetwork) UnregisterReceiver(c chan<- common.Seal) error {
-	n.Lock()
-	defer n.Unlock()
-
-	p := *(*int64)(unsafe.Pointer(&c))
-	if _, found := n.chans[p]; !found {
-		return network.ReceiverNotRegisteredError
-	}
-
-	delete(n.chans, p)
-	return nil
-}
-
-func (n *nodeTestNetwork) Send(node common.Node, seal common.Seal) error {
-	return nil
-}
 
 type testConsensus struct {
 	suite.Suite
 }
 
-func (t *testConsensus) newSeal(c uint64) common.Seal {
-	seal, err := common.NewSeal(VoteBallotSealType, testHash{I: c})
+func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state []byte) (*Consensus, network.NodeNetwork) {
+	node := common.NewRandomHomeNode()
+	cstate := &ConsensusState{node: node, height: height, block: block, state: state}
+	policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 1, Threshold: 1}
+
+	consensus, err := NewConsensus(policy, cstate)
 	t.NoError(err)
 
-	return seal
-}
+	nt := network.NewNodeTestNetwork()
 
-func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state []byte) *Consensus {
-	consensusState := &ConsensusState{height: height, block: block, state: state}
-	consensus, err := NewConsensus(consensusState)
-	t.NoError(err)
+	nt.AddReceiver(consensus.Receiver())
+	consensus.SetSender(nt.Send)
 
-	return consensus
+	stageTransistor, _ := NewISAACStageTransistor(policy, cstate, consensus.SealPool(), consensus.Voting())
+	stageTransistor.SetSender(nt.Send)
+	consensus.SetStageTransistor(stageTransistor)
+
+	consensus.Start()
+	stageTransistor.Start()
+
+	return consensus, nt
 }
 
 func (t *testConsensus) TestNew() {
-	defer func() {
-		if r := recover(); r != nil {
-			debug.PrintStack()
-			panic(r)
-		}
-	}()
-
-	networkID := []byte("this-is-test-network")
-
-	network := newNodeTestNetwork()
-	consensus := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
+	consensus, nt := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
 	defer consensus.Stop()
-	defer network.Stop()
+	defer consensus.StageTransistor().Stop()
+	defer nt.Stop()
 
-	consensus.Start()
-
-	network.RegisterReceiver(consensus.Receiver())
-	consensus.RegisterSendFunc(network.Send)
-
-	proposerSeed := common.RandomSeed()
+	proposerSeed := consensus.State().Node().Seed()
 	var proposeBallotSeal common.Seal
+	var proposeBallot ProposeBallot
 	{
 		var err error
-		_, proposeBallotSeal, err = NewTestSealProposeBallot(proposerSeed.Address(), nil)
+		proposeBallot, proposeBallotSeal, err = NewTestSealProposeBallot(proposerSeed.Address(), nil)
 		t.NoError(err)
-		err = proposeBallotSeal.Sign(networkID, proposerSeed)
+		err = proposeBallotSeal.Sign(common.TestNetworkID, proposerSeed)
 		t.NoError(err)
 
-		network.addSeal(proposeBallotSeal)
+		nt.Send(consensus.State().Node(), proposeBallotSeal)
 	}
 
-	voteSeed := common.RandomSeed()
-	stage := VoteStageSIGN
-	vote := VoteYES
-	{
-		sealHash, _, err := proposeBallotSeal.Hash()
-		t.NoError(err)
-		_, seal, err := NewTestSealVoteBallot(sealHash, voteSeed.Address(), stage, vote)
-		t.NoError(err)
-		err = seal.Sign(networkID, voteSeed)
-		t.NoError(err)
-
-		network.addSeal(seal)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	for _ = range ticker.C {
+		if consensus.State().Height().Equal(proposeBallot.Block.Height.Inc()) {
+			break
+		}
 	}
+	ticker.Stop()
+	consensus.Stop()
+
+	t.True(proposeBallot.Block.Height.Inc().Equal(consensus.State().Height()))
+	t.True(proposeBallot.Block.Next.Equal(consensus.State().Block()))
+	t.Equal(proposeBallot.State.Next, consensus.State().State())
+	t.Equal(Round(0), consensus.State().Round())
 }
 
 func TestConsensus(t *testing.T) {

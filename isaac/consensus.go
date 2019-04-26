@@ -10,21 +10,27 @@ import (
 type Consensus struct {
 	sync.RWMutex
 
-	state       *ConsensusState
-	receiver    chan common.Seal
-	sender      func(common.Node, common.Seal) error
-	stopChan    chan bool
-	sealHandler SealHandler
-	voting      *RoundVoting
+	policy          ConsensusPolicy
+	state           *ConsensusState
+	receiver        chan common.Seal
+	sender          func(common.Node, common.Seal) error
+	stopChan        chan bool
+	sealPool        SealPool
+	voting          *RoundVoting
+	stageTransistor StageTransistor
 }
 
-func NewConsensus(state *ConsensusState) (*Consensus, error) {
-	return &Consensus{
-		state:       state,
-		stopChan:    make(chan bool),
-		sealHandler: NewISAACSealHandler(),
-		voting:      NewRoundVoting(),
-	}, nil
+func NewConsensus(policy ConsensusPolicy, state *ConsensusState) (*Consensus, error) {
+	c := &Consensus{
+		policy:   policy,
+		state:    state,
+		stopChan: make(chan bool),
+		sealPool: NewISAACSealPool(),
+		voting:   NewRoundVoting(),
+		receiver: make(chan common.Seal),
+	}
+
+	return c, nil
 }
 
 func (c *Consensus) Name() string {
@@ -35,12 +41,7 @@ func (c *Consensus) Start() error {
 	c.Lock()
 	defer c.Unlock()
 
-	if c.receiver != nil {
-		close(c.receiver)
-	}
-
-	c.receiver = make(chan common.Seal)
-	go c.receive()
+	go c.doLoop()
 
 	return nil
 }
@@ -49,7 +50,11 @@ func (c *Consensus) Stop() error {
 	c.Lock()
 	defer c.Unlock()
 
-	c.stopChan <- true
+	if c.stopChan != nil {
+		c.stopChan <- true
+		close(c.stopChan)
+		c.stopChan = nil
+	}
 
 	if c.receiver != nil {
 		close(c.receiver)
@@ -59,24 +64,46 @@ func (c *Consensus) Stop() error {
 	return nil
 }
 
+func (c *Consensus) Policy() ConsensusPolicy {
+	return c.policy
+}
+
+func (c *Consensus) State() *ConsensusState {
+	return c.state
+}
+
 func (c *Consensus) Receiver() chan common.Seal {
 	return c.receiver
 }
 
-func (c *Consensus) SealHandler() SealHandler {
-	return c.sealHandler
+func (c *Consensus) SealPool() SealPool {
+	return c.sealPool
 }
 
-func (c *Consensus) SetSealHandler(h SealHandler) error {
+func (c *Consensus) SetSealPool(h SealPool) error {
 	c.Lock()
 	defer c.Unlock()
 
-	c.sealHandler = h
+	c.sealPool = h
 
 	return nil
 }
 
-func (c *Consensus) RegisterSendFunc(sender func(common.Node, common.Seal) error) error {
+func (c *Consensus) StageTransistor() StageTransistor {
+	c.RLock()
+	defer c.RUnlock()
+
+	return c.stageTransistor
+}
+
+func (c *Consensus) SetStageTransistor(s StageTransistor) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.stageTransistor = s
+}
+
+func (c *Consensus) SetSender(sender func(common.Node, common.Seal) error) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -85,8 +112,16 @@ func (c *Consensus) RegisterSendFunc(sender func(common.Node, common.Seal) error
 	return nil
 }
 
-func (c *Consensus) receive() {
-	// these seal should be verified that is well-formed.
+func (c *Consensus) Voting() *RoundVoting {
+	c.RLock()
+	defer c.RUnlock()
+
+	return c.voting
+}
+
+// TODO Please correct this boring method name, `doLoop` :(
+func (c *Consensus) doLoop() {
+	// NOTE these seal should be verified that is well-formed.
 end:
 	for {
 		select {
@@ -95,89 +130,41 @@ end:
 				continue
 			}
 
-			if err := c.handleSeal(seal); err != nil {
-				log.Error("failed to handle seal", "error", err)
-				continue
-			}
+			go c.receiveSeal(seal)
 		case <-c.stopChan:
 			break end
 		}
 	}
 }
 
-func (c *Consensus) handleSeal(seal common.Seal) error {
+func (c *Consensus) receiveSeal(seal common.Seal) error {
 	sealHash, _, err := seal.Hash()
 	if err != nil {
+		log.Error("failed to get sealHash", "error", err, "seal", seal)
 		return err
 	}
 
-	log_ := log.New(log15.Ctx{"seal-hash": sealHash, "type": seal.Type})
-	log_.Debug("got new seal")
+	log_ := log.New(log15.Ctx{"seal": sealHash, "seal-type": seal.Type})
 
-	switch seal.Type {
-	case ProposeBallotSealType:
-		vp, vs, err := c.voting.Open(seal)
-		if err != nil {
-			return err
-		}
-		log_.Debug("starting new round", "voting-proposal", vp, "voting-stage", vs)
-
-		if err := c.voted(seal, vp, vs); err != nil {
-			return err
-		}
-	case VoteBallotSealType:
-		var voteBallot VoteBallot
-		if err := seal.UnmarshalBody(&voteBallot); err != nil {
-			return err
-		}
-		vp, vs, err := c.voting.Vote(voteBallot)
-		if err != nil {
-			return err
-		}
-		log_.Debug("voted", "ballot", voteBallot, "voting-proposal", vp, "voting-stage", vs)
-
-		if err := c.voted(seal, vp, vs); err != nil {
-			return err
-		}
-	case TransactionSealType:
-		// TODO implement
-	}
-
-	if err := c.sealHandler.Add(seal); err != nil {
+	if err := c.sealPool.Add(seal); err != nil {
+		log_.Error("failed to SealPool", "error", err)
 		return err
 	}
 
-	return nil
-}
-
-func (c *Consensus) voted(seal common.Seal, vp *VotingProposal, vs *VotingStage) error {
-	if !vs.CanCount(c.state.Total(), c.state.Threshold()) {
-		return nil
-	}
-
-	majority := vs.Majority(c.state.Total(), c.state.Threshold())
-	switch majority {
-	case VoteResultNotYet:
-		return SomethingWrongVotingError.SetMessage(
-			"something wrong; CanCount() but voting not yet finished",
-		)
-	}
-
-	log.Debug(
-		"consensus got majority",
-		"majority", majority,
-		"total", c.state.Total(),
-		"threshold", c.state.Threshold(),
+	ctx := common.ContextWithValues(
+		nil,
+		"policy", c.policy,
+		"state", c.state,
+		"seal", seal,
+		"sealHash", sealHash,
+		"sealPool", c.sealPool,
+		"roundVoting", c.voting,
+		"stageTransistor", c.stageTransistor,
 	)
 
-	sealHash, _, err := seal.Hash()
-	if err != nil {
-		return err
-	}
-
-	// TODO store block & state data
-
-	if err := c.voting.Finish(sealHash); err != nil {
+	checker := common.NewChainChecker("received-seal-checker", ctx, CheckerSealTypes)
+	if err := checker.Check(); err != nil {
+		log_.Error("failed to checker for seal", "error", err, "seal", seal)
 		return err
 	}
 

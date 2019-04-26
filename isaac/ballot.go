@@ -3,6 +3,7 @@ package isaac
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -25,7 +26,7 @@ func (bb BallotBlock) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 
-	nextHash, err := bb.Current.MarshalBinary()
+	nextHash, err := bb.Next.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +321,7 @@ func (p *ProposeBallot) UnmarshalBinary(b []byte) error {
 
 func (p ProposeBallot) String() string {
 	b, _ := json.Marshal(p)
-	return string(b)
+	return strings.Replace(string(b), "\"", "'", -1)
 }
 
 func (p ProposeBallot) Wellformed() error {
@@ -338,7 +339,9 @@ func (p ProposeBallot) Wellformed() error {
 
 	for _, th := range p.Transactions {
 		if th.Empty() {
-			return ProposeBallotNotWellformedError.SetMessage("empty Hash found in ProposeBallot.Transactions")
+			return ProposeBallotNotWellformedError.SetMessage(
+				"empty Hash found in ProposeBallot.Transactions",
+			)
 		}
 	}
 
@@ -355,6 +358,23 @@ type VoteBallot struct {
 
 	hash    common.Hash
 	encoded []byte
+}
+
+func NewVoteBallot(sealHash common.Hash, source common.Address, vote Vote) (VoteBallot, error) {
+	b := VoteBallot{
+		Version:           CurrentBallotVersion,
+		Source:            source,
+		ProposeBallotSeal: sealHash,
+		Stage:             VoteStageSIGN,
+		Vote:              vote,
+		VotedAt:           common.Now(),
+	}
+
+	if err := b.Wellformed(); err != nil {
+		return VoteBallot{}, err
+	}
+
+	return b, nil
 }
 
 func (v VoteBallot) makeHash() (common.Hash, []byte, error) {
@@ -456,7 +476,7 @@ func (v *VoteBallot) UnmarshalBinary(b []byte) error {
 
 func (v VoteBallot) String() string {
 	b, _ := json.Marshal(v)
-	return string(b)
+	return strings.Replace(string(b), "\"", "'", -1)
 }
 
 func (v VoteBallot) Wellformed() error {
@@ -485,4 +505,29 @@ func (v VoteBallot) Wellformed() error {
 	}
 
 	return nil
+}
+
+func (v VoteBallot) NewForStage(stage VoteStage, source common.Address, vote Vote) (VoteBallot, error) {
+	if err := v.Wellformed(); err != nil {
+		return VoteBallot{}, err
+	}
+
+	if !stage.IsValid() || !stage.CanVote() {
+		return VoteBallot{}, InvalidVoteStageError
+	}
+
+	newBallot := VoteBallot{
+		Version:           CurrentBallotVersion,
+		Source:            source,
+		ProposeBallotSeal: v.ProposeBallotSeal,
+		Stage:             stage,
+		Vote:              vote,
+		VotedAt:           common.Now(),
+	}
+
+	if err := newBallot.Wellformed(); err != nil {
+		return VoteBallot{}, err
+	}
+
+	return newBallot, nil
 }

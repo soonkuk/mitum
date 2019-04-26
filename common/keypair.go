@@ -10,6 +10,10 @@ import (
 type Address string
 
 func (a Address) IsValid() (keypair.KP, error) {
+	if len(a) < 1 {
+		return nil, InvalidAddressError
+	}
+
 	return keypair.Parse(string(a))
 }
 

@@ -44,10 +44,29 @@ func (a *Big) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (a Big) String() string {
+	return (&a.Int).String()
+}
+
+func (a Big) Inc() Big {
+	b, _ := a.AddOK(NewBig(1))
+	return b
+}
+
+func (a Big) Add(n Big) Big {
+	b, _ := a.AddOK(n)
+	return b
+}
+
 func (a Big) AddOK(n Big) (Big, bool) {
 	var b big.Int
 	b.Add(&a.Int, &n.Int)
 	return Big{Int: b}, true
+}
+
+func (a Big) Sub(n Big) Big {
+	b, _ := a.SubOK(n)
+	return b
 }
 
 func (a Big) SubOK(n Big) (Big, bool) {
@@ -90,4 +109,8 @@ func (a Big) IsZero() bool {
 
 func (a Big) Cmp(b Big) int {
 	return a.Int.Cmp(&b.Int)
+}
+
+func (a Big) Equal(b Big) bool {
+	return a.Int.Cmp(&b.Int) == 0
 }

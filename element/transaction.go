@@ -100,3 +100,23 @@ func (t Transaction) String() string {
 	b, _ := json.MarshalIndent(t, "", "  ")
 	return string(b)
 }
+
+func (t Transaction) Wellformed() error {
+	if _, err := t.Source.IsValid(); err != nil {
+		return err
+	}
+
+	if len(t.Checkpoint) < 1 {
+		return TransactionNotWellformedError.SetMessage("empty Checkpoint")
+	}
+
+	if t.Fee.IsZero() {
+		return TransactionNotWellformedError.SetMessage("fee is zero")
+	}
+
+	if len(t.Operations) < 1 {
+		return TransactionNotWellformedError.SetMessage("operations not found")
+	}
+
+	return nil
+}

@@ -16,7 +16,7 @@ func LogFormatter(f string) log15.Format {
 	var logFormatter log15.Format
 	switch f {
 	case "terminal":
-		if isatty.IsTerminal(os.Stdout.Fd()) {
+		if InTest || isatty.IsTerminal(os.Stdout.Fd()) {
 			logFormatter = log15.TerminalFormat()
 		} else {
 			logFormatter = log15.LogfmtFormat()

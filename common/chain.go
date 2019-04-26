@@ -23,6 +23,7 @@ type ChainChecker struct {
 	ctx         context.Context
 	log         log15.Logger
 	deferFunc   func(*ChainChecker, ChainCheckerFunc, error)
+	success     bool
 }
 
 func NewChainChecker(name string, ctx context.Context, checkers ...ChainCheckerFunc) *ChainChecker {
@@ -49,6 +50,18 @@ func (c *ChainChecker) New(ctx context.Context) *ChainChecker {
 	}
 }
 
+func (c *ChainChecker) Error() string {
+	return "ChainChecker will be also chained"
+}
+
+func (c *ChainChecker) Success() bool {
+	return c.success
+}
+
+func (c *ChainChecker) Log() log15.Logger {
+	return c.log
+}
+
 func (c *ChainChecker) Context() context.Context {
 	return c.ctx
 }
@@ -70,25 +83,47 @@ func (c *ChainChecker) ContextValue(key interface{}, value interface{}) error {
 }
 
 func (c *ChainChecker) Check() error {
+	c.success = false
 	c.ctx = c.originalCtx // initialize context
 
 	var err error
+	var newChecker *ChainChecker
+
+end:
 	for _, f := range c.checkers {
 		err = f(c)
-		c.log.Debug("checking", "error", err, "func", FuncName(f))
+
 		if c.deferFunc != nil {
 			c.deferFunc(c, f, err)
 		}
 
-		if err != nil {
-			if _, ok := err.(ChainCheckerStop); ok {
-				c.log.Debug("checker stopped")
-				return nil
-			}
+		if err == nil {
+			continue
+		}
 
+		switch err.(type) {
+		case *ChainChecker:
+			newChecker = err.(*ChainChecker)
+			err = nil
+			break end
+		case ChainCheckerStop:
+			c.log.Debug("checker stopped")
+			c.success = true
+			return nil
+		default:
+			c.log.Error("checking", "error", err, "func", FuncName(f, false))
 			return err
 		}
 	}
 
-	return nil
+	if newChecker == nil {
+		c.success = true
+		return nil
+	}
+
+	err = newChecker.Check()
+	c.ctx = newChecker.Context()
+	c.success = newChecker.success
+
+	return err
 }

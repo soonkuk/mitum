@@ -72,8 +72,11 @@ func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 		message, err := seal.MarshalBinary()
 		t.NoError(err)
 
-		ctx = context.WithValue(ctx, "message", message)
-		ctx = context.WithValue(ctx, "networkID", NetworkID("bad-network-id"))
+		ctx = ContextWithValues(
+			ctx,
+			"message", message,
+			"networkID", NetworkID("bad-network-id"),
+		)
 
 		checker = checker.New(ctx)
 
@@ -83,8 +86,12 @@ func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 
 	{ // invalid networkID
 		_, message := t.newSealMessage()
-		ctx = context.WithValue(ctx, "message", message)
-		ctx = context.WithValue(ctx, "networkID", NetworkID("bad-network-id"))
+
+		ctx = ContextWithValues(
+			ctx,
+			"message", message,
+			"networkID", NetworkID("bad-network-id"),
+		)
 
 		checker = checker.New(ctx)
 

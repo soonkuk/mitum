@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/stretchr/testify/suite"
@@ -41,62 +40,6 @@ func (t testHash) Hash() (common.Hash, []byte, error) {
 	return hash, encoded, nil
 }
 
-type nodeTestNetwork struct {
-	sync.RWMutex
-	chans map[int64]chan<- common.Seal
-}
-
-func newNodeTestNetwork() *nodeTestNetwork {
-	return &nodeTestNetwork{
-		chans: map[int64]chan<- common.Seal{},
-	}
-}
-
-func (n *nodeTestNetwork) addSeal(seal common.Seal) error {
-	n.RLock()
-	defer n.RUnlock()
-
-	if len(n.chans) < 1 {
-		return NoReceiversError
-	}
-
-	for _, c := range n.chans {
-		c <- seal
-	}
-
-	return nil
-}
-
-func (n *nodeTestNetwork) RegisterReceiver(c chan<- common.Seal) error {
-	n.Lock()
-	defer n.Unlock()
-
-	p := *(*int64)(unsafe.Pointer(&c))
-	if _, found := n.chans[p]; found {
-		return ReceiverAlreadyRegisteredError
-	}
-
-	n.chans[p] = c
-	return nil
-}
-
-func (n *nodeTestNetwork) UnregisterReceiver(c chan<- common.Seal) error {
-	n.Lock()
-	defer n.Unlock()
-
-	p := *(*int64)(unsafe.Pointer(&c))
-	if _, found := n.chans[p]; !found {
-		return ReceiverNotRegisteredError
-	}
-
-	delete(n.chans, p)
-	return nil
-}
-
-func (n *nodeTestNetwork) Send(node common.Node, seal common.Seal) error {
-	return nil
-}
-
 type testNodeNetwork struct {
 	suite.Suite
 }
@@ -109,17 +52,19 @@ func (t *testNodeNetwork) newSeal(c uint64) common.Seal {
 }
 
 func (t *testNodeNetwork) TestMultipleReceiver() {
-	network := newNodeTestNetwork()
+	network := NewNodeTestNetwork()
+
+	node := common.NewRandomHomeNode()
 
 	// 2 receiver channel
 	receiver0 := make(chan common.Seal)
 
-	err := network.RegisterReceiver(receiver0)
+	err := network.AddReceiver(receiver0)
 	t.NoError(err)
 
 	receiver1 := make(chan common.Seal)
 
-	err = network.RegisterReceiver(receiver1)
+	err = network.AddReceiver(receiver1)
 	t.NoError(err)
 
 	count := 10
@@ -155,7 +100,7 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 	send = func(c uint64) {
 		seal := t.newSeal(c)
 
-		if err := network.addSeal(seal); err != nil {
+		if err := network.Send(node, seal); err != nil {
 			return
 		}
 		if c == uint64(count)-1 {
@@ -178,14 +123,16 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 	t.Equal(uint64(count*2), countedFinal)
 }
 
-func (t *testNodeNetwork) TestUnregisterReceiver() {
-	network := newNodeTestNetwork()
+func (t *testNodeNetwork) TestRemoveReceiver() {
+	network := NewNodeTestNetwork()
+
+	node := common.NewRandomHomeNode()
 
 	// 1 receiver channel
 	receiver0 := make(chan common.Seal)
 	defer close(receiver0)
 
-	err := network.RegisterReceiver(receiver0)
+	err := network.AddReceiver(receiver0)
 	t.NoError(err)
 
 	count := 10
@@ -222,7 +169,7 @@ func (t *testNodeNetwork) TestUnregisterReceiver() {
 				atomic.AddUint64(&counted, 1)
 
 				if th.I == stop-1 {
-					network.UnregisterReceiver(receiver0)
+					network.RemoveReceiver(receiver0)
 				}
 			case <-time.After(time.Millisecond * 100):
 				break end
@@ -240,7 +187,7 @@ func (t *testNodeNetwork) TestUnregisterReceiver() {
 	send = func(c uint64) {
 		seal := t.newSeal(c)
 
-		if err := network.addSeal(seal); err != nil {
+		if err := network.Send(node, seal); err != nil {
 			return
 		}
 		if c == uint64(count)-1 {
