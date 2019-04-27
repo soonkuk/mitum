@@ -10,14 +10,14 @@ import (
 type Consensus struct {
 	sync.RWMutex
 
-	policy          ConsensusPolicy
-	state           *ConsensusState
-	receiver        chan common.Seal
-	sender          func(common.Node, common.Seal) error
-	stopChan        chan bool
-	sealPool        SealPool
-	voting          *RoundVoting
-	stageTransistor StageTransistor
+	policy   ConsensusPolicy
+	state    *ConsensusState
+	receiver chan common.Seal
+	sender   func(common.Node, common.Seal) error
+	stopChan chan bool
+	sealPool SealPool
+	voting   *RoundVoting
+	roundboy Roundboy
 }
 
 func NewConsensus(policy ConsensusPolicy, state *ConsensusState) (*Consensus, error) {
@@ -89,18 +89,18 @@ func (c *Consensus) SetSealPool(h SealPool) error {
 	return nil
 }
 
-func (c *Consensus) StageTransistor() StageTransistor {
+func (c *Consensus) Roundboy() Roundboy {
 	c.RLock()
 	defer c.RUnlock()
 
-	return c.stageTransistor
+	return c.roundboy
 }
 
-func (c *Consensus) SetStageTransistor(s StageTransistor) {
+func (c *Consensus) SetRoundboy(s Roundboy) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.stageTransistor = s
+	c.roundboy = s
 }
 
 func (c *Consensus) SetSender(sender func(common.Node, common.Seal) error) error {
@@ -159,7 +159,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		"sHash", sHash,
 		"sealPool", c.sealPool,
 		"roundVoting", c.voting,
-		"stageTransistor", c.stageTransistor,
+		"roundboy", c.roundboy,
 	)
 
 	checker := common.NewChainChecker("received-seal-checker", ctx, CheckerSealTypes)

@@ -9,12 +9,12 @@ import (
 
 type stageTransitFunc func() (VoteStage, common.Seal, Vote)
 
-type StageTransistor interface {
+type Roundboy interface {
 	common.StartStopper
 	Transit(VoteStage, common.Seal, Vote)
 }
 
-type ISAACStageTransistor struct {
+type ISAACRoundboy struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
 	state    *ConsensusState
@@ -25,13 +25,13 @@ type ISAACStageTransistor struct {
 	stopChan chan bool
 }
 
-func NewISAACStageTransistor(
+func NewISAACRoundboy(
 	policy ConsensusPolicy,
 	state *ConsensusState,
 	sealPool SealPool,
 	voting *RoundVoting,
-) (*ISAACStageTransistor, error) {
-	return &ISAACStageTransistor{
+) (*ISAACRoundboy, error) {
+	return &ISAACRoundboy{
 		policy:   policy,
 		state:    state,
 		sealPool: sealPool,
@@ -41,7 +41,7 @@ func NewISAACStageTransistor(
 	}, nil
 }
 
-func (i *ISAACStageTransistor) SetSender(sender func(common.Node, common.Seal) error) error {
+func (i *ISAACRoundboy) SetSender(sender func(common.Node, common.Seal) error) error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -50,13 +50,13 @@ func (i *ISAACStageTransistor) SetSender(sender func(common.Node, common.Seal) e
 	return nil
 }
 
-func (i *ISAACStageTransistor) Start() error {
+func (i *ISAACRoundboy) Start() error {
 	go i.schedule()
 
 	return nil
 }
 
-func (i *ISAACStageTransistor) Stop() error {
+func (i *ISAACRoundboy) Stop() error {
 	if i.stopChan != nil {
 		i.stopChan <- true
 		close(i.stopChan)
@@ -66,7 +66,7 @@ func (i *ISAACStageTransistor) Stop() error {
 	return nil
 }
 
-func (i *ISAACStageTransistor) schedule() {
+func (i *ISAACRoundboy) schedule() {
 end:
 	for {
 		select {
@@ -81,7 +81,7 @@ end:
 	}
 }
 
-func (i *ISAACStageTransistor) broadcast(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
+func (i *ISAACRoundboy) broadcast(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (i *ISAACStageTransistor) broadcast(sealType common.SealType, body common.H
 	return nil
 }
 
-func (i *ISAACStageTransistor) Transit(stage VoteStage, seal common.Seal, vote Vote) {
+func (i *ISAACRoundboy) Transit(stage VoteStage, seal common.Seal, vote Vote) {
 	go func() {
 		i.channel <- func() (VoteStage, common.Seal, Vote) {
 			return stage, seal, vote
@@ -131,7 +131,7 @@ func (i *ISAACStageTransistor) Transit(stage VoteStage, seal common.Seal, vote V
 	}()
 }
 
-func (i *ISAACStageTransistor) transit(stage VoteStage, seal common.Seal, vote Vote) error {
+func (i *ISAACRoundboy) transit(stage VoteStage, seal common.Seal, vote Vote) error {
 	sHash, _, err := seal.Hash()
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (i *ISAACStageTransistor) transit(stage VoteStage, seal common.Seal, vote V
 	return nil
 }
 
-func (i *ISAACStageTransistor) transitToSIGN(psHash common.Hash, vote Vote) error {
+func (i *ISAACRoundboy) transitToSIGN(psHash common.Hash, vote Vote) error {
 	ballot, err := NewBallot(psHash, i.state.Node().Address(), vote)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (i *ISAACStageTransistor) transitToSIGN(psHash common.Hash, vote Vote) erro
 	return nil
 }
 
-func (i *ISAACStageTransistor) transitToACCEPT(ballot Ballot, vote Vote) error {
+func (i *ISAACRoundboy) transitToACCEPT(ballot Ballot, vote Vote) error {
 	ballot, err := ballot.NewForStage(VoteStageACCEPT, i.state.Node().Address(), vote)
 	if err != nil {
 		return err
@@ -214,7 +214,7 @@ func (i *ISAACStageTransistor) transitToACCEPT(ballot Ballot, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACStageTransistor) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
+func (i *ISAACRoundboy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
 	psHash := ballot.ProposeSeal
 	proposeSeal, err := i.sealPool.Get(psHash)
 	if err != nil {
@@ -258,10 +258,10 @@ func (i *ISAACStageTransistor) transitToALLCONFIRM(ballot Ballot, _ Vote) error 
 	return nil
 }
 
-func (i *ISAACStageTransistor) nextRound(seal common.Seal) error {
+func (i *ISAACRoundboy) nextRound(seal common.Seal) error {
 	return nil
 }
 
-func (i *ISAACStageTransistor) nextBlock(seal common.Seal) error {
+func (i *ISAACRoundboy) nextBlock(seal common.Seal) error {
 	return nil
 }

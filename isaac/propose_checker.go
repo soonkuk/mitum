@@ -174,12 +174,12 @@ func CheckerProposeNextStageBroadcast(c *common.ChainChecker) error {
 		return err
 	}
 
-	stageTransistor, ok := c.Context().Value("stageTransistor").(StageTransistor)
+	roundboy, ok := c.Context().Value("roundboy").(Roundboy)
 	if !ok {
-		return common.ContextValueNotFoundError.SetMessage("'stageTransistor' not found")
+		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
 	}
 
-	stageTransistor.Transit(VoteStageSIGN, seal, vote)
+	roundboy.Transit(VoteStageSIGN, seal, vote)
 
 	return nil
 }

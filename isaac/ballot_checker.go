@@ -161,9 +161,9 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 
 	// NOTE consensus agreed, move to next stage
 
-	stageTransistor, ok := c.Context().Value("stageTransistor").(StageTransistor)
+	roundboy, ok := c.Context().Value("roundboy").(Roundboy)
 	if !ok {
-		return common.ContextValueNotFoundError.SetMessage("'stageTransistor' not found")
+		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
 	}
 
 	nextStage := ballot.Stage.Next()
@@ -176,7 +176,7 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 		return err
 	}
 
-	stageTransistor.Transit(nextStage, seal, VoteYES)
+	roundboy.Transit(nextStage, seal, VoteYES)
 
 	return nil
 }
