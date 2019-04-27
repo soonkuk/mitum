@@ -26,12 +26,12 @@ type Ballot struct {
 
 // NewBallot creates new Ballot
 //  - psHash: Seal(Propose).Hash()
-func NewBallot(psHash common.Hash, source common.Address, vote Vote) (Ballot, error) {
+func NewBallot(psHash common.Hash, source common.Address, stage VoteStage, vote Vote) (Ballot, error) {
 	b := Ballot{
 		Version:     CurrentBallotVersion,
 		Source:      source,
 		ProposeSeal: psHash,
-		Stage:       VoteStageSIGN,
+		Stage:       stage,
 		Vote:        vote,
 		VotedAt:     common.Now(),
 	}

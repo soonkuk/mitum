@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 
 	"github.com/inconshreveable/log15"
@@ -10,24 +11,16 @@ import (
 type Consensus struct {
 	sync.RWMutex
 
-	policy   ConsensusPolicy
-	state    *ConsensusState
 	receiver chan common.Seal
-	sender   func(common.Node, common.Seal) error
 	stopChan chan bool
-	sealPool SealPool
-	voting   *RoundVoting
-	roundboy RoundBoy
+	ctx      context.Context
 }
 
-func NewConsensus(policy ConsensusPolicy, state *ConsensusState) (*Consensus, error) {
+func NewConsensus() (*Consensus, error) {
 	c := &Consensus{
-		policy:   policy,
-		state:    state,
 		stopChan: make(chan bool),
-		sealPool: NewISAACSealPool(),
-		voting:   NewRoundVoting(),
 		receiver: make(chan common.Seal),
+		ctx:      context.Background(),
 	}
 
 	return c, nil
@@ -38,6 +31,8 @@ func (c *Consensus) Name() string {
 }
 
 func (c *Consensus) Start() error {
+	// TODO check context values
+
 	c.Lock()
 	defer c.Unlock()
 
@@ -64,59 +59,28 @@ func (c *Consensus) Stop() error {
 	return nil
 }
 
-func (c *Consensus) Policy() ConsensusPolicy {
-	return c.policy
+func (c *Consensus) Context() context.Context {
+	return c.ctx
 }
 
-func (c *Consensus) State() *ConsensusState {
-	return c.state
+func (c *Consensus) SetContext(ctx context.Context, args ...interface{}) {
+	c.Lock()
+	defer c.Unlock()
+
+	if ctx == nil {
+		ctx = c.ctx
+	}
+
+	if len(args) < 1 {
+		c.ctx = ctx
+		return
+	}
+
+	c.ctx = common.ContextWithValues(ctx, args...)
 }
 
 func (c *Consensus) Receiver() chan common.Seal {
 	return c.receiver
-}
-
-func (c *Consensus) SealPool() SealPool {
-	return c.sealPool
-}
-
-func (c *Consensus) SetSealPool(h SealPool) error {
-	c.Lock()
-	defer c.Unlock()
-
-	c.sealPool = h
-
-	return nil
-}
-
-func (c *Consensus) RoundBoy() RoundBoy {
-	c.RLock()
-	defer c.RUnlock()
-
-	return c.roundboy
-}
-
-func (c *Consensus) SetRoundBoy(s RoundBoy) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.roundboy = s
-}
-
-func (c *Consensus) SetSender(sender func(common.Node, common.Seal) error) error {
-	c.Lock()
-	defer c.Unlock()
-
-	c.sender = sender
-
-	return nil
-}
-
-func (c *Consensus) Voting() *RoundVoting {
-	c.RLock()
-	defer c.RUnlock()
-
-	return c.voting
 }
 
 // TODO Please correct this boring method name, `doLoop` :(
@@ -146,23 +110,18 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 
 	log_ := log.New(log15.Ctx{"seal": sHash, "seal-type": seal.Type})
 
-	if err := c.sealPool.Add(seal); err != nil {
-		log_.Error("failed to SealPool", "error", err)
-		return err
-	}
-
 	ctx := common.ContextWithValues(
-		nil,
-		"policy", c.policy,
-		"state", c.state,
+		c.ctx,
 		"seal", seal,
 		"sHash", sHash,
-		"sealPool", c.sealPool,
-		"roundVoting", c.voting,
-		"roundboy", c.roundboy,
 	)
 
-	checker := common.NewChainChecker("received-seal-checker", ctx, CheckerSealTypes)
+	checker := common.NewChainChecker(
+		"received-seal-checker",
+		ctx,
+		CheckerSealPool,
+		CheckerSealTypes,
+	)
 	if err := checker.Check(); err != nil {
 		log_.Error("failed to checker for seal", "error", err, "seal", sHash)
 		return err

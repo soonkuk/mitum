@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -19,31 +20,55 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 	cstate := &ConsensusState{node: node, height: height, block: block, state: state}
 	policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 1, Threshold: 1}
 
-	consensus, err := NewConsensus(policy, cstate)
+	consensus, err := NewConsensus()
 	t.NoError(err)
 
 	nt := network.NewNodeTestNetwork()
-
 	nt.AddReceiver(consensus.Receiver())
-	consensus.SetSender(nt.Send)
 
-	roundboy, _ := NewISAACRoundBoy(policy, cstate, consensus.SealPool(), consensus.Voting())
-	roundboy.SetSender(nt.Send)
-	consensus.SetRoundBoy(roundboy)
+	sb, _ := NewISAACSealBroadcaster(policy, cstate)
+	sb.SetSender(nt.Send)
+
+	rv := NewRoundVoting()
+	sealPool := NewISAACSealPool()
+	roundBoy, _ := NewISAACRoundBoy(policy, cstate, sealPool, rv)
+	roundBoy.SetBroadcaster(sb)
+
+	bs, _ := NewISAACBlockStorage(cstate)
+
+	consensus.SetContext(
+		nil,
+		"state", cstate,
+		"blockStorage", bs,
+		"policy", policy,
+		"roundVoting", rv,
+		"roundBoy", roundBoy,
+		"sealPool", sealPool,
+	)
 
 	consensus.Start()
-	roundboy.Start()
+	roundBoy.Start()
 
 	return consensus, nt
 }
 
 func (t *testConsensus) TestNew() {
+	defer func() {
+		if r := recover(); r != nil {
+			debug.PrintStack()
+		}
+	}()
+
 	consensus, nt := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
 	defer consensus.Stop()
-	defer consensus.RoundBoy().Stop()
 	defer nt.Stop()
 
-	proposerSeed := consensus.State().Node().Seed()
+	roundBoy := consensus.Context().Value("roundBoy").(RoundBoy)
+	defer roundBoy.Stop()
+
+	state := consensus.Context().Value("state").(*ConsensusState)
+
+	proposerSeed := state.Node().Seed()
 	var proposeSeal common.Seal
 	var propose Propose
 	{
@@ -53,22 +78,21 @@ func (t *testConsensus) TestNew() {
 		err = proposeSeal.Sign(common.TestNetworkID, proposerSeed)
 		t.NoError(err)
 
-		nt.Send(consensus.State().Node(), proposeSeal)
+		nt.Send(state.Node(), proposeSeal)
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	for _ = range ticker.C {
-		if consensus.State().Height().Equal(propose.Block.Height.Inc()) {
+		if state.Height().Equal(propose.Block.Height.Inc()) {
 			break
 		}
 	}
 	ticker.Stop()
 	consensus.Stop()
 
-	t.True(propose.Block.Height.Inc().Equal(consensus.State().Height()))
-	t.True(propose.Block.Next.Equal(consensus.State().Block()))
-	t.Equal(propose.State.Next, consensus.State().State())
-	t.Equal(Round(0), consensus.State().Round())
+	t.True(propose.Block.Height.Inc().Equal(state.Height()))
+	t.True(propose.Block.Next.Equal(state.Block()))
+	t.Equal(propose.State.Next, state.State())
 }
 
 func TestConsensus(t *testing.T) {

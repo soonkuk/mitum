@@ -7,22 +7,23 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-type stageTransitFunc func() (VoteStage, common.Seal, Vote)
+type stageTransitFunc func() (VoteStage, common.Hash, Vote)
 
 type RoundBoy interface {
 	common.StartStopper
-	Transit(VoteStage, common.Seal, Vote)
+	Transit(VoteStage /* Seal(Propose).Hash() */, common.Hash, Vote)
 }
 
 type ISAACRoundBoy struct {
 	sync.RWMutex
-	policy   ConsensusPolicy
-	state    *ConsensusState
-	sealPool SealPool
-	voting   *RoundVoting
-	sender   func(common.Node, common.Seal) error
-	channel  chan stageTransitFunc
-	stopChan chan bool
+	round       Round
+	policy      ConsensusPolicy
+	state       *ConsensusState
+	sealPool    SealPool
+	voting      *RoundVoting
+	broadcaster SealBroadcaster
+	channel     chan stageTransitFunc
+	stopChan    chan bool
 }
 
 func NewISAACRoundBoy(
@@ -41,15 +42,6 @@ func NewISAACRoundBoy(
 	}, nil
 }
 
-func (i *ISAACRoundBoy) SetSender(sender func(common.Node, common.Seal) error) error {
-	i.Lock()
-	defer i.Unlock()
-
-	i.sender = sender
-
-	return nil
-}
-
 func (i *ISAACRoundBoy) Start() error {
 	go i.schedule()
 
@@ -66,115 +58,52 @@ func (i *ISAACRoundBoy) Stop() error {
 	return nil
 }
 
+func (i *ISAACRoundBoy) SetBroadcaster(broadcaster SealBroadcaster) error {
+	i.Lock()
+	defer i.Unlock()
+
+	i.broadcaster = broadcaster
+
+	return nil
+}
+
 func (i *ISAACRoundBoy) schedule() {
 end:
 	for {
 		select {
 		case <-i.stopChan:
 			break end
-		case f := <-i.channel:
-			stage, seal, vote := f()
-			if err := i.transit(stage, seal, vote); err != nil {
-				log.Error("failed to transit", "error", err, "stage", stage, "vote", vote)
+		case f := <-i.channel: // one stage at a time
+			stage, psHash, vote := f()
+			if err := i.transit(stage, psHash, vote); err != nil {
+				log.Error("failed to transit", "error", err, "psHash", psHash, "stage", stage, "vote", vote)
 			}
 		}
 	}
 }
 
-func (i *ISAACRoundBoy) broadcast(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
-	seal, err := common.NewSeal(sealType, body)
-	if err != nil {
-		return err
-	}
-
-	if err := seal.Sign(i.policy.NetworkID, i.state.Node().Seed()); err != nil {
-		return err
-	}
-
-	sHash, _, err := seal.Hash()
-	if err != nil {
-		return err
-	}
-
-	log_ := log.New(log15.Ctx{"seal": sHash})
-	log_.Debug("seal will be broadcasted")
-
-	var targets = []common.Node{i.state.Node()}
-	for _, node := range i.state.Node().Validators() {
-		var exclude bool
-		for _, a := range excludes {
-			if a == node.Address() {
-				exclude = true
-				break
-			}
-		}
-		if exclude {
-			continue
-		}
-		targets = append(targets, node)
-	}
-
-	for _, node := range targets {
-		if err := i.sender(node, seal); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (i *ISAACRoundBoy) Transit(stage VoteStage, seal common.Seal, vote Vote) {
+func (i *ISAACRoundBoy) Transit(stage VoteStage, psHash common.Hash, vote Vote) {
 	go func() {
-		i.channel <- func() (VoteStage, common.Seal, Vote) {
-			return stage, seal, vote
+		i.channel <- func() (VoteStage, common.Hash, Vote) {
+			return stage, psHash, vote
 		}
 	}()
 }
 
-func (i *ISAACRoundBoy) transit(stage VoteStage, seal common.Seal, vote Vote) error {
-	sHash, _, err := seal.Hash()
-	if err != nil {
-		return err
-	}
-
-	log_ := log.New(log15.Ctx{"to": stage, "seal": sHash})
+func (i *ISAACRoundBoy) transit(stage VoteStage, psHash common.Hash, vote Vote) error {
+	log_ := log.New(log15.Ctx{"from": stage, "next": stage.Next(), "psHash": psHash})
 	log_.Debug("stage transitted")
 
-	var psHash common.Hash
-	switch seal.Type {
-	case ProposeSealType:
-		if stage != VoteStageSIGN {
-			log_.Error("sign ballot should be created from Propose")
-			return InvalidSealTypeError
-		}
-
-		if sHash, _, err := seal.Hash(); err != nil {
-			return err
-		} else {
-			psHash = sHash
-		}
-
-		if err := i.transitToSIGN(psHash, vote); err != nil {
-			return err
-		}
-	case BallotSealType:
-		var ballot Ballot
-		if err := seal.UnmarshalBody(&ballot); err != nil {
-			return err
-		}
-		psHash = ballot.ProposeSeal
-
-		switch stage {
-		case VoteStageACCEPT:
-			return i.transitToACCEPT(ballot, vote)
-		case VoteStageALLCONFIRM:
-			log_.Debug("consensus reached ALLCONFIRM")
-			return i.transitToALLCONFIRM(ballot, vote)
-		default:
-			log_.Error("trying to weired stage")
-		}
+	switch stage {
+	case VoteStageINIT:
+		return i.transitToSIGN(psHash, vote)
+	case VoteStageSIGN:
+		return i.transitToACCEPT(psHash, vote)
+	case VoteStageACCEPT:
+		log_.Debug("consensus reached ALLCONFIRM")
+		return i.transitToALLCONFIRM(psHash, vote)
 	default:
-		return InvalidSealTypeError
+		log_.Error("trying to weired stage")
 	}
 
 	if err := i.voting.Agreed(psHash); err != nil {
@@ -185,12 +114,14 @@ func (i *ISAACRoundBoy) transit(stage VoteStage, seal common.Seal, vote Vote) er
 }
 
 func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
-	ballot, err := NewBallot(psHash, i.state.Node().Address(), vote)
+	ballot, err := NewBallot(psHash, i.state.Node().Address(), VoteStageSIGN, vote)
 	if err != nil {
 		return err
 	}
 
-	if err := i.broadcast(BallotSealType, ballot); err != nil {
+	log.Debug("new Ballot will be broadcasted")
+
+	if err := i.broadcaster.Send(BallotSealType, ballot); err != nil {
 		log.Error("failed to broadcast", "error", err)
 		return err
 	}
@@ -198,15 +129,15 @@ func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) transitToACCEPT(ballot Ballot, vote Vote) error {
-	ballot, err := ballot.NewForStage(VoteStageACCEPT, i.state.Node().Address(), vote)
+func (i *ISAACRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
+	ballot, err := NewBallot(psHash, i.state.Node().Address(), VoteStageACCEPT, vote)
 	if err != nil {
 		return err
 	}
 
-	log.Debug("new Ballot will be broadcasted", "new-ballot", ballot)
+	log.Debug("new Ballot will be broadcasted")
 
-	if err := i.broadcast(BallotSealType, ballot); err != nil {
+	if err := i.broadcaster.Send(BallotSealType, ballot); err != nil {
 		log.Error("failed to broadcast", "error", err)
 		return err
 	}
@@ -214,17 +145,9 @@ func (i *ISAACRoundBoy) transitToACCEPT(ballot Ballot, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
-	psHash := ballot.ProposeSeal
-	proposeSeal, err := i.sealPool.Get(psHash)
-	if err != nil {
-		return err
-	}
-
-	var propose Propose
-	if err := proposeSeal.UnmarshalBody(&propose); err != nil {
-		return err
-	}
+func (i *ISAACRoundBoy) transitToALLCONFIRM(psHash common.Hash, _ Vote) error {
+	i.Lock()
+	defer i.Unlock()
 
 	// finish voting
 	if err := i.voting.Finish(psHash); err != nil {
@@ -232,36 +155,7 @@ func (i *ISAACRoundBoy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
 		return err
 	}
 
-	// TODO store block
+	i.round = Round(0)
 
-	// update state
-	prevState := *i.state
-
-	i.state.SetHeight(propose.Block.Height.Inc())
-	i.state.SetBlock(propose.Block.Next)
-	i.state.SetState(propose.State.Next)
-	i.state.SetRound(Round(0))
-
-	log.Debug(
-		"allConfirmed",
-		"psHash", psHash,
-		"old-block-height", prevState.Height(),
-		"old-block-hash", prevState.Block(),
-		"old-state-hash", prevState.State(),
-		"old-round", prevState.Round(),
-		"new-block-height", i.state.Height().String(),
-		"new-block-hash", i.state.Block(),
-		"new-state-hash", i.state.State(),
-		"new-round", i.state.Round(),
-	)
-
-	return nil
-}
-
-func (i *ISAACRoundBoy) nextRound(seal common.Seal) error {
-	return nil
-}
-
-func (i *ISAACRoundBoy) nextBlock(seal common.Seal) error {
 	return nil
 }

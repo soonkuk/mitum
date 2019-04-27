@@ -13,7 +13,6 @@ type ConsensusState struct {
 	height common.Big  // last Block.Height
 	block  common.Hash // Block.Hash()
 	state  []byte      // last State.Root.Hash()
-	round  Round       // currently running round
 }
 
 func (c ConsensusState) String() string {
@@ -22,7 +21,6 @@ func (c ConsensusState) String() string {
 		"height": c.height,
 		"block":  c.block,
 		"state":  c.state,
-		"round":  c.round,
 	})
 	return common.TerminalLogString(string(b))
 }
@@ -74,18 +72,4 @@ func (c *ConsensusState) SetState(state []byte) {
 	defer c.Unlock()
 
 	c.state = state
-}
-
-func (c *ConsensusState) Round() Round {
-	c.RLock()
-	defer c.RUnlock()
-
-	return c.round
-}
-
-func (c *ConsensusState) SetRound(round Round) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.round = round
 }

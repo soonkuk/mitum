@@ -4,6 +4,24 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
+func CheckerSealPool(c *common.ChainChecker) error {
+	var sealPool SealPool
+	if err := c.ContextValue("sealPool", &sealPool); err != nil {
+		return err
+	}
+
+	var seal common.Seal
+	if err := c.ContextValue("seal", &seal); err != nil {
+		return err
+	}
+
+	if err := sealPool.Add(seal); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func CheckerSealTypes(c *common.ChainChecker) error {
 	var seal common.Seal
 	if err := c.ContextValue("seal", &seal); err != nil {

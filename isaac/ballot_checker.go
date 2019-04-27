@@ -66,7 +66,7 @@ func CheckerBallotProposeSeal(c *common.ChainChecker) error {
 		return nil
 	}
 
-	c.SetContext("ProposeSeal", seal)
+	c.SetContext("proposeSeal", seal)
 
 	return nil
 }
@@ -145,7 +145,7 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 	c.Log().Debug(
 		"consensus got majority",
 		"ProposeSeal", ballot.ProposeSeal,
-		"stage", VoteStageSIGN,
+		"stage", ballot.Stage,
 		"majority", majority,
 		"total", policy.Total,
 		"threshold", policy.Threshold,
@@ -161,22 +161,29 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 
 	// NOTE consensus agreed, move to next stage
 
-	roundboy, ok := c.Context().Value("roundboy").(RoundBoy)
-	if !ok {
-		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
+	if ballot.Stage == VoteStageACCEPT {
+		var blockStorage BlockStorage
+		if err := c.ContextValue("blockStorage", &blockStorage); err != nil {
+			return err
+		}
+
+		var proposeSeal common.Seal
+		if err := c.ContextValue("proposeSeal", &proposeSeal); err != nil {
+			return err
+		}
+
+		if err := blockStorage.NewBlock(proposeSeal); err != nil {
+			return nil
+		}
 	}
 
-	nextStage := ballot.Stage.Next()
-	c.Log().Debug("stage will be changed", "current-stage", ballot.Stage, "next-stage", nextStage)
+	roundBoy, ok := c.Context().Value("roundBoy").(RoundBoy)
+	if !ok {
+		return common.ContextValueNotFoundError.SetMessage("'roundBoy' not found")
+	}
 
 	// TODO set VoteXXX
-
-	var seal common.Seal
-	if err := c.ContextValue("seal", &seal); err != nil {
-		return err
-	}
-
-	roundboy.Transit(nextStage, seal, VoteYES)
+	roundBoy.Transit(ballot.Stage, ballot.ProposeSeal, VoteYES)
 
 	return nil
 }

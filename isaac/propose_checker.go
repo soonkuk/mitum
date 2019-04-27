@@ -154,11 +154,6 @@ func CheckerProposeValidate(c *common.ChainChecker) error {
 }
 
 func CheckerProposeNextStageBroadcast(c *common.ChainChecker) error {
-	var seal common.Seal
-	if err := c.ContextValue("seal", &seal); err != nil {
-		return err
-	}
-
 	var state *ConsensusState
 	if err := c.ContextValue("state", &state); err != nil {
 		return err
@@ -169,17 +164,17 @@ func CheckerProposeNextStageBroadcast(c *common.ChainChecker) error {
 		return err
 	}
 
+	roundBoy, ok := c.Context().Value("roundBoy").(RoundBoy)
+	if !ok {
+		return common.ContextValueNotFoundError.SetMessage("'roundBoy' not found")
+	}
+
 	var psHash common.Hash
 	if err := c.ContextValue("sHash", &psHash); err != nil {
 		return err
 	}
 
-	roundboy, ok := c.Context().Value("roundboy").(RoundBoy)
-	if !ok {
-		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
-	}
-
-	roundboy.Transit(VoteStageSIGN, seal, vote)
+	roundBoy.Transit(VoteStageINIT, psHash, vote)
 
 	return nil
 }
