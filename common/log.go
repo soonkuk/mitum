@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"boscoin.io/sebak/lib/errors"
@@ -113,4 +114,8 @@ func JsonFormatEx(pretty, lineSeparated bool) log15.Format {
 
 		return b
 	})
+}
+
+func TerminalLogString(s string) string {
+	return strings.Replace(s, "\"", "'", -1)
 }

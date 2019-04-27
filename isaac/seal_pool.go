@@ -23,13 +23,13 @@ func NewISAACSealPool() *ISAACSealPool {
 	}
 }
 
-func (s *ISAACSealPool) Exists(sealHash common.Hash) bool {
-	_, found := s.seals.Load(sealHash)
+func (s *ISAACSealPool) Exists(sHash common.Hash) bool {
+	_, found := s.seals.Load(sHash)
 	return found
 }
 
-func (s *ISAACSealPool) Get(sealHash common.Hash) (common.Seal, error) {
-	n, found := s.seals.Load(sealHash)
+func (s *ISAACSealPool) Get(sHash common.Hash) (common.Seal, error) {
+	n, found := s.seals.Load(sHash)
 	if !found {
 		return common.Seal{}, SealNotFoundError
 	}
@@ -40,18 +40,18 @@ func (s *ISAACSealPool) Get(sealHash common.Hash) (common.Seal, error) {
 func (s *ISAACSealPool) Add(seal common.Seal) error {
 	// NOTE seal should be checked well-formed already
 
-	sealHash, _, err := seal.Hash()
+	sHash, _, err := seal.Hash()
 	if err != nil {
 		return err
 	}
 
-	log_ := log.New(log15.Ctx{"seal-hash": sealHash, "type": seal.Type})
-	if _, found := s.seals.Load(sealHash); found {
+	log_ := log.New(log15.Ctx{"sHash": sHash, "type": seal.Type})
+	if _, found := s.seals.Load(sHash); found {
 		log_.Debug("already received; it will be ignored")
 		return KnownSealFoundError
 	}
 
-	s.seals.Store(sealHash, seal)
+	s.seals.Store(sHash, seal)
 	log_.Debug("seal added")
 
 	return nil

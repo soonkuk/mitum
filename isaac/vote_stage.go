@@ -1,6 +1,8 @@
 package isaac
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type VoteStage uint
 

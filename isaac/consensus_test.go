@@ -44,30 +44,30 @@ func (t *testConsensus) TestNew() {
 	defer nt.Stop()
 
 	proposerSeed := consensus.State().Node().Seed()
-	var proposeBallotSeal common.Seal
-	var proposeBallot ProposeBallot
+	var proposeSeal common.Seal
+	var propose Propose
 	{
 		var err error
-		proposeBallot, proposeBallotSeal, err = NewTestSealProposeBallot(proposerSeed.Address(), nil)
+		propose, proposeSeal, err = NewTestSealPropose(proposerSeed.Address(), nil)
 		t.NoError(err)
-		err = proposeBallotSeal.Sign(common.TestNetworkID, proposerSeed)
+		err = proposeSeal.Sign(common.TestNetworkID, proposerSeed)
 		t.NoError(err)
 
-		nt.Send(consensus.State().Node(), proposeBallotSeal)
+		nt.Send(consensus.State().Node(), proposeSeal)
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	for _ = range ticker.C {
-		if consensus.State().Height().Equal(proposeBallot.Block.Height.Inc()) {
+		if consensus.State().Height().Equal(propose.Block.Height.Inc()) {
 			break
 		}
 	}
 	ticker.Stop()
 	consensus.Stop()
 
-	t.True(proposeBallot.Block.Height.Inc().Equal(consensus.State().Height()))
-	t.True(proposeBallot.Block.Next.Equal(consensus.State().Block()))
-	t.Equal(proposeBallot.State.Next, consensus.State().State())
+	t.True(propose.Block.Height.Inc().Equal(consensus.State().Height()))
+	t.True(propose.Block.Next.Equal(consensus.State().Block()))
+	t.Equal(propose.State.Next, consensus.State().State())
 	t.Equal(Round(0), consensus.State().Round())
 }
 

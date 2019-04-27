@@ -4,27 +4,27 @@ package isaac
 
 import "github.com/spikeekips/mitum/common"
 
-func NewTestSealProposeBallot(proposer common.Address, transactions []common.Hash) (ProposeBallot, common.Seal, error) {
+func NewTestSealPropose(proposer common.Address, transactions []common.Hash) (Propose, common.Seal, error) {
 	currentBlockHash, err := common.NewHash("bh", []byte(common.RandomUUID()))
 	if err != nil {
-		return ProposeBallot{}, common.Seal{}, err
+		return Propose{}, common.Seal{}, err
 	}
 
 	nextBlockHash, err := common.NewHash("bh", []byte(common.RandomUUID()))
 	if err != nil {
-		return ProposeBallot{}, common.Seal{}, err
+		return Propose{}, common.Seal{}, err
 	}
 
-	ballot := ProposeBallot{
+	ballot := Propose{
 		Version:  CurrentBallotVersion,
 		Proposer: proposer,
 		Round:    0,
-		Block: BallotBlock{
+		Block: ProposeBlock{
 			Height:  common.NewBig(99),
 			Current: currentBlockHash,
 			Next:    nextBlockHash,
 		},
-		State: BallotBlockState{
+		State: ProposeState{
 			Current: []byte(common.RandomUUID()),
 			Next:    []byte(common.RandomUUID()),
 		},
@@ -32,20 +32,20 @@ func NewTestSealProposeBallot(proposer common.Address, transactions []common.Has
 		Transactions: transactions,
 	}
 
-	seal, err := common.NewSeal(ProposeBallotSealType, ballot)
+	seal, err := common.NewSeal(ProposeSealType, ballot)
 	return ballot, seal, err
 }
 
-func NewTestSealVoteBallot(proposeBallotSealHash common.Hash, source common.Address, stage VoteStage, vote Vote) (VoteBallot, common.Seal, error) {
-	ballot := VoteBallot{
-		Version:           CurrentBallotVersion,
-		Source:            source,
-		ProposeBallotSeal: proposeBallotSealHash,
-		Stage:             stage,
-		Vote:              vote,
-		VotedAt:           common.Now(),
+func NewTestSealBallot(psHash common.Hash, source common.Address, stage VoteStage, vote Vote) (Ballot, common.Seal, error) {
+	ballot := Ballot{
+		Version:     CurrentBallotVersion,
+		Source:      source,
+		ProposeSeal: psHash,
+		Stage:       stage,
+		Vote:        vote,
+		VotedAt:     common.Now(),
 	}
 
-	seal, err := common.NewSeal(VoteBallotSealType, ballot)
+	seal, err := common.NewSeal(BallotSealType, ballot)
 	return ballot, seal, err
 }

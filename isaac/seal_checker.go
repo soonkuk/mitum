@@ -11,42 +11,42 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 	}
 
 	switch seal.Type {
-	case ProposeBallotSealType:
-		var proposeBallot ProposeBallot
-		if err := seal.UnmarshalBody(&proposeBallot); err != nil {
+	case ProposeSealType:
+		var propose Propose
+		if err := seal.UnmarshalBody(&propose); err != nil {
 			return err
 		}
-		c.SetContext("ballot", proposeBallot)
+		c.SetContext("propose", propose)
 
 		return common.NewChainChecker(
-			"proposeBallot checker",
+			"Propose checker",
 			c.Context(),
-			CheckerProposeBallotIsValid,
-			CheckerProposeBallotProposerIsFromKnowns,
-			CheckerProposeBallotProposerIsValid,
-			CheckerProposeBallotTimeIsValid,
-			CheckerProposeBallotBlock,
-			CheckerProposeBallotState,
-			CheckerProposeBallotOpenVoting,
-			CheckerProposeBallotValidate,
-			CheckerProposeBallotNextStageBroadcast,
+			CheckerProposeIsValid,
+			CheckerProposeProposerIsFromKnowns,
+			CheckerProposeProposerIsValid,
+			CheckerProposeTimeIsValid,
+			CheckerProposeBlock,
+			CheckerProposeState,
+			CheckerProposeOpenVoting,
+			CheckerProposeValidate,
+			CheckerProposeNextStageBroadcast,
 		)
-	case VoteBallotSealType:
-		var voteBallot VoteBallot
-		if err := seal.UnmarshalBody(&voteBallot); err != nil {
+	case BallotSealType:
+		var ballot Ballot
+		if err := seal.UnmarshalBody(&ballot); err != nil {
 			return err
 		}
-		c.SetContext("ballot", voteBallot)
+		c.SetContext("ballot", ballot)
 
 		return common.NewChainChecker(
-			"voteBallot checker",
+			"ballot checker",
 			c.Context(),
-			CheckerVoteBallotIsValid,
-			CheckerVoteBallotTimeIsValid,
-			CheckerVoteBallotIsFinished,
-			CheckerVoteBallotProposeBallotSeal,
-			CheckerVoteBallotVote,
-			CheckerVoteBallotVoteResult,
+			CheckerBallotIsValid,
+			CheckerBallotTimeIsValid,
+			CheckerBallotIsFinished,
+			CheckerBallotProposeSeal,
+			CheckerBallotVote,
+			CheckerBallotVoteResult,
 		)
 	case TransactionSealType:
 		// TODO store transaction

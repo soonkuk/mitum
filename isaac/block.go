@@ -17,9 +17,11 @@ type Block struct {
 	state     []byte
 	prevState []byte
 
-	proposer       common.Address
-	proposedAt     common.Time
-	proposedBallot common.Hash
+	proposer   common.Address
+	round      Round
+	proposedAt common.Time
+	propose    common.Hash // Seal(Propose).Hash()
+	validators []common.Validator
 
 	transactions []common.Hash
 }

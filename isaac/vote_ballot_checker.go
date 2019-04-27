@@ -4,50 +4,50 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-func CheckerVoteBallotIsValid(c *common.ChainChecker) error {
+func CheckerBallotIsValid(c *common.ChainChecker) error {
 	// TODO test
 	var seal common.Seal
 	if err := c.ContextValue("seal", &seal); err != nil {
 		return err
 	}
 
-	var voteBallot VoteBallot
-	if err := c.ContextValue("ballot", &voteBallot); err != nil {
+	var ballot Ballot
+	if err := c.ContextValue("ballot", &ballot); err != nil {
 		return err
 	}
 
-	if err := voteBallot.Wellformed(); err != nil {
+	if err := ballot.Wellformed(); err != nil {
 		return err
 	}
 
 	// source must be same
-	if seal.Source != voteBallot.Source {
-		return VoteBallotNotWellformedError.SetMessage(
-			"Seal.Source does not match with VoteBallot.Source; '%s' != '%s'",
+	if seal.Source != ballot.Source {
+		return BallotNotWellformedError.SetMessage(
+			"Seal.Source does not match with Ballot.Source; '%s' != '%s'",
 			seal.Source,
-			voteBallot.Source,
+			ballot.Source,
 		)
 	}
 
 	return nil
 }
 
-// CheckerSealVoteBallotTimeIsValid checks `VoteBallot.VotedAt` is not
+// CheckerSealBallotTimeIsValid checks `Ballot.VotedAt` is not
 // far from now
-func CheckerVoteBallotTimeIsValid(c *common.ChainChecker) error {
+func CheckerBallotTimeIsValid(c *common.ChainChecker) error {
 	// TODO test
 	return nil
 }
 
-// CheckerVoteBallotIsFinished checks the vote is finished or not
-func CheckerVoteBallotIsFinished(c *common.ChainChecker) error {
+// CheckerBallotIsFinished checks the vote is finished or not
+func CheckerBallotIsFinished(c *common.ChainChecker) error {
 	// TODO test
 	return nil
 }
 
-// CheckerVoteBallotProposeBallotSeal checks `VoteBallot.ProposeBallotSeal`
+// CheckerBallotProposeSeal checks `Ballot.ProposeSeal`
 // exists; if not, request to other nodes and then open new voting
-func CheckerVoteBallotProposeBallotSeal(c *common.ChainChecker) error {
+func CheckerBallotProposeSeal(c *common.ChainChecker) error {
 	// TODO test
 
 	var sealPool SealPool
@@ -55,27 +55,27 @@ func CheckerVoteBallotProposeBallotSeal(c *common.ChainChecker) error {
 		return err
 	}
 
-	var voteBallot VoteBallot
-	if err := c.ContextValue("ballot", &voteBallot); err != nil {
+	var ballot Ballot
+	if err := c.ContextValue("ballot", &ballot); err != nil {
 		return err
 	}
 
-	seal, err := sealPool.Get(voteBallot.ProposeBallotSeal)
+	seal, err := sealPool.Get(ballot.ProposeSeal)
 	if SealNotFoundError.Equal(err) {
-		// TODO unknown proposeBallotSeal found, request from other nodes
+		// TODO unknown ProposeSeal found, request from other nodes
 		return nil
 	}
 
-	c.SetContext("proposeBallotSeal", seal)
+	c.SetContext("ProposeSeal", seal)
 
 	return nil
 }
 
-// CheckerVoteBallotVote votes
-func CheckerVoteBallotVote(c *common.ChainChecker) error {
+// CheckerBallotVote votes
+func CheckerBallotVote(c *common.ChainChecker) error {
 	// TODO test
-	var voteBallot VoteBallot
-	if err := c.ContextValue("ballot", &voteBallot); err != nil {
+	var ballot Ballot
+	if err := c.ContextValue("ballot", &ballot); err != nil {
 		return err
 	}
 
@@ -84,32 +84,32 @@ func CheckerVoteBallotVote(c *common.ChainChecker) error {
 		return err
 	}
 
-	var sealHash common.Hash
-	if err := c.ContextValue("sealHash", &sealHash); err != nil {
+	var sHash common.Hash
+	if err := c.ContextValue("sHash", &sHash); err != nil {
 		return err
 	}
 
-	vp, vs, err := roundVoting.Vote(voteBallot)
+	vp, vs, err := roundVoting.Vote(ballot)
 	if err != nil {
 		return err
 	}
 
-	c.Log().Debug("voted", "seal", sealHash, "voting-proposal", vp, "voting-stage", vs)
+	c.Log().Debug("voted", "seal", sHash, "voting-proposal", vp, "voting-stage", vs)
 
 	return nil
 }
 
-// CheckerVoteBallotVoteResult checks voting result
-func CheckerVoteBallotVoteResult(c *common.ChainChecker) error {
+// CheckerBallotVoteResult checks voting result
+func CheckerBallotVoteResult(c *common.ChainChecker) error {
 	// TODO test
 
-	var sealHash common.Hash
-	if err := c.ContextValue("sealHash", &sealHash); err != nil {
+	var sHash common.Hash
+	if err := c.ContextValue("sHash", &sHash); err != nil {
 		return err
 	}
 
-	var voteBallot VoteBallot
-	if err := c.ContextValue("ballot", &voteBallot); err != nil {
+	var ballot Ballot
+	if err := c.ContextValue("ballot", &ballot); err != nil {
 		return err
 	}
 
@@ -118,12 +118,12 @@ func CheckerVoteBallotVoteResult(c *common.ChainChecker) error {
 		return err
 	}
 
-	vp := roundVoting.Proposal(voteBallot.ProposeBallotSeal)
+	vp := roundVoting.Proposal(ballot.ProposeSeal)
 	if vp == nil {
 		return VotingProposalNotFoundError
 	}
 
-	vs := vp.Stage(voteBallot.Stage)
+	vs := vp.Stage(ballot.Stage)
 
 	var policy ConsensusPolicy
 	if err := c.ContextValue("policy", &policy); err != nil {
@@ -144,7 +144,7 @@ func CheckerVoteBallotVoteResult(c *common.ChainChecker) error {
 
 	c.Log().Debug(
 		"consensus got majority",
-		"proposeBallotSeal", voteBallot.ProposeBallotSeal,
+		"ProposeSeal", ballot.ProposeSeal,
 		"stage", VoteStageSIGN,
 		"majority", majority,
 		"total", policy.Total,
@@ -166,8 +166,8 @@ func CheckerVoteBallotVoteResult(c *common.ChainChecker) error {
 		return common.ContextValueNotFoundError.SetMessage("'stageTransistor' not found")
 	}
 
-	nextStage := voteBallot.Stage.Next()
-	c.Log().Debug("stage will be changed", "current-stage", voteBallot.Stage, "next-stage", nextStage)
+	nextStage := ballot.Stage.Next()
+	c.Log().Debug("stage will be changed", "current-stage", ballot.Stage, "next-stage", nextStage)
 
 	// TODO set VoteXXX
 
@@ -176,7 +176,7 @@ func CheckerVoteBallotVoteResult(c *common.ChainChecker) error {
 		return err
 	}
 
-	err := stageTransistor.Transit(voteBallot.ProposeBallotSeal, nextStage, seal, VoteYES)
+	err := stageTransistor.Transit(ballot.ProposeSeal, nextStage, seal, VoteYES)
 	if err != nil {
 		c.Log().Error("failed to stage transition", "error", err)
 		return err

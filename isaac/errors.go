@@ -12,8 +12,8 @@ const (
 	KnownSealFoundCode
 	SealNotFoundCode
 	SomethingWrongVotingCode
-	ProposeBallotNotWellformedCode
-	VoteBallotNotWellformedCode
+	ProposeNotWellformedCode
+	BallotNotWellformedCode
 )
 
 var (
@@ -25,6 +25,6 @@ var (
 	KnownSealFoundError               common.Error = common.NewError("isaac", KnownSealFoundCode, "known seal found")
 	SealNotFoundError                 common.Error = common.NewError("isaac", SealNotFoundCode, "seal not found")
 	SomethingWrongVotingError         common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
-	ProposeBallotNotWellformedError   common.Error = common.NewError("isaac", ProposeBallotNotWellformedCode, "")
-	VoteBallotNotWellformedError      common.Error = common.NewError("isaac", VoteBallotNotWellformedCode, "")
+	ProposeNotWellformedError         common.Error = common.NewError("isaac", ProposeNotWellformedCode, "")
+	BallotNotWellformedError          common.Error = common.NewError("isaac", BallotNotWellformedCode, "")
 )

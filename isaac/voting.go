@@ -3,7 +3,6 @@ package isaac
 import (
 	"encoding/json"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/spikeekips/mitum/common"
@@ -20,36 +19,36 @@ func NewRoundVoting() *RoundVoting {
 	}
 }
 
-// NewRound will only get the ProposeBallotSealType
+// NewRound will only get the ProposeSealType
 func (r *RoundVoting) Open(seal common.Seal) (*VotingProposal, *VotingStage, error) {
-	if seal.Type != ProposeBallotSealType {
+	if seal.Type != ProposeSealType {
 		return nil, nil, InvalidSealTypeError
 	}
 
-	proposeBallotSealHash, _, err := seal.Hash()
+	psHash, _, err := seal.Hash()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if r.IsRunning(proposeBallotSealHash) {
+	if r.IsRunning(psHash) {
 		return nil, nil, VotingProposalAlreadyStartedError
 	}
 
-	var proposeBallot ProposeBallot
-	if err := seal.UnmarshalBody(&proposeBallot); err != nil {
+	var Propose Propose
+	if err := seal.UnmarshalBody(&Propose); err != nil {
 		return nil, nil, err
 	}
 
-	vp := NewVotingProposal(proposeBallot.Block.Height)
+	vp := NewVotingProposal(Propose.Block.Height)
 
 	r.Lock()
 	defer r.Unlock()
 
-	r.proposals[proposeBallotSealHash] = vp
+	r.proposals[psHash] = vp
 
 	vs := vp.Stage(VoteStageSIGN)
 	err = vs.Vote(
-		proposeBallotSealHash,
+		psHash,
 		seal.Source,
 		VoteYES,
 	)
@@ -60,25 +59,25 @@ func (r *RoundVoting) Open(seal common.Seal) (*VotingProposal, *VotingStage, err
 	return vp, vs, nil
 }
 
-func (r *RoundVoting) IsRunning(proposeBallotSealHash common.Hash) bool {
+func (r *RoundVoting) IsRunning(psHash common.Hash) bool {
 	r.RLock()
 	defer r.RUnlock()
 
-	_, found := r.proposals[proposeBallotSealHash]
+	_, found := r.proposals[psHash]
 	return found
 }
 
-func (r *RoundVoting) Finish(proposeBallotSealHash common.Hash) error {
-	if !r.IsRunning(proposeBallotSealHash) {
+func (r *RoundVoting) Finish(psHash common.Hash) error {
+	if !r.IsRunning(psHash) {
 		return nil
 	}
 
 	r.Lock()
 	defer r.Unlock()
 
-	currentHeight := r.proposals[proposeBallotSealHash].height
+	currentHeight := r.proposals[psHash].height
 
-	removeHashes := []common.Hash{proposeBallotSealHash}
+	removeHashes := []common.Hash{psHash}
 	for ph, vp := range r.proposals {
 		if vp.height.Cmp(currentHeight) < 1 { // same or lower
 			removeHashes = append(removeHashes, ph)
@@ -92,11 +91,11 @@ func (r *RoundVoting) Finish(proposeBallotSealHash common.Hash) error {
 	return nil
 }
 
-func (r *RoundVoting) Proposal(proposeBallotSealHash common.Hash) *VotingProposal {
+func (r *RoundVoting) Proposal(psHash common.Hash) *VotingProposal {
 	r.RLock()
 	defer r.RUnlock()
 
-	vp, found := r.proposals[proposeBallotSealHash]
+	vp, found := r.proposals[psHash]
 	if !found {
 		return nil
 	}
@@ -104,25 +103,25 @@ func (r *RoundVoting) Proposal(proposeBallotSealHash common.Hash) *VotingProposa
 	return vp
 }
 
-func (r *RoundVoting) Vote(voteBallot VoteBallot) (*VotingProposal, *VotingStage, error) {
-	if !r.IsRunning(voteBallot.ProposeBallotSeal) {
+func (r *RoundVoting) Vote(ballot Ballot) (*VotingProposal, *VotingStage, error) {
+	if !r.IsRunning(ballot.ProposeSeal) {
 		return nil, nil, VotingProposalNotFoundError
 	}
 
-	vp := r.Proposal(voteBallot.ProposeBallotSeal)
+	vp := r.Proposal(ballot.ProposeSeal)
 	if vp == nil {
 		return nil, nil, VotingProposalNotFoundError
 	}
 
-	stage := vp.Stage(voteBallot.Stage)
+	stage := vp.Stage(ballot.Stage)
 	if stage == nil {
 		return nil, nil, InvalidVoteStageError
 	}
 
 	err := stage.Vote(
-		voteBallot.ProposeBallotSeal,
-		voteBallot.Source,
-		voteBallot.Vote,
+		ballot.ProposeSeal,
+		ballot.Source,
+		ballot.Vote,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -132,8 +131,8 @@ func (r *RoundVoting) Vote(voteBallot VoteBallot) (*VotingProposal, *VotingStage
 }
 
 // Agreed clean up the other proposals except agreed proposal
-func (r *RoundVoting) Agreed(proposeBallotSealHash common.Hash) error {
-	if !r.IsRunning(proposeBallotSealHash) {
+func (r *RoundVoting) Agreed(psHash common.Hash) error {
+	if !r.IsRunning(psHash) {
 		return VotingProposalNotFoundError
 	}
 
@@ -141,12 +140,12 @@ func (r *RoundVoting) Agreed(proposeBallotSealHash common.Hash) error {
 	defer r.Unlock()
 
 	for k, _ := range r.proposals {
-		if k.Equal(proposeBallotSealHash) {
+		if k.Equal(psHash) {
 			continue
 		}
 		log.Debug(
 			"voting agreed; the other proposals will be removed",
-			"agreed-seal", proposeBallotSealHash,
+			"agreed-seal", psHash,
 			"proposal", k,
 		)
 		delete(r.proposals, k)
@@ -197,7 +196,7 @@ func (r *VotingProposal) String() string {
 		},
 	})
 
-	return strings.Replace(string(b), "\"", "'", -1)
+	return common.TerminalLogString(string(b))
 }
 
 type VotingStage struct {
@@ -233,7 +232,7 @@ func (r *VotingStage) String() string {
 		"exp": []interface{}{len(exp), exp},
 	})
 
-	return strings.Replace(string(b), "\"", "'", -1)
+	return common.TerminalLogString(string(b))
 }
 
 func (r *VotingStage) YES() map[common.Address]common.Hash {
@@ -274,7 +273,7 @@ func (r *VotingStage) Voted(source common.Address) (Vote, bool) {
 	return VoteNONE, false
 }
 
-func (r *VotingStage) Vote(sealHash common.Hash, source common.Address, vote Vote) error {
+func (r *VotingStage) Vote(sHash common.Hash, source common.Address, vote Vote) error {
 	var m map[common.Address]common.Hash
 	var others []map[common.Address]common.Hash
 	switch vote {
@@ -301,7 +300,7 @@ func (r *VotingStage) Vote(sealHash common.Hash, source common.Address, vote Vot
 		delete(o, source)
 	}
 
-	m[source] = sealHash
+	m[source] = sHash
 
 	return nil
 }

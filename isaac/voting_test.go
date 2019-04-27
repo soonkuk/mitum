@@ -17,7 +17,7 @@ func (t *testVotingStage) newSeed() common.Seed {
 	return common.RandomSeed()
 }
 
-func (t *testVotingStage) newSealHash() common.Hash {
+func (t *testVotingStage) newSHash() common.Hash {
 	hash, err := common.NewHashFromObject("sl", common.RandomUUID())
 	t.NoError(err)
 
@@ -40,10 +40,10 @@ func (t *testVotingStage) TestVote() {
 	nodes := t.makeNodes(nodeCount)
 
 	{
-		st.Vote(t.newSealHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
 
 		yes := st.YES()
 		nop := st.NOP()
@@ -61,12 +61,12 @@ func (t *testVotingStage) TestMultipleVote() {
 	nodes := t.makeNodes(nodeCount)
 
 	{ // node3 vote again with same vote
-		st.Vote(t.newSealHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
 
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
 
 		yes := st.YES()
 		nop := st.NOP()
@@ -79,12 +79,12 @@ func (t *testVotingStage) TestMultipleVote() {
 	}
 
 	{ // node3 overturns it's vote
-		st.Vote(t.newSealHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
 
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteEXPIRE)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteEXPIRE)
 
 		yes := st.YES()
 		nop := st.NOP()
@@ -105,8 +105,8 @@ func (t *testVotingStage) TestCanCount() {
 	nodes := t.makeNodes(total)
 
 	{ // under threshold
-		st.Vote(t.newSealHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSealHash(), nodes[1].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
 
 		t.Equal(2, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -116,7 +116,7 @@ func (t *testVotingStage) TestCanCount() {
 	}
 
 	{ // vote count is over threshold, but draw
-		st.Vote(t.newSealHash(), nodes[2].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[2].Address(), VoteNOP)
 
 		t.Equal(3, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -126,7 +126,7 @@ func (t *testVotingStage) TestCanCount() {
 	}
 
 	{ // vote count is over threshold, and yes
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteYES)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteYES)
 
 		t.Equal(4, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -136,8 +136,8 @@ func (t *testVotingStage) TestCanCount() {
 	}
 
 	{ // yes=2 nop=2 exp=1 draw
-		st.Vote(t.newSealHash(), nodes[3].Address(), VoteNOP)
-		st.Vote(t.newSealHash(), nodes[4].Address(), VoteEXPIRE)
+		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(t.newSHash(), nodes[4].Address(), VoteEXPIRE)
 
 		t.Equal(5, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -155,38 +155,38 @@ type testRoundVoting struct {
 	suite.Suite
 }
 
-func (t *testRoundVoting) newProposeBallotSeal(seed common.Seed) (common.Seal, ProposeBallot) {
-	proposeBallot, proposeBallotSeal, err := NewTestSealProposeBallot(seed.Address(), nil)
+func (t *testRoundVoting) newProposeSeal(seed common.Seed) (common.Seal, Propose) {
+	Propose, ProposeSeal, err := NewTestSealPropose(seed.Address(), nil)
 	t.NoError(err)
-	err = proposeBallotSeal.Sign(common.TestNetworkID, seed)
+	err = ProposeSeal.Sign(common.TestNetworkID, seed)
 	t.NoError(err)
 
-	return proposeBallotSeal, proposeBallot
+	return ProposeSeal, Propose
 }
 
 func (t *testRoundVoting) TestNew() {
 	vm := NewRoundVoting()
 
 	proposerSeed := common.RandomSeed()
-	proposeBallotSeal, proposeBallot := t.newProposeBallotSeal(proposerSeed)
-	t.Equal(1, proposeBallot.Block.Height.Cmp(common.NewBig(0)))
+	ProposeSeal, Propose := t.newProposeSeal(proposerSeed)
+	t.Equal(1, Propose.Block.Height.Cmp(common.NewBig(0)))
 
-	vp, _, err := vm.Open(proposeBallotSeal)
+	vp, _, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 	t.NotEmpty(vp)
-	t.Equal(proposeBallot.Block.Height, vp.height)
+	t.Equal(Propose.Block.Height, vp.height)
 
-	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
-	t.True(vm.IsRunning(proposeBallotSealHash))
+	psHash, _, err := ProposeSeal.Hash()
+	t.True(vm.IsRunning(psHash))
 }
 
 func (t *testRoundVoting) TestNewRoundSignVote() {
 	vm := NewRoundVoting()
 
 	proposerSeed := common.RandomSeed()
-	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
+	ProposeSeal, _ := t.newProposeSeal(proposerSeed)
 
-	vp, _, err := vm.Open(proposeBallotSeal)
+	vp, _, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 	t.NotEmpty(vp)
 
@@ -197,7 +197,7 @@ func (t *testRoundVoting) TestNewRoundSignVote() {
 	t.Equal(VoteNONE, vote)
 	t.False(voted)
 
-	// ProposeBallot will be automatically voted in sign stage
+	// Propose will be automatically voted in sign stage
 	vote, voted = vp.Stage(VoteStageSIGN).Voted(proposerSeed.Address())
 	t.Equal(VoteYES, vote)
 	t.True(voted)
@@ -211,20 +211,20 @@ func (t *testRoundVoting) TestVoteBeforePropose() {
 	vm := NewRoundVoting()
 
 	proposerSeed := common.RandomSeed()
-	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
-	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
+	ProposeSeal, _ := t.newProposeSeal(proposerSeed)
+	psHash, _, err := ProposeSeal.Hash()
 	t.NoError(err)
 
 	voteSeed := common.RandomSeed()
-	voteBallot, _, err := NewTestSealVoteBallot(
-		proposeBallotSealHash,
+	ballot, _, err := NewTestSealBallot(
+		psHash,
 		voteSeed.Address(),
 		VoteStageSIGN,
 		VoteYES,
 	)
 	t.NoError(err)
 
-	_, _, err = vm.Vote(voteBallot)
+	_, _, err = vm.Vote(ballot)
 	t.True(VotingProposalNotFoundError.Equal(err))
 }
 
@@ -232,26 +232,26 @@ func (t *testRoundVoting) TestVote() {
 	vm := NewRoundVoting()
 
 	proposerSeed := common.RandomSeed()
-	proposeBallotSeal, _ := t.newProposeBallotSeal(proposerSeed)
-	proposeBallotSealHash, _, err := proposeBallotSeal.Hash()
+	ProposeSeal, _ := t.newProposeSeal(proposerSeed)
+	psHash, _, err := ProposeSeal.Hash()
 	t.NoError(err)
 
-	vp, _, err := vm.Open(proposeBallotSeal)
+	vp, _, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 
 	voteSeed := common.RandomSeed()
-	voteBallot, _, err := NewTestSealVoteBallot(
-		proposeBallotSealHash,
+	ballot, _, err := NewTestSealBallot(
+		psHash,
 		voteSeed.Address(),
 		VoteStageSIGN,
 		VoteYES,
 	)
 	t.NoError(err)
 
-	_, _, err = vm.Vote(voteBallot)
+	_, _, err = vm.Vote(ballot)
 	t.NoError(err)
 
-	stage := vp.Stage(voteBallot.Stage)
+	stage := vp.Stage(ballot.Stage)
 	var vote Vote
 	var voted bool
 

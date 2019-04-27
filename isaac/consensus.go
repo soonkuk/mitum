@@ -138,13 +138,13 @@ end:
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
-	sealHash, _, err := seal.Hash()
+	sHash, _, err := seal.Hash()
 	if err != nil {
-		log.Error("failed to get sealHash", "error", err, "seal", seal)
+		log.Error("failed to get Seal.Hash()", "error", err, "seal", seal)
 		return err
 	}
 
-	log_ := log.New(log15.Ctx{"seal": sealHash, "seal-type": seal.Type})
+	log_ := log.New(log15.Ctx{"seal": sHash, "seal-type": seal.Type})
 
 	if err := c.sealPool.Add(seal); err != nil {
 		log_.Error("failed to SealPool", "error", err)
@@ -156,7 +156,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		"policy", c.policy,
 		"state", c.state,
 		"seal", seal,
-		"sealHash", sealHash,
+		"sHash", sHash,
 		"sealPool", c.sealPool,
 		"roundVoting", c.voting,
 		"stageTransistor", c.stageTransistor,
@@ -164,7 +164,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 
 	checker := common.NewChainChecker("received-seal-checker", ctx, CheckerSealTypes)
 	if err := checker.Check(); err != nil {
-		log_.Error("failed to checker for seal", "error", err, "seal", seal)
+		log_.Error("failed to checker for seal", "error", err, "seal", sHash)
 		return err
 	}
 
