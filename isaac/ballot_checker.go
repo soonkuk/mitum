@@ -161,7 +161,7 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 
 	// NOTE consensus agreed, move to next stage
 
-	roundboy, ok := c.Context().Value("roundboy").(Roundboy)
+	roundboy, ok := c.Context().Value("roundboy").(RoundBoy)
 	if !ok {
 		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
 	}

@@ -9,12 +9,12 @@ import (
 
 type stageTransitFunc func() (VoteStage, common.Seal, Vote)
 
-type Roundboy interface {
+type RoundBoy interface {
 	common.StartStopper
 	Transit(VoteStage, common.Seal, Vote)
 }
 
-type ISAACRoundboy struct {
+type ISAACRoundBoy struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
 	state    *ConsensusState
@@ -25,13 +25,13 @@ type ISAACRoundboy struct {
 	stopChan chan bool
 }
 
-func NewISAACRoundboy(
+func NewISAACRoundBoy(
 	policy ConsensusPolicy,
 	state *ConsensusState,
 	sealPool SealPool,
 	voting *RoundVoting,
-) (*ISAACRoundboy, error) {
-	return &ISAACRoundboy{
+) (*ISAACRoundBoy, error) {
+	return &ISAACRoundBoy{
 		policy:   policy,
 		state:    state,
 		sealPool: sealPool,
@@ -41,7 +41,7 @@ func NewISAACRoundboy(
 	}, nil
 }
 
-func (i *ISAACRoundboy) SetSender(sender func(common.Node, common.Seal) error) error {
+func (i *ISAACRoundBoy) SetSender(sender func(common.Node, common.Seal) error) error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -50,13 +50,13 @@ func (i *ISAACRoundboy) SetSender(sender func(common.Node, common.Seal) error) e
 	return nil
 }
 
-func (i *ISAACRoundboy) Start() error {
+func (i *ISAACRoundBoy) Start() error {
 	go i.schedule()
 
 	return nil
 }
 
-func (i *ISAACRoundboy) Stop() error {
+func (i *ISAACRoundBoy) Stop() error {
 	if i.stopChan != nil {
 		i.stopChan <- true
 		close(i.stopChan)
@@ -66,7 +66,7 @@ func (i *ISAACRoundboy) Stop() error {
 	return nil
 }
 
-func (i *ISAACRoundboy) schedule() {
+func (i *ISAACRoundBoy) schedule() {
 end:
 	for {
 		select {
@@ -81,7 +81,7 @@ end:
 	}
 }
 
-func (i *ISAACRoundboy) broadcast(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
+func (i *ISAACRoundBoy) broadcast(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (i *ISAACRoundboy) broadcast(sealType common.SealType, body common.Hasher, 
 	return nil
 }
 
-func (i *ISAACRoundboy) Transit(stage VoteStage, seal common.Seal, vote Vote) {
+func (i *ISAACRoundBoy) Transit(stage VoteStage, seal common.Seal, vote Vote) {
 	go func() {
 		i.channel <- func() (VoteStage, common.Seal, Vote) {
 			return stage, seal, vote
@@ -131,7 +131,7 @@ func (i *ISAACRoundboy) Transit(stage VoteStage, seal common.Seal, vote Vote) {
 	}()
 }
 
-func (i *ISAACRoundboy) transit(stage VoteStage, seal common.Seal, vote Vote) error {
+func (i *ISAACRoundBoy) transit(stage VoteStage, seal common.Seal, vote Vote) error {
 	sHash, _, err := seal.Hash()
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (i *ISAACRoundboy) transit(stage VoteStage, seal common.Seal, vote Vote) er
 	return nil
 }
 
-func (i *ISAACRoundboy) transitToSIGN(psHash common.Hash, vote Vote) error {
+func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
 	ballot, err := NewBallot(psHash, i.state.Node().Address(), vote)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (i *ISAACRoundboy) transitToSIGN(psHash common.Hash, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundboy) transitToACCEPT(ballot Ballot, vote Vote) error {
+func (i *ISAACRoundBoy) transitToACCEPT(ballot Ballot, vote Vote) error {
 	ballot, err := ballot.NewForStage(VoteStageACCEPT, i.state.Node().Address(), vote)
 	if err != nil {
 		return err
@@ -214,7 +214,7 @@ func (i *ISAACRoundboy) transitToACCEPT(ballot Ballot, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundboy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
+func (i *ISAACRoundBoy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
 	psHash := ballot.ProposeSeal
 	proposeSeal, err := i.sealPool.Get(psHash)
 	if err != nil {
@@ -258,10 +258,10 @@ func (i *ISAACRoundboy) transitToALLCONFIRM(ballot Ballot, _ Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundboy) nextRound(seal common.Seal) error {
+func (i *ISAACRoundBoy) nextRound(seal common.Seal) error {
 	return nil
 }
 
-func (i *ISAACRoundboy) nextBlock(seal common.Seal) error {
+func (i *ISAACRoundBoy) nextBlock(seal common.Seal) error {
 	return nil
 }

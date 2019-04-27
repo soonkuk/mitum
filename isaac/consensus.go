@@ -17,7 +17,7 @@ type Consensus struct {
 	stopChan chan bool
 	sealPool SealPool
 	voting   *RoundVoting
-	roundboy Roundboy
+	roundboy RoundBoy
 }
 
 func NewConsensus(policy ConsensusPolicy, state *ConsensusState) (*Consensus, error) {
@@ -89,14 +89,14 @@ func (c *Consensus) SetSealPool(h SealPool) error {
 	return nil
 }
 
-func (c *Consensus) Roundboy() Roundboy {
+func (c *Consensus) RoundBoy() RoundBoy {
 	c.RLock()
 	defer c.RUnlock()
 
 	return c.roundboy
 }
 
-func (c *Consensus) SetRoundboy(s Roundboy) {
+func (c *Consensus) SetRoundBoy(s RoundBoy) {
 	c.Lock()
 	defer c.Unlock()
 

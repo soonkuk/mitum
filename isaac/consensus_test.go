@@ -27,9 +27,9 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 	nt.AddReceiver(consensus.Receiver())
 	consensus.SetSender(nt.Send)
 
-	roundboy, _ := NewISAACRoundboy(policy, cstate, consensus.SealPool(), consensus.Voting())
+	roundboy, _ := NewISAACRoundBoy(policy, cstate, consensus.SealPool(), consensus.Voting())
 	roundboy.SetSender(nt.Send)
-	consensus.SetRoundboy(roundboy)
+	consensus.SetRoundBoy(roundboy)
 
 	consensus.Start()
 	roundboy.Start()
@@ -40,7 +40,7 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 func (t *testConsensus) TestNew() {
 	consensus, nt := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
 	defer consensus.Stop()
-	defer consensus.Roundboy().Stop()
+	defer consensus.RoundBoy().Stop()
 	defer nt.Stop()
 
 	proposerSeed := consensus.State().Node().Seed()

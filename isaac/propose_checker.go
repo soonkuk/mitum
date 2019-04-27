@@ -174,7 +174,7 @@ func CheckerProposeNextStageBroadcast(c *common.ChainChecker) error {
 		return err
 	}
 
-	roundboy, ok := c.Context().Value("roundboy").(Roundboy)
+	roundboy, ok := c.Context().Value("roundboy").(RoundBoy)
 	if !ok {
 		return common.ContextValueNotFoundError.SetMessage("'roundboy' not found")
 	}
