@@ -176,11 +176,7 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 		return err
 	}
 
-	err := stageTransistor.Transit(ballot.ProposeSeal, nextStage, seal, VoteYES)
-	if err != nil {
-		c.Log().Error("failed to stage transition", "error", err)
-		return err
-	}
+	stageTransistor.Transit(nextStage, seal, VoteYES)
 
 	return nil
 }

@@ -174,23 +174,12 @@ func CheckerProposeNextStageBroadcast(c *common.ChainChecker) error {
 		return err
 	}
 
-	ballot, err := NewBallot(psHash, state.Node().Address(), vote)
-	if err != nil {
-		return err
-	}
-
-	c.Log().Debug("new Ballot will be broadcasted", "new-ballot", ballot)
-
 	stageTransistor, ok := c.Context().Value("stageTransistor").(StageTransistor)
 	if !ok {
 		return common.ContextValueNotFoundError.SetMessage("'stageTransistor' not found")
 	}
 
-	err = stageTransistor.Transit(psHash, VoteStageSIGN, seal, vote)
-	if err != nil {
-		c.Log().Error("failed to stage transition", "error", err)
-		return err
-	}
+	stageTransistor.Transit(VoteStageSIGN, seal, vote)
 
 	return nil
 }
