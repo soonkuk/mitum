@@ -5,7 +5,7 @@ import (
 )
 
 type BlockStorage interface {
-	NewBlock( /* Seal(Propose) */ common.Seal) error
+	NewBlock(common.Seal /* Seal(Propose) */) error
 }
 
 type ISAACBlockStorage struct {

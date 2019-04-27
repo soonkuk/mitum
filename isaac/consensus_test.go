@@ -30,7 +30,7 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 
 	rv := NewRoundVoting()
 	sealPool := NewISAACSealPool()
-	roundBoy, _ := NewISAACRoundBoy(policy, cstate, sealPool, rv)
+	roundBoy, _ := NewISAACRoundBoy(node)
 	roundBoy.SetBroadcaster(sb)
 
 	bs, _ := NewISAACBlockStorage(cstate)

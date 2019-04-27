@@ -135,12 +135,6 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 	}
 
 	majority := vs.Majority(policy.Total, policy.Threshold)
-	switch majority {
-	case VoteResultNotYet:
-		return SomethingWrongVotingError.SetMessage(
-			"something wrong; CanCount() but voting not yet finished",
-		)
-	}
 
 	c.Log().Debug(
 		"consensus got majority",
@@ -153,15 +147,31 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 
 	switch majority {
 	case VoteResultNotYet:
+		return SomethingWrongVotingError.SetMessage(
+			"something wrong; CanCount() but voting not yet finished",
+		)
+	}
+
+	if err := roundVoting.Agreed(ballot.ProposeSeal); err != nil {
+		return err
+	}
+
+	switch majority {
+	case VoteResultDRAW:
+		// TODO if voting result is draw, start new round
 		return common.ChainCheckerStop{}
-	case VoteResultNOP, VoteResultDRAW:
-		// NOTE back to propose
+	case VoteResultNOP:
+		// NOTE , start new round
 		return common.ChainCheckerStop{}
 	}
 
 	// NOTE consensus agreed, move to next stage
 
-	if ballot.Stage == VoteStageACCEPT {
+	if ballot.Stage == VoteStageACCEPT { // it means, ALLCONFIRM reaches
+		if err := roundVoting.Finish(ballot.ProposeSeal); err != nil {
+			return err
+		}
+
 		var blockStorage BlockStorage
 		if err := c.ContextValue("blockStorage", &blockStorage); err != nil {
 			return err

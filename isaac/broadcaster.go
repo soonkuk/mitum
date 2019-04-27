@@ -9,7 +9,7 @@ import (
 )
 
 type SealBroadcaster interface {
-	Send(common.SealType /* body */, common.Hasher /* excludes */, ...common.Address) error
+	Send(common.SealType, common.Hasher /* body */, ...common.Address /* excludes */) error
 }
 
 type ISAACSealBroadcaster struct {

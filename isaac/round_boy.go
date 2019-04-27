@@ -11,32 +11,23 @@ type stageTransitFunc func() (VoteStage, common.Hash, Vote)
 
 type RoundBoy interface {
 	common.StartStopper
-	Transit(VoteStage /* Seal(Propose).Hash() */, common.Hash, Vote)
+	Transit(VoteStage, common.Hash /* Seal(Propose).Hash() */, Vote)
 }
 
 type ISAACRoundBoy struct {
 	sync.RWMutex
 	round       Round
-	policy      ConsensusPolicy
-	state       *ConsensusState
-	sealPool    SealPool
-	voting      *RoundVoting
+	homeNode    common.HomeNode
 	broadcaster SealBroadcaster
 	channel     chan stageTransitFunc
 	stopChan    chan bool
 }
 
 func NewISAACRoundBoy(
-	policy ConsensusPolicy,
-	state *ConsensusState,
-	sealPool SealPool,
-	voting *RoundVoting,
+	homeNode common.HomeNode,
 ) (*ISAACRoundBoy, error) {
 	return &ISAACRoundBoy{
-		policy:   policy,
-		state:    state,
-		sealPool: sealPool,
-		voting:   voting,
+		homeNode: homeNode,
 		stopChan: make(chan bool),
 		channel:  make(chan stageTransitFunc),
 	}, nil
@@ -106,15 +97,11 @@ func (i *ISAACRoundBoy) transit(stage VoteStage, psHash common.Hash, vote Vote) 
 		log_.Error("trying to weired stage")
 	}
 
-	if err := i.voting.Agreed(psHash); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
-	ballot, err := NewBallot(psHash, i.state.Node().Address(), VoteStageSIGN, vote)
+	ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageSIGN, vote)
 	if err != nil {
 		return err
 	}
@@ -130,7 +117,7 @@ func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
 }
 
 func (i *ISAACRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
-	ballot, err := NewBallot(psHash, i.state.Node().Address(), VoteStageACCEPT, vote)
+	ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageACCEPT, vote)
 	if err != nil {
 		return err
 	}
@@ -148,12 +135,6 @@ func (i *ISAACRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
 func (i *ISAACRoundBoy) transitToALLCONFIRM(psHash common.Hash, _ Vote) error {
 	i.Lock()
 	defer i.Unlock()
-
-	// finish voting
-	if err := i.voting.Finish(psHash); err != nil {
-		log.Error("failed to finish voting", "error", err)
-		return err
-	}
 
 	i.round = Round(0)
 

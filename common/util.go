@@ -52,8 +52,6 @@ func FuncName(f interface{}, full bool) string {
 		return rf.Name()
 	}
 	return rf.Name()[len(basePath)+1:]
-
-	// github.com/spikeekips/mitum/isaac.CheckerVoteBallotVote
 }
 
 func ContextWithValues(ctx context.Context, args ...interface{}) context.Context {
