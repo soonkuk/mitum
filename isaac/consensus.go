@@ -32,6 +32,10 @@ func (c *Consensus) Name() string {
 
 func (c *Consensus) Start() error {
 	// TODO check context values
+	shouldBeExistContextValues := [][]interface{
+		{"state", *ConsensusState},
+	}
+	fmt.Println(">>>>>.", shouldBeExistContextValues)
 
 	c.Lock()
 	defer c.Unlock()
