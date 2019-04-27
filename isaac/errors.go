@@ -14,6 +14,7 @@ const (
 	SomethingWrongVotingCode
 	ProposeNotWellformedCode
 	BallotNotWellformedCode
+	ConsensusNotReadyCode
 )
 
 var (
@@ -27,4 +28,5 @@ var (
 	SomethingWrongVotingError         common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
 	ProposeNotWellformedError         common.Error = common.NewError("isaac", ProposeNotWellformedCode, "")
 	BallotNotWellformedError          common.Error = common.NewError("isaac", BallotNotWellformedCode, "")
+	ConsensusNotReadyError            common.Error = common.NewError("isaac", ConsensusNotReadyCode, "consensus is not ready yet")
 )

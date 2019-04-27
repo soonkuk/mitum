@@ -31,14 +31,54 @@ func (c *Consensus) Name() string {
 }
 
 func (c *Consensus) Start() error {
-	// TODO check context values
-	shouldBeExistContextValues := [][]interface{
-		{"state", *ConsensusState},
+	// check context values, which should exist
+	if _, ok := c.Context().Value("state").(*ConsensusState); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"state",
+		)
 	}
-	fmt.Println(">>>>>.", shouldBeExistContextValues)
 
-	c.Lock()
-	defer c.Unlock()
+	if _, ok := c.Context().Value("policy").(ConsensusPolicy); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"policy",
+		)
+	}
+
+	if _, ok := c.Context().Value("blockStorage").(BlockStorage); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"blockStorage",
+		)
+	}
+
+	if _, ok := c.Context().Value("roundVoting").(*RoundVoting); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"roundVoting",
+		)
+	}
+
+	if _, ok := c.Context().Value("roundBoy").(RoundBoy); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"roundBoy",
+		)
+	}
+
+	if _, ok := c.Context().Value("sealPool").(SealPool); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"sealPool",
+		)
+	}
 
 	go c.doLoop()
 
@@ -64,6 +104,9 @@ func (c *Consensus) Stop() error {
 }
 
 func (c *Consensus) Context() context.Context {
+	c.RLock()
+	defer c.RUnlock()
+
 	return c.ctx
 }
 

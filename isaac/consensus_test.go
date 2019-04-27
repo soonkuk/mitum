@@ -1,7 +1,6 @@
 package isaac
 
 import (
-	"runtime/debug"
 	"testing"
 	"time"
 
@@ -39,8 +38,8 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 	consensus.SetContext(
 		nil,
 		"state", cstate,
-		"blockStorage", bs,
 		"policy", policy,
+		"blockStorage", bs,
 		"roundVoting", rv,
 		"roundBoy", roundBoy,
 		"sealPool", sealPool,
@@ -53,12 +52,6 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 }
 
 func (t *testConsensus) TestNew() {
-	defer func() {
-		if r := recover(); r != nil {
-			debug.PrintStack()
-		}
-	}()
-
 	consensus, nt := t.newConsensus(common.NewBig(0), common.NewRandomHash("bk"), []byte("sl"))
 	defer consensus.Stop()
 	defer nt.Stop()

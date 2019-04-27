@@ -1,6 +1,8 @@
 package isaac
 
-import "github.com/spikeekips/mitum/common"
+import (
+	"github.com/spikeekips/mitum/common"
+)
 
 type BlockStorage interface {
 	NewBlock( /* Seal(Propose) */ common.Seal) error
@@ -34,7 +36,6 @@ func (i *ISAACBlockStorage) NewBlock(proposeSeal common.Seal) error {
 	// TODO store block
 
 	// update state
-
 	prevState := *i.state
 
 	i.state.SetHeight(propose.Block.Height.Inc())
