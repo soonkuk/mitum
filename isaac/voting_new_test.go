@@ -14,11 +14,13 @@ type testVotingNew struct {
 	seals        map[common.Hash]common.Seal
 	proposeSeals map[common.Hash]Propose
 	ballotSeals  map[common.Hash]Ballot
+	policy       ConsensusPolicy
 }
 
 func (t *testVotingNew) SetupTest() {
 	t.homeNode = common.NewRandomHomeNode()
-	t.rv = NewRoundVoting()
+	t.policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
+	t.rv = NewRoundVoting(policy)
 	t.seals = map[common.Hash]common.Seal{}
 	t.proposeSeals = map[common.Hash]Propose{}
 	t.ballotSeals = map[common.Hash]Ballot{}

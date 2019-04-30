@@ -13,10 +13,12 @@ type RoundVoting struct {
 	current  *VotingProposal
 	previous *VotingProposal
 	unknown  *VotingUnknown
+	policy   ConsensusPolicy
 }
 
-func NewRoundVoting() *RoundVoting {
+func NewRoundVoting(policy ConsensusPolicy) *RoundVoting {
 	return &RoundVoting{
+		policy:  policy,
 		unknown: NewVotingUnknown(),
 	}
 }
