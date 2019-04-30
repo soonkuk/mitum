@@ -12,32 +12,30 @@ type SealBroadcaster interface {
 	Send(common.SealType, common.Hasher /* body */, ...common.Address /* excludes */) error
 }
 
-type ISAACSealBroadcaster struct {
+type DefaultSealBroadcaster struct {
 	sync.RWMutex
-	policy ConsensusPolicy
-	state  *ConsensusState
-	sender network.SenderFunc
+	policy   ConsensusPolicy
+	homeNode common.HomeNode
+	sender   network.SenderFunc
 }
 
-func NewISAACSealBroadcaster(
+func NewDefaultSealBroadcaster(
 	policy ConsensusPolicy,
-	state *ConsensusState,
-) (*ISAACSealBroadcaster, error) {
-	return &ISAACSealBroadcaster{
-		policy: policy,
-		state:  state,
+	homeNode common.HomeNode,
+) (*DefaultSealBroadcaster, error) {
+	return &DefaultSealBroadcaster{
+		policy:   policy,
+		homeNode: homeNode,
 	}, nil
 }
 
-func (i *ISAACSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
+func (i *DefaultSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
 		return err
 	}
 
-	homeNode := i.state.Node()
-
-	if err := seal.Sign(i.policy.NetworkID, homeNode.Seed()); err != nil {
+	if err := seal.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
 		return err
 	}
 
@@ -49,8 +47,8 @@ func (i *ISAACSealBroadcaster) Send(sealType common.SealType, body common.Hasher
 	log_ := log.New(log15.Ctx{"seal": sHash})
 	log_.Debug("seal will be broadcasted")
 
-	var targets = []common.Node{homeNode}
-	for _, node := range homeNode.Validators() {
+	var targets = []common.Node{i.homeNode}
+	for _, node := range i.homeNode.Validators() {
 		var exclude bool
 		for _, a := range excludes {
 			if a == node.Address() {
@@ -73,7 +71,7 @@ func (i *ISAACSealBroadcaster) Send(sealType common.SealType, body common.Hasher
 	return nil
 }
 
-func (i *ISAACSealBroadcaster) SetSender(sender network.SenderFunc) error {
+func (i *DefaultSealBroadcaster) SetSender(sender network.SenderFunc) error {
 	i.Lock()
 	defer i.Unlock()
 

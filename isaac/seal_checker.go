@@ -45,8 +45,8 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerProposeTimeIsValid,
 			CheckerProposeBlock,
 			CheckerProposeState,
-			CheckerProposeOpenVoting,
 			CheckerProposeValidate,
+			CheckerProposeOpenVoting,
 			CheckerProposeNextStageBroadcast,
 		)
 	case BallotSealType:
@@ -64,7 +64,6 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerBallotIsFinished,
 			CheckerBallotProposeSeal,
 			CheckerBallotVote,
-			CheckerBallotVoteResult,
 		)
 	case TransactionSealType:
 		// TODO store transaction

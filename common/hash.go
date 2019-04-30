@@ -121,8 +121,11 @@ func (h *Hash) UnmarshalBinary(b []byte) error {
 }
 
 func (h Hash) MarshalJSON() ([]byte, error) {
+	// if h.Empty() {
+	// 	return nil, EmptyHashError
+	// }
 	if h.Empty() {
-		return nil, EmptyHashError
+		return json.Marshal("")
 	}
 
 	return json.Marshal(h.String())
@@ -171,4 +174,18 @@ func (s *Signature) UnmarshalJSON(b []byte) error {
 	*s = Signature(base58.Decode(n))
 
 	return nil
+}
+
+func UniquHashSlice(l []Hash) []Hash {
+	var ul []Hash
+	founds := map[Hash]struct{}{}
+	for _, s := range l {
+		if _, found := founds[s]; found {
+			continue
+		}
+		founds[s] = struct{}{}
+		ul = append(ul, s)
+	}
+
+	return ul
 }

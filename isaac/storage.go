@@ -8,17 +8,17 @@ type BlockStorage interface {
 	NewBlock(common.Seal /* Seal(Propose) */) error
 }
 
-type ISAACBlockStorage struct {
+type DefaultBlockStorage struct {
 	state *ConsensusState
 }
 
-func NewISAACBlockStorage(state *ConsensusState) (*ISAACBlockStorage, error) {
-	return &ISAACBlockStorage{
+func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error) {
+	return &DefaultBlockStorage{
 		state: state,
 	}, nil
 }
 
-func (i *ISAACBlockStorage) NewBlock(proposeSeal common.Seal) error {
+func (i *DefaultBlockStorage) NewBlock(proposeSeal common.Seal) error {
 	if proposeSeal.Type != ProposeSealType {
 		return InvalidSealTypeError
 	}

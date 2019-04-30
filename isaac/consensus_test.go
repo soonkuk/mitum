@@ -25,15 +25,15 @@ func (t *testConsensus) newConsensus(height common.Big, block common.Hash, state
 	nt := network.NewNodeTestNetwork()
 	nt.AddReceiver(consensus.Receiver())
 
-	sb, _ := NewISAACSealBroadcaster(policy, cstate)
+	sb, _ := NewDefaultSealBroadcaster(policy, node)
 	sb.SetSender(nt.Send)
 
 	rv := NewRoundVoting()
-	sealPool := NewISAACSealPool()
-	roundBoy, _ := NewISAACRoundBoy(node)
+	sealPool := NewDefaultSealPool()
+	roundBoy, _ := NewDefaultRoundBoy(node)
 	roundBoy.SetBroadcaster(sb)
 
-	bs, _ := NewISAACBlockStorage(cstate)
+	bs, _ := NewDefaultBlockStorage(cstate)
 
 	consensus.SetContext(
 		nil,

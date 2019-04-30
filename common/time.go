@@ -53,6 +53,14 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (t Time) Before(b Time) bool {
+	return t.Time.Before(b.Time)
+}
+
+func (t Time) After(b Time) bool {
+	return t.Time.After(b.Time)
+}
+
 func Now() Time {
 	return Time{Time: time.Now()}
 }

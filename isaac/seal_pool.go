@@ -13,22 +13,22 @@ type SealPool interface {
 	Add(common.Seal) error
 }
 
-type ISAACSealPool struct {
+type DefaultSealPool struct {
 	seals *syncmap.Map // TODO should be stored in persistent storage
 }
 
-func NewISAACSealPool() *ISAACSealPool {
-	return &ISAACSealPool{
+func NewDefaultSealPool() *DefaultSealPool {
+	return &DefaultSealPool{
 		seals: &syncmap.Map{},
 	}
 }
 
-func (s *ISAACSealPool) Exists(sHash common.Hash) bool {
+func (s *DefaultSealPool) Exists(sHash common.Hash) bool {
 	_, found := s.seals.Load(sHash)
 	return found
 }
 
-func (s *ISAACSealPool) Get(sHash common.Hash) (common.Seal, error) {
+func (s *DefaultSealPool) Get(sHash common.Hash) (common.Seal, error) {
 	n, found := s.seals.Load(sHash)
 	if !found {
 		return common.Seal{}, SealNotFoundError
@@ -37,7 +37,7 @@ func (s *ISAACSealPool) Get(sHash common.Hash) (common.Seal, error) {
 	return n.(common.Seal), nil
 }
 
-func (s *ISAACSealPool) Add(seal common.Seal) error {
+func (s *DefaultSealPool) Add(seal common.Seal) error {
 	// NOTE seal should be checked well-formed already
 
 	sHash, _, err := seal.Hash()

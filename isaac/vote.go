@@ -1,6 +1,10 @@
 package isaac
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/spikeekips/mitum/common"
+)
 
 type VoteResult uint
 
@@ -27,6 +31,44 @@ func (v VoteResult) String() string {
 	default:
 		return ""
 	}
+}
+
+type VoteResultInfo struct {
+	Result      VoteResult
+	Proposal    common.Hash
+	Height      common.Big
+	Round       Round
+	Stage       VoteStage
+	LastVotedAt common.Time
+}
+
+func NewVoteResultInfo() VoteResultInfo {
+	return VoteResultInfo{}
+}
+
+func (v VoteResultInfo) NotYet() bool {
+	return v.Result == VoteResultNotYet
+}
+
+func (v VoteResultInfo) Draw() bool {
+	return v.Result == VoteResultDRAW
+}
+
+func (v VoteResultInfo) Vote() Vote {
+	if v.Stage == VoteStageSIGN {
+		switch v.Result {
+		case VoteResultYES:
+			return VoteYES
+		}
+		return VoteNOP
+	}
+
+	return VoteYES
+}
+
+type Majoritier interface {
+	CanCount(uint, uint) bool
+	Majority(uint, uint) VoteResultInfo
 }
 
 type Vote uint

@@ -7,14 +7,15 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-type stageTransitFunc func() (VoteStage, common.Hash, Vote)
+type stageTransitFunc func() (VoteStage, common.Hash, Vote, chan<- error)
 
 type RoundBoy interface {
 	common.StartStopper
-	Transit(VoteStage, common.Hash /* Seal(Propose).Hash() */, Vote)
+	Transit(VoteStage, common.Hash /* Seal(Propose).Hash() */, Vote) error
+	Channel() chan stageTransitFunc
 }
 
-type ISAACRoundBoy struct {
+type DefaultRoundBoy struct {
 	sync.RWMutex
 	round       Round
 	homeNode    common.HomeNode
@@ -23,23 +24,23 @@ type ISAACRoundBoy struct {
 	stopChan    chan bool
 }
 
-func NewISAACRoundBoy(
+func NewDefaultRoundBoy(
 	homeNode common.HomeNode,
-) (*ISAACRoundBoy, error) {
-	return &ISAACRoundBoy{
+) (*DefaultRoundBoy, error) {
+	return &DefaultRoundBoy{
 		homeNode: homeNode,
 		stopChan: make(chan bool),
 		channel:  make(chan stageTransitFunc),
 	}, nil
 }
 
-func (i *ISAACRoundBoy) Start() error {
+func (i *DefaultRoundBoy) Start() error {
 	go i.schedule()
 
 	return nil
 }
 
-func (i *ISAACRoundBoy) Stop() error {
+func (i *DefaultRoundBoy) Stop() error {
 	if i.stopChan != nil {
 		i.stopChan <- true
 		close(i.stopChan)
@@ -49,7 +50,11 @@ func (i *ISAACRoundBoy) Stop() error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) SetBroadcaster(broadcaster SealBroadcaster) error {
+func (i *DefaultRoundBoy) Channel() chan stageTransitFunc {
+	return i.channel
+}
+
+func (i *DefaultRoundBoy) SetBroadcaster(broadcaster SealBroadcaster) error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -58,30 +63,38 @@ func (i *ISAACRoundBoy) SetBroadcaster(broadcaster SealBroadcaster) error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) schedule() {
+func (i *DefaultRoundBoy) schedule() {
 end:
 	for {
 		select {
 		case <-i.stopChan:
 			break end
 		case f := <-i.channel: // one stage at a time
-			stage, psHash, vote := f()
-			if err := i.transit(stage, psHash, vote); err != nil {
+			stage, psHash, vote, errChan := f()
+			err := i.transit(stage, psHash, vote)
+			if err != nil {
 				log.Error("failed to transit", "error", err, "psHash", psHash, "stage", stage, "vote", vote)
 			}
+
+			errChan <- err
 		}
 	}
 }
 
-func (i *ISAACRoundBoy) Transit(stage VoteStage, psHash common.Hash, vote Vote) {
+func (i *DefaultRoundBoy) Transit(stage VoteStage, psHash common.Hash, vote Vote) error {
+	errChan := make(chan error)
+	defer close(errChan)
+
 	go func() {
-		i.channel <- func() (VoteStage, common.Hash, Vote) {
-			return stage, psHash, vote
+		i.channel <- func() (VoteStage, common.Hash, Vote, chan<- error) {
+			return stage, psHash, vote, errChan
 		}
 	}()
+
+	return <-errChan
 }
 
-func (i *ISAACRoundBoy) transit(stage VoteStage, psHash common.Hash, vote Vote) error {
+func (i *DefaultRoundBoy) transit(stage VoteStage, psHash common.Hash, vote Vote) error {
 	log_ := log.New(log15.Ctx{"from": stage, "next": stage.Next(), "psHash": psHash})
 	log_.Debug("stage transitted")
 
@@ -100,11 +113,14 @@ func (i *ISAACRoundBoy) transit(stage VoteStage, psHash common.Hash, vote Vote) 
 	return nil
 }
 
-func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
-	ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageSIGN, vote)
-	if err != nil {
-		return err
-	}
+func (i *DefaultRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
+	/*
+		ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageSIGN, vote)
+		if err != nil {
+			return err
+		}
+	*/
+	ballot := Ballot{}
 
 	log.Debug("new Ballot will be broadcasted")
 
@@ -116,11 +132,15 @@ func (i *ISAACRoundBoy) transitToSIGN(psHash common.Hash, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
-	ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageACCEPT, vote)
-	if err != nil {
-		return err
-	}
+func (i *DefaultRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
+	/*
+		ballot, err := NewBallot(psHash, i.homeNode.Address(), VoteStageACCEPT, vote)
+		if err != nil {
+			return err
+		}
+	*/
+
+	ballot := Ballot{}
 
 	log.Debug("new Ballot will be broadcasted")
 
@@ -132,7 +152,7 @@ func (i *ISAACRoundBoy) transitToACCEPT(psHash common.Hash, vote Vote) error {
 	return nil
 }
 
-func (i *ISAACRoundBoy) transitToALLCONFIRM(psHash common.Hash, _ Vote) error {
+func (i *DefaultRoundBoy) transitToALLCONFIRM(psHash common.Hash, _ Vote) error {
 	i.Lock()
 	defer i.Unlock()
 

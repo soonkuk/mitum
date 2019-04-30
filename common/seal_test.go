@@ -140,22 +140,6 @@ func (t *testSeal) TestJSON() {
 	t.NotEmpty(returnedSeal)
 }
 
-func (t *testSeal) TestJSONEmptyHash() {
-	networkID := NetworkID([]byte("this-is-network"))
-	body := sealTestBody{A: 1, B: "b"}
-	st := NewSealType("body")
-	seal, _ := NewSeal(st, body)
-
-	seed := RandomSeed()
-	err := seal.Sign(networkID, seed)
-	t.NoError(err)
-
-	seal.bodyHash = Hash{} // make Hash to be empty
-
-	_, err = json.MarshalIndent(seal, "", "  ")
-	t.Contains(err.Error(), EmptyHashError.Message())
-}
-
 func (t *testSeal) TestSealedSeal() {
 	networkID := NetworkID([]byte("this-is-network"))
 	body := sealTestBody{A: 1, B: "b"}

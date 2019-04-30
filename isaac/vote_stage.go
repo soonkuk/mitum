@@ -82,6 +82,7 @@ func (s VoteStage) Next() VoteStage {
 
 func (s VoteStage) CanVote() bool {
 	switch s {
+	case VoteStageINIT:
 	case VoteStageSIGN:
 	case VoteStageACCEPT:
 	default:

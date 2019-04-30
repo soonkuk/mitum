@@ -74,8 +74,8 @@ func CheckerBallotProposeSeal(c *common.ChainChecker) error {
 // CheckerBallotVote votes
 func CheckerBallotVote(c *common.ChainChecker) error {
 	// TODO test
-	var ballot Ballot
-	if err := c.ContextValue("ballot", &ballot); err != nil {
+	var seal common.Seal
+	if err := c.ContextValue("seal", &seal); err != nil {
 		return err
 	}
 
@@ -89,74 +89,31 @@ func CheckerBallotVote(c *common.ChainChecker) error {
 		return err
 	}
 
-	vp, vs, err := roundVoting.Vote(ballot)
+	m, err := roundVoting.Vote(seal)
 	if err != nil {
 		return err
 	}
-
-	c.Log().Debug("voted", "seal", sHash, "voting-proposal", vp, "voting-stage", vs)
-
-	return nil
-}
-
-// CheckerBallotVoteResult checks voting result
-func CheckerBallotVoteResult(c *common.ChainChecker) error {
-	// TODO test
-
-	var sHash common.Hash
-	if err := c.ContextValue("sHash", &sHash); err != nil {
-		return err
-	}
-
-	var ballot Ballot
-	if err := c.ContextValue("ballot", &ballot); err != nil {
-		return err
-	}
-
-	var roundVoting *RoundVoting
-	if err := c.ContextValue("roundVoting", &roundVoting); err != nil {
-		return err
-	}
-
-	vp := roundVoting.Proposal(ballot.ProposeSeal)
-	if vp == nil {
-		return VotingProposalNotFoundError
-	}
-
-	vs := vp.Stage(ballot.Stage)
 
 	var policy ConsensusPolicy
 	if err := c.ContextValue("policy", &policy); err != nil {
 		return err
 	}
 
-	if !vs.CanCount(policy.Total, policy.Threshold) {
+	result := m.Majority(policy.Total, policy.Threshold)
+	c.Log().Debug("voted", "seal", sHash, "result", result)
+
+	if result.NotYet() {
 		return common.ChainCheckerStop{}
 	}
 
-	majority := vs.Majority(policy.Total, policy.Threshold)
-
 	c.Log().Debug(
 		"consensus got majority",
-		"ProposeSeal", ballot.ProposeSeal,
-		"stage", ballot.Stage,
-		"majority", majority,
+		"result", result,
 		"total", policy.Total,
 		"threshold", policy.Threshold,
 	)
 
-	switch majority {
-	case VoteResultNotYet:
-		return SomethingWrongVotingError.SetMessage(
-			"something wrong; CanCount() but voting not yet finished",
-		)
-	}
-
-	if err := roundVoting.Agreed(ballot.ProposeSeal); err != nil {
-		return err
-	}
-
-	switch majority {
+	switch result.Result {
 	case VoteResultDRAW:
 		// TODO if voting result is draw, start new round
 		return common.ChainCheckerStop{}
@@ -167,8 +124,8 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 
 	// NOTE consensus agreed, move to next stage
 
-	if ballot.Stage == VoteStageACCEPT { // it means, ALLCONFIRM reaches
-		if err := roundVoting.Finish(ballot.ProposeSeal); err != nil {
+	if result.Stage == VoteStageACCEPT { // it means, ALLCONFIRM reaches
+		if err := roundVoting.Close(); err != nil {
 			return err
 		}
 
@@ -193,7 +150,7 @@ func CheckerBallotVoteResult(c *common.ChainChecker) error {
 	}
 
 	// TODO set VoteXXX
-	roundBoy.Transit(ballot.Stage, ballot.ProposeSeal, VoteYES)
+	roundBoy.Transit(result.Stage, result.Proposal, result.Vote())
 
 	return nil
 }

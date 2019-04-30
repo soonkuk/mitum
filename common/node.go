@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -18,6 +19,7 @@ type Node interface {
 }
 
 type BaseNode struct {
+	sync.RWMutex
 	address    Address
 	publish    NetAddr
 	validators map[Address]Validator
@@ -153,6 +155,10 @@ func (n *BaseNode) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (n BaseNode) AsValidator() Validator {
+	return Validator{BaseNode: n}
+}
+
 func (n BaseNode) String() string {
 	b, _ := json.Marshal(n)
 	return strings.Replace(string(b), "\"", "'", -1)
@@ -165,13 +171,37 @@ type HomeNode struct {
 
 func NewHomeNode(seed Seed, publish NetAddr) HomeNode {
 	return HomeNode{
-		BaseNode: BaseNode{address: seed.Address(), publish: publish},
+		BaseNode: NewBaseNode(seed.Address(), publish, nil),
 		seed:     seed,
 	}
 }
 
 func (n HomeNode) Seed() Seed {
 	return n.seed
+}
+
+func (n *HomeNode) AddValidators(validators ...Validator) {
+	n.Lock()
+	defer n.Unlock()
+
+	for _, v := range validators {
+		if _, found := n.validators[v.Address()]; found {
+			continue
+		}
+		n.validators[v.Address()] = v
+	}
+}
+
+func (n *HomeNode) RemoveValidators(validators ...Validator) {
+	n.Lock()
+	defer n.RUnlock()
+
+	for _, v := range validators {
+		if _, found := n.validators[v.Address()]; !found {
+			continue
+		}
+		delete(n.validators, v.Address())
+	}
 }
 
 func (n *HomeNode) UnmarshalBinary(b []byte) error {

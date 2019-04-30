@@ -16,6 +16,8 @@ type Ballot struct {
 	Version     common.Version `json:"version"`
 	Source      common.Address `json:"source"`
 	ProposeSeal common.Hash    `json:"propose_seal"` // NOTE ProposeSeal.Hash()
+	Height      common.Big     `json:"height"`
+	Round       Round          `json:"round"`
 	Stage       VoteStage      `json:"stage"`
 	Vote        Vote           `json:"vote"`
 	VotedAt     common.Time    `json:"voted_at"`
@@ -24,13 +26,13 @@ type Ballot struct {
 	encoded []byte
 }
 
-// NewBallot creates new Ballot
-//  - psHash: Seal(Propose).Hash()
-func NewBallot(psHash common.Hash, source common.Address, stage VoteStage, vote Vote) (Ballot, error) {
+func NewBallot(psHash common.Hash, source common.Address, height common.Big, round Round, stage VoteStage, vote Vote) (Ballot, error) {
 	b := Ballot{
 		Version:     CurrentBallotVersion,
 		Source:      source,
 		ProposeSeal: psHash,
+		Height:      height,
+		Round:       round,
 		Stage:       stage,
 		Vote:        vote,
 		VotedAt:     common.Now(),
@@ -75,6 +77,8 @@ func (v Ballot) MarshalBinary() ([]byte, error) {
 		v.Version,
 		v.Source,
 		psHash,
+		v.Height,
+		v.Round,
 		v.Stage,
 		v.Vote,
 		v.VotedAt,
@@ -107,24 +111,36 @@ func (v *Ballot) UnmarshalBinary(b []byte) error {
 		}
 	}
 
+	var height common.Big
+	if err := common.Decode(m[3], &height); err != nil {
+		return err
+	}
+
+	var round Round
+	if err := common.Decode(m[4], &round); err != nil {
+		return err
+	}
+
 	var stage VoteStage
-	if err := common.Decode(m[3], &stage); err != nil {
+	if err := common.Decode(m[5], &stage); err != nil {
 		return err
 	}
 
 	var vote Vote
-	if err := common.Decode(m[4], &vote); err != nil {
+	if err := common.Decode(m[6], &vote); err != nil {
 		return err
 	}
 
 	var votedAt common.Time
-	if err := common.Decode(m[5], &votedAt); err != nil {
+	if err := common.Decode(m[7], &votedAt); err != nil {
 		return err
 	}
 
 	v.Version = version
 	v.Source = source
 	v.ProposeSeal = psHash
+	v.Height = height
+	v.Round = round
 	v.Stage = stage
 	v.Vote = vote
 	v.VotedAt = votedAt
@@ -170,30 +186,9 @@ func (v Ballot) Wellformed() error {
 		return BallotNotWellformedError.SetMessage("Vote is not for vote")
 	}
 
+	if v.Vote != VoteYES && v.Stage != VoteStageSIGN {
+		return BallotNotWellformedError.SetMessage("except sign stage, vote should be yes")
+	}
+
 	return nil
-}
-
-func (v Ballot) NewForStage(stage VoteStage, source common.Address, vote Vote) (Ballot, error) {
-	if err := v.Wellformed(); err != nil {
-		return Ballot{}, err
-	}
-
-	if !stage.IsValid() || !stage.CanVote() {
-		return Ballot{}, InvalidVoteStageError
-	}
-
-	newBallot := Ballot{
-		Version:     CurrentBallotVersion,
-		Source:      source,
-		ProposeSeal: v.ProposeSeal,
-		Stage:       stage,
-		Vote:        vote,
-		VotedAt:     common.Now(),
-	}
-
-	if err := newBallot.Wellformed(); err != nil {
-		return Ballot{}, err
-	}
-
-	return newBallot, nil
 }

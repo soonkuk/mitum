@@ -17,13 +17,6 @@ func (t *testVotingStage) newSeed() common.Seed {
 	return common.RandomSeed()
 }
 
-func (t *testVotingStage) newSHash() common.Hash {
-	hash, err := common.NewHashFromObject("sl", common.RandomUUID())
-	t.NoError(err)
-
-	return hash
-}
-
 func (t *testVotingStage) makeNodes(c uint) []common.Seed {
 	var nodes []common.Seed
 	for i := 0; i < int(c); i++ {
@@ -33,117 +26,115 @@ func (t *testVotingStage) makeNodes(c uint) []common.Seed {
 	return nodes
 }
 
+func (t *testVotingStage) newVotingStage() *VotingStage {
+	return NewVotingStage(common.NewRandomHash("sl"), common.NewBig(33), Round(0), VoteStageSIGN)
+}
+
 func (t *testVotingStage) TestVote() {
-	st := NewVotingStage()
+	st := t.newVotingStage()
 
 	var nodeCount uint = 5
 	nodes := t.makeNodes(nodeCount)
 
 	{
-		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
 
-		yes := st.YES()
-		nop := st.NOP()
-		exp := st.EXP()
-		t.Equal(3, len(yes))
-		t.Equal(1, len(nop))
-		t.Equal(0, len(exp))
+		yes, nop, exp := st.VoteCount()
+		t.Equal(3, yes)
+		t.Equal(1, nop)
+		t.Equal(0, exp)
 	}
 }
 
 func (t *testVotingStage) TestMultipleVote() {
-	st := NewVotingStage()
+	st := t.newVotingStage()
 
 	var nodeCount uint = 5
 	nodes := t.makeNodes(nodeCount)
 
 	{ // node3 vote again with same vote
-		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
 
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
 
-		yes := st.YES()
-		nop := st.NOP()
-		exp := st.EXP()
+		yes, nop, exp := st.VoteCount()
 
 		// result is not changed
-		t.Equal(3, len(yes))
-		t.Equal(1, len(nop))
-		t.Equal(0, len(exp))
+		t.Equal(3, yes)
+		t.Equal(1, nop)
+		t.Equal(0, exp)
 	}
 
 	{ // node3 overturns it's vote
-		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[2].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
 
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteEXPIRE)
+		st.Vote(nodes[3].Address(), VoteEXPIRE, common.NewRandomHash("sl"))
 
-		yes := st.YES()
-		nop := st.NOP()
-		exp := st.EXP()
+		yes, nop, exp := st.VoteCount()
 
 		// previous vote will be canceled
-		t.Equal(3, len(yes))
-		t.Equal(0, len(nop))
-		t.Equal(1, len(exp))
+		t.Equal(3, yes)
+		t.Equal(0, nop)
+		t.Equal(1, exp)
 	}
 }
 
 func (t *testVotingStage) TestCanCount() {
-	st := NewVotingStage()
+	st := t.newVotingStage()
 
 	var total uint = 5
 	threshold := uint(math.Round(float64(5) * float64(0.67)))
 	nodes := t.makeNodes(total)
 
 	{ // under threshold
-		st.Vote(t.newSHash(), nodes[0].Address(), VoteYES)
-		st.Vote(t.newSHash(), nodes[1].Address(), VoteYES)
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
 
 		t.Equal(2, st.Count())
 		canCount := st.CanCount(total, threshold)
 		t.False(canCount)
-		majority := st.Majority(total, threshold)
-		t.Equal(VoteResultNotYet, majority)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultNotYet, ri.Result)
 	}
 
 	{ // vote count is over threshold, but draw
-		st.Vote(t.newSHash(), nodes[2].Address(), VoteNOP)
+		st.Vote(nodes[2].Address(), VoteNOP, common.NewRandomHash("sl"))
 
 		t.Equal(3, st.Count())
 		canCount := st.CanCount(total, threshold)
 		t.False(canCount)
-		majority := st.Majority(total, threshold)
-		t.Equal(VoteResultNotYet, majority)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultNotYet, ri.Result)
 	}
 
 	{ // vote count is over threshold, and yes
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteYES)
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"))
 
 		t.Equal(4, st.Count())
 		canCount := st.CanCount(total, threshold)
 		t.True(canCount)
-		majority := st.Majority(total, threshold)
-		t.Equal(VoteResultYES, majority)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultYES, ri.Result)
 	}
 
 	{ // yes=2 nop=2 exp=1 draw
-		st.Vote(t.newSHash(), nodes[3].Address(), VoteNOP)
-		st.Vote(t.newSHash(), nodes[4].Address(), VoteEXPIRE)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[4].Address(), VoteEXPIRE, common.NewRandomHash("sl"))
 
 		t.Equal(5, st.Count())
 		canCount := st.CanCount(total, threshold)
 		t.True(canCount)
-		majority := st.Majority(total, threshold)
-		t.Equal(VoteResultDRAW, majority)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultDRAW, ri.Result)
 	}
 }
 
@@ -171,13 +162,13 @@ func (t *testRoundVoting) TestNew() {
 	ProposeSeal, Propose := t.newProposeSeal(proposerSeed)
 	t.Equal(1, Propose.Block.Height.Cmp(common.NewBig(0)))
 
-	vp, _, err := vm.Open(ProposeSeal)
+	vp, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 	t.NotEmpty(vp)
 	t.Equal(Propose.Block.Height, vp.height)
 
 	psHash, _, err := ProposeSeal.Hash()
-	t.True(vm.IsRunning(psHash))
+	t.Equal(psHash, vm.Current().psHash)
 }
 
 func (t *testRoundVoting) TestNewRoundSignVote() {
@@ -186,24 +177,24 @@ func (t *testRoundVoting) TestNewRoundSignVote() {
 	proposerSeed := common.RandomSeed()
 	ProposeSeal, _ := t.newProposeSeal(proposerSeed)
 
-	vp, _, err := vm.Open(ProposeSeal)
+	vp, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 	t.NotEmpty(vp)
 
-	var vote Vote
+	var vote VotingStageNode
 	var voted bool
 
 	vote, voted = vp.Stage(VoteStageINIT).Voted(proposerSeed.Address())
-	t.Equal(VoteNONE, vote)
+	t.Equal(VoteNONE, vote.vote)
 	t.False(voted)
 
 	// Propose will be automatically voted in sign stage
 	vote, voted = vp.Stage(VoteStageSIGN).Voted(proposerSeed.Address())
-	t.Equal(VoteYES, vote)
+	t.Equal(VoteYES, vote.vote)
 	t.True(voted)
 
 	vote, voted = vp.Stage(VoteStageACCEPT).Voted(proposerSeed.Address())
-	t.Equal(VoteNONE, vote)
+	t.Equal(VoteNONE, vote.vote)
 	t.False(voted)
 }
 
@@ -216,16 +207,19 @@ func (t *testRoundVoting) TestVoteBeforePropose() {
 	t.NoError(err)
 
 	voteSeed := common.RandomSeed()
-	ballot, _, err := NewTestSealBallot(
+	_, ballotSeal, err := NewTestSealBallot(
 		psHash,
 		voteSeed.Address(),
+		common.NewBig(1),
+		Round(1),
 		VoteStageSIGN,
 		VoteYES,
 	)
 	t.NoError(err)
 
-	_, _, err = vm.Vote(ballot)
-	t.True(VotingProposalNotFoundError.Equal(err))
+	_, err = vm.Vote(ballotSeal)
+	_, voted := vm.Unknown().Voted(voteSeed.Address())
+	t.True(voted)
 }
 
 func (t *testRoundVoting) TestVote() {
@@ -236,237 +230,41 @@ func (t *testRoundVoting) TestVote() {
 	psHash, _, err := ProposeSeal.Hash()
 	t.NoError(err)
 
-	vp, _, err := vm.Open(ProposeSeal)
+	vp, err := vm.Open(ProposeSeal)
 	t.NoError(err)
 
 	voteSeed := common.RandomSeed()
-	ballot, _, err := NewTestSealBallot(
+	ballot, ballotSeal, err := NewTestSealBallot(
 		psHash,
 		voteSeed.Address(),
+		common.NewBig(1),
+		Round(1),
 		VoteStageSIGN,
 		VoteYES,
 	)
 	t.NoError(err)
 
-	_, _, err = vm.Vote(ballot)
+	_, err = vm.Vote(ballotSeal)
 	t.NoError(err)
 
 	stage := vp.Stage(ballot.Stage)
-	var vote Vote
+	var vote VotingStageNode
 	var voted bool
 
 	vote, voted = stage.Voted(proposerSeed.Address())
-	t.Equal(VoteYES, vote)
+	t.Equal(VoteYES, vote.vote)
 	t.True(voted)
 
 	vote, voted = stage.Voted(voteSeed.Address())
-	t.Equal(VoteYES, vote)
+	t.Equal(VoteYES, vote.vote)
 	t.True(voted)
 
 	unknownSeed := common.RandomSeed()
 	vote, voted = stage.Voted(unknownSeed.Address())
-	t.Equal(VoteNONE, vote)
+	t.Equal(VoteNONE, vote.vote)
 	t.False(voted)
 }
 
 func TestRoundVoting(t *testing.T) {
 	suite.Run(t, new(testRoundVoting))
-}
-
-type testCountVoting struct {
-	suite.Suite
-}
-
-func (t *testCountVoting) TestCanCountVoting() {
-	cases := []struct {
-		name      string
-		total     uint
-		threshold uint
-		yes       int
-		nop       int
-		exp       int
-		expected  bool
-	}{
-		{
-			name:  "threshold > total",
-			total: 10, threshold: 20,
-			yes: 1, nop: 1, exp: 1,
-			expected: false,
-		},
-		{
-			name:  "not yet",
-			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 1,
-			expected: false,
-		},
-		{
-			name:  "yes",
-			total: 10, threshold: 7,
-			yes: 7, nop: 1, exp: 1,
-			expected: true,
-		},
-		{
-			name:  "nop",
-			total: 10, threshold: 7,
-			yes: 1, nop: 7, exp: 1,
-			expected: true,
-		},
-		{
-			name:  "exp",
-			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 7,
-			expected: true,
-		},
-		{
-			name:  "not draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 0,
-			expected: false,
-		},
-		{
-			name:  "draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 1,
-			expected: true,
-		},
-		{
-			name:  "yes over margin",
-			total: 10, threshold: 7,
-			yes: 4, nop: 0, exp: 0,
-			expected: true,
-		},
-		{
-			name:  "nop over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 4, exp: 0,
-			expected: true,
-		},
-		{
-			name:  "exp over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 0, exp: 4,
-			expected: true,
-		},
-		{
-			name:  "over total",
-			total: 10, threshold: 7,
-			yes: 4, nop: 4, exp: 4,
-			expected: true,
-		},
-		{
-			name:  "1 total 1 threshold",
-			total: 1, threshold: 1,
-			yes: 1, nop: 0, exp: 0,
-			expected: true,
-		},
-	}
-
-	for i, c := range cases {
-		t.T().Run(
-			c.name,
-			func(*testing.T) {
-				result := canCountVoting(c.total, c.threshold, c.yes, c.nop, c.exp)
-				t.Equal(c.expected, result, "%d: %v", i, c.name)
-			},
-		)
-	}
-}
-
-func (t *testCountVoting) TestMajority() {
-	cases := []struct {
-		name      string
-		total     uint
-		threshold uint
-		yes       int
-		nop       int
-		exp       int
-		expected  VoteResult
-	}{
-		{
-			name:  "threshold > total",
-			total: 10, threshold: 20,
-			yes: 1, nop: 1, exp: 1,
-			expected: VoteResultNotYet,
-		},
-		{
-			name:  "not yet",
-			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 1,
-			expected: VoteResultNotYet,
-		},
-		{
-			name:  "yes",
-			total: 10, threshold: 7,
-			yes: 7, nop: 1, exp: 1,
-			expected: VoteResultYES,
-		},
-		{
-			name:  "nop",
-			total: 10, threshold: 7,
-			yes: 1, nop: 7, exp: 1,
-			expected: VoteResultNOP,
-		},
-		{
-			name:  "exp",
-			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 7,
-			expected: VoteResultEXPIRE,
-		},
-		{
-			name:  "not draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 0,
-			expected: VoteResultNotYet,
-		},
-		{
-			name:  "draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 1,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "yes over margin",
-			total: 10, threshold: 7,
-			yes: 4, nop: 0, exp: 0,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "nop over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 4, exp: 0,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "exp over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 0, exp: 4,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "over total",
-			total: 10, threshold: 7,
-			yes: 4, nop: 4, exp: 4,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "1 total 1 threshold",
-			total: 1, threshold: 1,
-			yes: 1, nop: 0, exp: 0,
-			expected: VoteResultYES,
-		},
-	}
-
-	for i, c := range cases {
-		t.T().Run(
-			c.name,
-			func(*testing.T) {
-				result := majority(c.total, c.threshold, c.yes, c.nop, c.exp)
-				t.Equal(c.expected, result, "%d: %v", i, c.name)
-			},
-		)
-	}
-}
-
-func TestCountVoting(t *testing.T) {
-	suite.Run(t, new(testCountVoting))
 }

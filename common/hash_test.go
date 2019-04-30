@@ -56,7 +56,7 @@ func (t *testHash) TestJSON() {
 func (t *testHash) TestJSONEmptyHash() {
 	hash := Hash{}
 	_, err := json.Marshal(hash)
-	t.Contains(err.Error(), EmptyHashError.Message())
+	t.NoError(err)
 }
 
 func (t *testHash) TestBinaryMarshal() {

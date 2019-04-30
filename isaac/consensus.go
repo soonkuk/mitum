@@ -136,16 +136,17 @@ func (c *Consensus) doLoop() {
 end:
 	for {
 		select {
+		case <-c.stopChan:
+			break end
 		case seal, notClosed := <-c.receiver:
 			if !notClosed {
 				continue
 			}
 
 			go c.receiveSeal(seal)
-		case <-c.stopChan:
-			break end
 		}
 	}
+
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {

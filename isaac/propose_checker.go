@@ -101,34 +101,6 @@ func CheckerProposeState(c *common.ChainChecker) error {
 	return nil
 }
 
-// CheckerProposeOpenVoting opens new voting
-func CheckerProposeOpenVoting(c *common.ChainChecker) error {
-	// TODO test
-	var seal common.Seal
-	if err := c.ContextValue("seal", &seal); err != nil {
-		return err
-	}
-
-	var psHash common.Hash
-	if err := c.ContextValue("sHash", &psHash); err != nil {
-		return err
-	}
-
-	var roundVoting *RoundVoting
-	if err := c.ContextValue("roundVoting", &roundVoting); err != nil {
-		return err
-	}
-
-	vp, stage, err := roundVoting.Open(seal)
-	if err != nil {
-		return err
-	}
-
-	c.Log().Debug("starting new round", "seal", psHash, "voting-proposal", vp, "voting-stage", stage)
-
-	return nil
-}
-
 // CheckerProposeValidate validates the received Propose; if
 // validated and it looks good, `vote=VoteYES`.
 func CheckerProposeValidate(c *common.ChainChecker) error {
@@ -149,6 +121,39 @@ func CheckerProposeValidate(c *common.ChainChecker) error {
 	// NOTE validate
 	// TODO remove :) this is for testing
 	c.SetContext("vote", VoteYES)
+
+	return nil
+}
+
+// CheckerProposeOpenVoting opens new voting
+func CheckerProposeOpenVoting(c *common.ChainChecker) error {
+	// TODO test
+	var seal common.Seal
+	if err := c.ContextValue("seal", &seal); err != nil {
+		return err
+	}
+
+	var psHash common.Hash
+	if err := c.ContextValue("sHash", &psHash); err != nil {
+		return err
+	}
+
+	var roundVoting *RoundVoting
+	if err := c.ContextValue("roundVoting", &roundVoting); err != nil {
+		return err
+	}
+
+	vp, err := roundVoting.Open(seal)
+	if err != nil {
+		return err
+	}
+
+	var propose Propose
+	if err := c.ContextValue("propose", &propose); err != nil {
+		return err
+	}
+
+	c.Log().Debug("starting new round", "seal", psHash, "voting-proposal", vp)
 
 	return nil
 }
