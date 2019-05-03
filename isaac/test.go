@@ -47,7 +47,14 @@ func NewTestSealPropose(proposer common.Address, transactions []common.Hash) (Pr
 	return propose, seal, err
 }
 
-func NewTestSealBallot(psHash common.Hash, source common.Address, height common.Big, round Round, stage VoteStage, vote Vote) (Ballot, common.Seal, error) {
+func NewTestSealBallot(
+	psHash common.Hash,
+	source common.Address,
+	height common.Big,
+	round Round,
+	stage VoteStage,
+	vote Vote,
+) (Ballot, common.Seal, error) {
 	ballot, err := NewBallot(psHash, source, height, round, stage, vote)
 	if err != nil {
 		return Ballot{}, common.Seal{}, err
@@ -57,12 +64,12 @@ func NewTestSealBallot(psHash common.Hash, source common.Address, height common.
 	return ballot, seal, err
 }
 
+// TODO remove if unused
 type TestSealBroadcaster struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
 	homeNode common.HomeNode
-	seals    []common.Seal
-	last     int
+	sendChan chan common.Seal
 }
 
 func NewTestSealBroadcaster(
@@ -75,6 +82,10 @@ func NewTestSealBroadcaster(
 	}, nil
 }
 
+func (i *TestSealBroadcaster) SetSendChan(c chan common.Seal) {
+	i.sendChan = c
+}
+
 func (i *TestSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
@@ -85,30 +96,33 @@ func (i *TestSealBroadcaster) Send(sealType common.SealType, body common.Hasher,
 		return err
 	}
 
-	i.Lock()
-	defer i.Unlock()
+	if i.sendChan == nil {
+		return nil
+	}
 
-	i.seals = append(i.seals, seal)
+	i.sendChan <- seal
 
 	return nil
 }
 
-func (i *TestSealBroadcaster) NewSeals() []common.Seal {
-	i.Lock()
-	defer i.Unlock()
-
-	if len(i.seals) == i.last {
-		return nil
-	}
-
-	l := i.seals[i.last:]
-	i.last = len(i.seals)
-	return l
+type TestMockVoting struct {
+	result VoteResultInfo
+	err    error
 }
 
-func (i *TestSealBroadcaster) Clear() {
-	i.Lock()
-	defer i.Unlock()
+func (t *TestMockVoting) SetResult(result VoteResultInfo, err error) {
+	t.result = result
+	t.err = err
+}
 
-	i.seals = nil
+func (t *TestMockVoting) Open(common.Seal) (VoteResultInfo, error) {
+	return t.result, t.err
+}
+
+func (t *TestMockVoting) Vote(seal common.Seal) (VoteResultInfo, error) {
+	return t.result, t.err
+}
+
+func (t *TestMockVoting) Close() error {
+	return nil
 }

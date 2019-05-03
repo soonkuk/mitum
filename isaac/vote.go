@@ -12,9 +12,12 @@ const (
 	VoteResultNotYet VoteResult = iota
 	VoteResultYES
 	VoteResultNOP
-	VoteResultEXPIRE
 	VoteResultDRAW
 )
+
+func (v VoteResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.String())
+}
 
 func (v VoteResult) String() string {
 	switch v {
@@ -24,8 +27,6 @@ func (v VoteResult) String() string {
 		return "nop"
 	case VoteResultYES:
 		return "yes"
-	case VoteResultEXPIRE:
-		return "exp"
 	case VoteResultDRAW:
 		return "draw"
 	default:
@@ -34,12 +35,13 @@ func (v VoteResult) String() string {
 }
 
 type VoteResultInfo struct {
-	Result      VoteResult
-	Proposal    common.Hash
-	Height      common.Big
-	Round       Round
-	Stage       VoteStage
-	LastVotedAt common.Time
+	Result      VoteResult  `json:"result"`
+	Proposal    common.Hash `json:"proposal"`
+	Height      common.Big  `json:"height"`
+	Round       Round       `json:"round"`
+	Stage       VoteStage   `json:"stage"`
+	Proposed    bool        `json:"proposed"`
+	LastVotedAt common.Time `json:"last_voted_at"`
 }
 
 func NewVoteResultInfo() VoteResultInfo {
@@ -54,16 +56,9 @@ func (v VoteResultInfo) Draw() bool {
 	return v.Result == VoteResultDRAW
 }
 
-func (v VoteResultInfo) Vote() Vote {
-	if v.Stage == VoteStageSIGN {
-		switch v.Result {
-		case VoteResultYES:
-			return VoteYES
-		}
-		return VoteNOP
-	}
-
-	return VoteYES
+func (v VoteResultInfo) String() string {
+	b, _ := json.Marshal(v)
+	return common.TerminalLogString(string(b))
 }
 
 type Majoritier interface {
@@ -77,7 +72,6 @@ const (
 	VoteNONE Vote = iota
 	VoteYES
 	VoteNOP
-	VoteEXPIRE
 )
 
 func (v Vote) String() string {
@@ -86,8 +80,6 @@ func (v Vote) String() string {
 		return "nop"
 	case VoteYES:
 		return "yes"
-	case VoteEXPIRE:
-		return "exp"
 	default:
 		return ""
 	}
@@ -112,8 +104,6 @@ func (v *Vote) UnmarshalJSON(b []byte) error {
 		*v = VoteNOP
 	case "yes":
 		*v = VoteYES
-	case "exp":
-		*v = VoteEXPIRE
 	default:
 		return InvalidVoteError
 	}
@@ -126,7 +116,6 @@ func (s Vote) IsValid() bool {
 	case VoteNONE:
 	case VoteYES:
 	case VoteNOP:
-	case VoteEXPIRE:
 	default:
 		return false
 	}

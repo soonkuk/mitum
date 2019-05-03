@@ -45,9 +45,6 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerProposeTimeIsValid,
 			CheckerProposeBlock,
 			CheckerProposeState,
-			CheckerProposeValidate,
-			CheckerProposeOpenVoting,
-			CheckerProposeNextStageBroadcast,
 		)
 	case BallotSealType:
 		var ballot Ballot
@@ -61,9 +58,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			c.Context(),
 			CheckerBallotIsValid,
 			CheckerBallotTimeIsValid,
-			CheckerBallotIsFinished,
 			CheckerBallotProposeSeal,
-			CheckerBallotVote,
 		)
 	case TransactionSealType:
 		// TODO store transaction
@@ -71,7 +66,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 	case common.SealedSealType:
 		// TODO decapsule sealed seal
 	default:
-		return InvalidSealTypeError
+		return common.InvalidSealTypeError
 	}
 
 	return nil

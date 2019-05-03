@@ -3,6 +3,8 @@
 package common
 
 import (
+	"runtime/debug"
+
 	"github.com/inconshreveable/log15"
 )
 
@@ -27,4 +29,11 @@ func NewRandomHash(hint string) Hash {
 
 func NewRandomHomeNode() HomeNode {
 	return NewHomeNode(RandomSeed(), NetAddr{})
+}
+
+func DebugPanic() {
+	if r := recover(); r != nil {
+		debug.PrintStack()
+		panic(r)
+	}
 }

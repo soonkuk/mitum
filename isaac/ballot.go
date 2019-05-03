@@ -15,7 +15,8 @@ var (
 type Ballot struct {
 	Version     common.Version `json:"version"`
 	Source      common.Address `json:"source"`
-	ProposeSeal common.Hash    `json:"propose_seal"` // NOTE ProposeSeal.Hash()
+	ProposeSeal common.Hash    `json:"propose_seal"` // NOTE ProposeSeal.Hash() // TODO rename Proposal
+	Proposer    common.Address `json:"proposer"`     // NOTE only for `INIT`
 	Height      common.Big     `json:"height"`
 	Round       Round          `json:"round"`
 	Stage       VoteStage      `json:"stage"`
@@ -36,10 +37,6 @@ func NewBallot(psHash common.Hash, source common.Address, height common.Big, rou
 		Stage:       stage,
 		Vote:        vote,
 		VotedAt:     common.Now(),
-	}
-
-	if err := b.Wellformed(); err != nil {
-		return Ballot{}, err
 	}
 
 	return b, nil
@@ -68,7 +65,17 @@ func (v Ballot) Hash() (common.Hash, []byte, error) {
 }
 
 func (v Ballot) MarshalBinary() ([]byte, error) {
-	psHash, err := v.ProposeSeal.MarshalBinary()
+	var psHash []byte
+	if v.ProposeSeal.Empty() {
+	} else {
+		h, err := v.ProposeSeal.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		psHash = h
+	}
+
+	votedAt, err := v.VotedAt.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +84,12 @@ func (v Ballot) MarshalBinary() ([]byte, error) {
 		v.Version,
 		v.Source,
 		psHash,
+		v.Proposer,
 		v.Height,
 		v.Round,
 		v.Stage,
 		v.Vote,
-		v.VotedAt,
+		votedAt,
 	})
 }
 
@@ -106,39 +114,53 @@ func (v *Ballot) UnmarshalBinary(b []byte) error {
 		var vs []byte
 		if err := common.Decode(m[2], &vs); err != nil {
 			return err
+		} else if len(vs) < 1 {
+			//
 		} else if err := psHash.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
 
+	var proposer common.Address
+	if err := common.Decode(m[3], &proposer); err != nil {
+		return err
+	}
+
 	var height common.Big
-	if err := common.Decode(m[3], &height); err != nil {
+	if err := common.Decode(m[4], &height); err != nil {
 		return err
 	}
 
 	var round Round
-	if err := common.Decode(m[4], &round); err != nil {
+	if err := common.Decode(m[5], &round); err != nil {
 		return err
 	}
 
 	var stage VoteStage
-	if err := common.Decode(m[5], &stage); err != nil {
+	if err := common.Decode(m[6], &stage); err != nil {
 		return err
 	}
 
 	var vote Vote
-	if err := common.Decode(m[6], &vote); err != nil {
+	if err := common.Decode(m[7], &vote); err != nil {
 		return err
 	}
 
 	var votedAt common.Time
-	if err := common.Decode(m[7], &votedAt); err != nil {
-		return err
+	{
+		var vs []byte
+		if err := common.Decode(m[8], &vs); err != nil {
+			return err
+		}
+		if err := votedAt.UnmarshalBinary(vs); err != nil {
+			return err
+		}
 	}
 
 	v.Version = version
 	v.Source = source
 	v.ProposeSeal = psHash
+	v.Proposer = proposer
 	v.Height = height
 	v.Round = round
 	v.Stage = stage
@@ -166,16 +188,30 @@ func (v Ballot) Wellformed() error {
 		return err
 	}
 
-	if v.ProposeSeal.Empty() {
-		return BallotNotWellformedError.SetMessage("ProposeSeal is empty")
+	if !v.Stage.CanVote() {
+		return BallotNotWellformedError.SetMessage("Stage is not for vote")
+	}
+
+	if v.Stage == VoteStageINIT {
+		if len(v.Proposer) < 1 {
+			return BallotNotWellformedError.SetMessage("Proposer is empty for INIT")
+		}
+
+		if !v.ProposeSeal.Empty() {
+			return BallotNotWellformedError.SetMessage("ProposeSeal is not empty")
+		}
+	} else {
+		if len(v.Proposer) > 0 {
+			return BallotNotWellformedError.SetMessage("Proposer is not empty for not INIT")
+		}
+
+		if v.ProposeSeal.Empty() {
+			return BallotNotWellformedError.SetMessage("ProposeSeal is empty")
+		}
 	}
 
 	if !v.Stage.IsValid() {
 		return BallotNotWellformedError.SetMessage("Stage is invalid")
-	}
-
-	if !v.Stage.CanVote() {
-		return BallotNotWellformedError.SetMessage("Stage is not for vote")
 	}
 
 	if !v.Vote.IsValid() {

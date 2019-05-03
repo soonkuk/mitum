@@ -43,6 +43,12 @@ type Seal struct {
 }
 
 func NewSeal(t SealType, body Hasher) (Seal, error) {
+	if w, ok := body.(WellformChecker); ok {
+		if err := w.Wellformed(); err != nil {
+			return Seal{}, err
+		}
+	}
+
 	bodyHash, encoded, err := body.Hash()
 	if err != nil {
 		return Seal{}, err

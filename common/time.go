@@ -9,16 +9,21 @@ const (
 	TIMEFORMAT_ISO8601 string = "2006-01-02T15:04:05.000000000Z07:00"
 )
 
-func FormatISO8601(t time.Time) string {
-	return t.Format(TIMEFORMAT_ISO8601)
+func FormatISO8601(t Time) string {
+	return t.Time.Format(TIMEFORMAT_ISO8601)
 }
 
 func NowISO8601() string {
-	return FormatISO8601(time.Now())
+	return FormatISO8601(Now())
 }
 
-func ParseISO8601(s string) (time.Time, error) {
-	return time.Parse(TIMEFORMAT_ISO8601, s)
+func ParseISO8601(s string) (Time, error) {
+	t, err := time.Parse(TIMEFORMAT_ISO8601, s)
+	if err != nil {
+		return Time{}, err
+	}
+
+	return Time{Time: t}, err
 }
 
 type Time struct {
@@ -30,11 +35,30 @@ func (t Time) UTC() Time {
 }
 
 func (t Time) String() string {
-	return FormatISO8601(t.Time)
+	return FormatISO8601(t)
+}
+
+func (t Time) MarshalBinary() ([]byte, error) {
+	return Encode(t.String())
+}
+
+func (t *Time) UnmarshalBinary(b []byte) error {
+	var s string
+	if err := Decode(b, &s); err != nil {
+		return err
+	}
+
+	n, err := ParseISO8601(s)
+	if err != nil {
+		return err
+	}
+
+	*t = n
+	return nil
 }
 
 func (t Time) MarshalJSON() ([]byte, error) {
-	return json.Marshal(FormatISO8601(t.Time))
+	return json.Marshal(FormatISO8601(t))
 }
 
 func (t *Time) UnmarshalJSON(b []byte) error {
@@ -48,7 +72,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	*t = Time{Time: n}
+	*t = n
 
 	return nil
 }
@@ -59,6 +83,14 @@ func (t Time) Before(b Time) bool {
 
 func (t Time) After(b Time) bool {
 	return t.Time.After(b.Time)
+}
+
+func (t Time) Between(c Time, d time.Duration) bool {
+	if d < 0 {
+		d = d * -1
+	}
+
+	return t.Time.Before(c.Time.Add(d)) && t.Time.After(c.Time.Add(d*-1))
 }
 
 func Now() Time {

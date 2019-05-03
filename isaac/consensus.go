@@ -10,17 +10,21 @@ import (
 
 type Consensus struct {
 	sync.RWMutex
-
 	receiver chan common.Seal
-	stopChan chan bool
+	stop     chan bool
+	voteChan chan common.Seal
 	ctx      context.Context
+	blocker  *ConsensusBlocker
 }
 
-func NewConsensus() (*Consensus, error) {
+func NewConsensus(
+	blocker *ConsensusBlocker,
+) (*Consensus, error) {
 	c := &Consensus{
-		stopChan: make(chan bool),
 		receiver: make(chan common.Seal),
+		voteChan: make(chan common.Seal),
 		ctx:      context.Background(),
+		blocker:  blocker,
 	}
 
 	return c, nil
@@ -31,44 +35,18 @@ func (c *Consensus) Name() string {
 }
 
 func (c *Consensus) Start() error {
-	// check context values, which should exist
-	if _, ok := c.Context().Value("state").(*ConsensusState); !ok {
-		return ConsensusNotReadyError.SetMessage(
-			"%s; '%v' is missing in context",
-			ConsensusNotReadyError.Message(),
-			"state",
-		)
+	if c.stop != nil {
+		return common.StartStopperAlreadyStartedError
 	}
 
+	c.stop = make(chan bool)
+
+	// check context values, which should exist
 	if _, ok := c.Context().Value("policy").(ConsensusPolicy); !ok {
 		return ConsensusNotReadyError.SetMessage(
 			"%s; '%v' is missing in context",
 			ConsensusNotReadyError.Message(),
 			"policy",
-		)
-	}
-
-	if _, ok := c.Context().Value("blockStorage").(BlockStorage); !ok {
-		return ConsensusNotReadyError.SetMessage(
-			"%s; '%v' is missing in context",
-			ConsensusNotReadyError.Message(),
-			"blockStorage",
-		)
-	}
-
-	if _, ok := c.Context().Value("roundVoting").(*RoundVoting); !ok {
-		return ConsensusNotReadyError.SetMessage(
-			"%s; '%v' is missing in context",
-			ConsensusNotReadyError.Message(),
-			"roundVoting",
-		)
-	}
-
-	if _, ok := c.Context().Value("roundBoy").(RoundBoy); !ok {
-		return ConsensusNotReadyError.SetMessage(
-			"%s; '%v' is missing in context",
-			ConsensusNotReadyError.Message(),
-			"roundBoy",
 		)
 	}
 
@@ -80,7 +58,7 @@ func (c *Consensus) Start() error {
 		)
 	}
 
-	go c.doLoop()
+	go c.schedule()
 
 	return nil
 }
@@ -89,16 +67,16 @@ func (c *Consensus) Stop() error {
 	c.Lock()
 	defer c.Unlock()
 
-	if c.stopChan != nil {
-		c.stopChan <- true
-		close(c.stopChan)
-		c.stopChan = nil
+	if c.stop == nil {
+		return nil
 	}
 
-	if c.receiver != nil {
-		close(c.receiver)
-		c.receiver = nil
-	}
+	c.stop <- true
+	close(c.stop)
+	c.stop = nil
+
+	close(c.receiver)
+	c.receiver = nil
 
 	return nil
 }
@@ -130,13 +108,13 @@ func (c *Consensus) Receiver() chan common.Seal {
 	return c.receiver
 }
 
-// TODO Please correct this boring method name, `doLoop` :(
-func (c *Consensus) doLoop() {
+// TODO Please correct this boring method name, `schedule` :(
+func (c *Consensus) schedule() {
 	// NOTE these seal should be verified that is well-formed.
 end:
 	for {
 		select {
-		case <-c.stopChan:
+		case <-c.stop:
 			break end
 		case seal, notClosed := <-c.receiver:
 			if !notClosed {
@@ -146,7 +124,6 @@ end:
 			go c.receiveSeal(seal)
 		}
 	}
-
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
@@ -158,15 +135,13 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 
 	log_ := log.New(log15.Ctx{"seal": sHash, "seal-type": seal.Type})
 
-	ctx := common.ContextWithValues(
-		c.ctx,
-		"seal", seal,
-		"sHash", sHash,
-	)
-
 	checker := common.NewChainChecker(
 		"received-seal-checker",
-		ctx,
+		common.ContextWithValues(
+			c.ctx,
+			"seal", seal,
+			"sHash", sHash,
+		),
 		CheckerSealPool,
 		CheckerSealTypes,
 	)
@@ -174,6 +149,10 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		log_.Error("failed to checker for seal", "error", err, "seal", sHash)
 		return err
 	}
+
+	go func() {
+		c.blocker.Vote(seal)
+	}()
 
 	return nil
 }

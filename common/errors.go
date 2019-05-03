@@ -3,6 +3,7 @@ package common
 const (
 	_ uint = iota
 	OverflowErrorCode
+	SomethingWrongCode
 	UnknownSealTypeCode
 	JSONUnmarshalCode
 	NotImplementedCode
@@ -16,10 +17,13 @@ const (
 	SignatureVerificationFailedCode
 	InvalidAddressCode
 	InvalidNetAddrCode
+	StartStopperAlreadyStartedCode
+	InvalidSealTypeCode
 )
 
 var (
 	OverflowError                    Error = NewError("common", OverflowErrorCode, "overflow number")
+	SomethingWrongError              Error = NewError("common", SomethingWrongCode, "something wrong")
 	UnknownSealTypeError             Error = NewError("common", UnknownSealTypeCode, "unknown seal type found")
 	JSONUnmarshalError               Error = NewError("common", JSONUnmarshalCode, "failed json unmarshal")
 	NotImplementedError              Error = NewError("common", NotImplementedCode, "not implemented")
@@ -33,4 +37,6 @@ var (
 	SignatureVerificationFailedError Error = NewError("common", SignatureVerificationFailedCode, "signature verification failed")
 	InvalidAddressError              Error = NewError("common", InvalidAddressCode, "invalid Address")
 	InvalidNetAddrError              Error = NewError("common", InvalidNetAddrCode, "invalid NetAddr")
+	StartStopperAlreadyStartedError  Error = NewError("common", StartStopperAlreadyStartedCode, "StartStopper already started")
+	InvalidSealTypeError             Error = NewError("isaac", InvalidSealTypeCode, "invalid SealType")
 )

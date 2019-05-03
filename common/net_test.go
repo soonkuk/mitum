@@ -50,6 +50,7 @@ func (t testNetAddr) TestBaseNode() {
 	}
 
 	for i, c := range cases {
+		c := c
 		t.T().Run(
 			c.name,
 			func(*testing.T) {

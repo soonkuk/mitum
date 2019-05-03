@@ -4,11 +4,10 @@ import "github.com/spikeekips/mitum/common"
 
 const (
 	_ uint = iota
-	InvalidSealTypeCode
 	InvalidVoteCode
 	InvalidVoteStageCode
-	VotingProposalAlreadyStartedCode
-	VotingProposalNotFoundCode
+	VotingBoxProposalAlreadyStartedCode
+	VotingBoxProposalNotFoundCode
 	KnownSealFoundCode
 	SealNotFoundCode
 	SomethingWrongVotingCode
@@ -17,20 +16,25 @@ const (
 	ConsensusNotReadyCode
 	AnotherProposalIsOpenedCode
 	ProposalIsNotOpenedCode
+	SealAlreadyVotedCode
+	InvalidVoteResultInfoCode
+	VotingFailedCode
 )
 
 var (
-	InvalidSealTypeError              common.Error = common.NewError("isaac", InvalidSealTypeCode, "invalid SealType")
-	InvalidVoteError                  common.Error = common.NewError("isaac", InvalidVoteCode, "invalid vote found")
-	InvalidVoteStageError             common.Error = common.NewError("isaac", InvalidVoteStageCode, "invalid vote stage found")
-	VotingProposalAlreadyStartedError common.Error = common.NewError("isaac", VotingProposalAlreadyStartedCode, "VotingProposal already started")
-	VotingProposalNotFoundError       common.Error = common.NewError("isaac", VotingProposalNotFoundCode, "VotingProposal not found")
-	KnownSealFoundError               common.Error = common.NewError("isaac", KnownSealFoundCode, "known seal found")
-	SealNotFoundError                 common.Error = common.NewError("isaac", SealNotFoundCode, "seal not found")
-	SomethingWrongVotingError         common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
-	ProposeNotWellformedError         common.Error = common.NewError("isaac", ProposeNotWellformedCode, "")
-	BallotNotWellformedError          common.Error = common.NewError("isaac", BallotNotWellformedCode, "")
-	ConsensusNotReadyError            common.Error = common.NewError("isaac", ConsensusNotReadyCode, "consensus is not ready yet")
-	AnotherProposalIsOpenedError      common.Error = common.NewError("isaac", AnotherProposalIsOpenedCode, "another opened proposal is running")
-	ProposalIsNotOpenedError          common.Error = common.NewError("isaac", ProposalIsNotOpenedCode, "proposal is not opened")
+	InvalidVoteError                     common.Error = common.NewError("isaac", InvalidVoteCode, "invalid vote found")
+	InvalidVoteStageError                common.Error = common.NewError("isaac", InvalidVoteStageCode, "invalid vote stage found")
+	VotingBoxProposalAlreadyStartedError common.Error = common.NewError("isaac", VotingBoxProposalAlreadyStartedCode, "VotingBoxProposal already started")
+	VotingBoxProposalNotFoundError       common.Error = common.NewError("isaac", VotingBoxProposalNotFoundCode, "VotingBoxProposal not found")
+	KnownSealFoundError                  common.Error = common.NewError("isaac", KnownSealFoundCode, "known seal found")
+	SealNotFoundError                    common.Error = common.NewError("isaac", SealNotFoundCode, "seal not found")
+	SomethingWrongVotingError            common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
+	ProposeNotWellformedError            common.Error = common.NewError("isaac", ProposeNotWellformedCode, "")
+	BallotNotWellformedError             common.Error = common.NewError("isaac", BallotNotWellformedCode, "")
+	ConsensusNotReadyError               common.Error = common.NewError("isaac", ConsensusNotReadyCode, "consensus is not ready yet")
+	AnotherProposalIsOpenedError         common.Error = common.NewError("isaac", AnotherProposalIsOpenedCode, "another opened proposal is running")
+	ProposalIsNotOpenedError             common.Error = common.NewError("isaac", ProposalIsNotOpenedCode, "proposal is not opened")
+	SealAlreadyVotedError                common.Error = common.NewError("isaac", SealAlreadyVotedCode, "seal is already voted")
+	InvalidVoteResultInfoError           common.Error = common.NewError("isaac", InvalidVoteResultInfoCode, "invalid VoteResultInfo")
+	VotingFailedError                    common.Error = common.NewError("isaac", VotingFailedCode, "voting failed")
 )

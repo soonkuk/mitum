@@ -17,79 +17,72 @@ func (t *testCountVoting) TestCanCountVoting() {
 		threshold uint
 		yes       int
 		nop       int
-		exp       int
 		expected  bool
 	}{
 		{
-			name:  "threshold > total",
+			name:  "threshold > total; yes",
 			total: 10, threshold: 20,
-			yes: 1, nop: 1, exp: 1,
-			expected: false,
+			yes: 10, nop: 0,
+			expected: true,
+		},
+		{
+			name:  "threshold > total; o",
+			total: 10, threshold: 20,
+			yes: 0, nop: 10,
+			expected: true,
 		},
 		{
 			name:  "not yet",
 			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 1,
+			yes: 1, nop: 1,
 			expected: false,
 		},
 		{
 			name:  "yes",
 			total: 10, threshold: 7,
-			yes: 7, nop: 1, exp: 1,
+			yes: 7, nop: 1,
 			expected: true,
 		},
 		{
 			name:  "nop",
 			total: 10, threshold: 7,
-			yes: 1, nop: 7, exp: 1,
+			yes: 1, nop: 7,
 			expected: true,
 		},
 		{
-			name:  "exp",
+			name:  "not draw #0",
 			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 7,
-			expected: true,
-		},
-		{
-			name:  "not draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 0,
+			yes: 3, nop: 3,
 			expected: false,
 		},
 		{
-			name:  "draw",
+			name:  "not draw #1",
 			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 1,
+			yes: 0, nop: 4,
+			expected: false,
+		},
+		{
+			name:  "draw #0",
+			total: 10, threshold: 7,
+			yes: 4, nop: 4,
 			expected: true,
 		},
 		{
-			name:  "yes over margin",
+			name:  "draw #1",
 			total: 10, threshold: 7,
-			yes: 4, nop: 0, exp: 0,
-			expected: true,
-		},
-		{
-			name:  "nop over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 4, exp: 0,
-			expected: true,
-		},
-		{
-			name:  "exp over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 0, exp: 4,
+			yes: 5, nop: 5,
 			expected: true,
 		},
 		{
 			name:  "over total",
 			total: 10, threshold: 7,
-			yes: 4, nop: 4, exp: 4,
+			yes: 4, nop: 4,
 			expected: true,
 		},
 		{
 			name:  "1 total 1 threshold",
 			total: 1, threshold: 1,
-			yes: 1, nop: 0, exp: 0,
+			yes: 1, nop: 0,
 			expected: true,
 		},
 	}
@@ -98,7 +91,7 @@ func (t *testCountVoting) TestCanCountVoting() {
 		t.T().Run(
 			c.name,
 			func(*testing.T) {
-				result := canCountVoting(c.total, c.threshold, c.yes, c.nop, c.exp)
+				result := canCountVoting(c.total, c.threshold, c.yes, c.nop)
 				t.Equal(c.expected, result, "%d: %v", i, c.name)
 			},
 		)
@@ -112,79 +105,72 @@ func (t *testCountVoting) TestMajority() {
 		threshold uint
 		yes       int
 		nop       int
-		exp       int
 		expected  VoteResult
 	}{
 		{
-			name:  "threshold > total",
+			name:  "threshold > total; yes",
 			total: 10, threshold: 20,
-			yes: 1, nop: 1, exp: 1,
-			expected: VoteResultNotYet,
+			yes: 10, nop: 0,
+			expected: VoteResultYES,
+		},
+		{
+			name:  "threshold > total; nop",
+			total: 10, threshold: 20,
+			yes: 0, nop: 10,
+			expected: VoteResultNOP,
 		},
 		{
 			name:  "not yet",
 			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 1,
+			yes: 1, nop: 1,
 			expected: VoteResultNotYet,
 		},
 		{
 			name:  "yes",
 			total: 10, threshold: 7,
-			yes: 7, nop: 1, exp: 1,
+			yes: 7, nop: 1,
 			expected: VoteResultYES,
 		},
 		{
 			name:  "nop",
 			total: 10, threshold: 7,
-			yes: 1, nop: 7, exp: 1,
+			yes: 1, nop: 7,
 			expected: VoteResultNOP,
 		},
 		{
-			name:  "exp",
+			name:  "not draw #1",
 			total: 10, threshold: 7,
-			yes: 1, nop: 1, exp: 7,
-			expected: VoteResultEXPIRE,
-		},
-		{
-			name:  "not draw",
-			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 0,
+			yes: 3, nop: 3,
 			expected: VoteResultNotYet,
 		},
 		{
-			name:  "draw",
+			name:  "not draw #1",
 			total: 10, threshold: 7,
-			yes: 3, nop: 3, exp: 1,
+			yes: 4, nop: 0,
+			expected: VoteResultNotYet,
+		},
+		{
+			name:  "draw #0",
+			total: 10, threshold: 7,
+			yes: 4, nop: 4,
 			expected: VoteResultDRAW,
 		},
 		{
-			name:  "yes over margin",
+			name:  "draw #1",
 			total: 10, threshold: 7,
-			yes: 4, nop: 0, exp: 0,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "nop over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 4, exp: 0,
-			expected: VoteResultDRAW,
-		},
-		{
-			name:  "exp over margin",
-			total: 10, threshold: 7,
-			yes: 0, nop: 0, exp: 4,
+			yes: 5, nop: 5,
 			expected: VoteResultDRAW,
 		},
 		{
 			name:  "over total",
 			total: 10, threshold: 7,
-			yes: 4, nop: 4, exp: 4,
-			expected: VoteResultDRAW,
+			yes: 4, nop: 10,
+			expected: VoteResultNOP,
 		},
 		{
 			name:  "1 total 1 threshold",
 			total: 1, threshold: 1,
-			yes: 1, nop: 0, exp: 0,
+			yes: 1, nop: 0,
 			expected: VoteResultYES,
 		},
 	}
@@ -193,8 +179,8 @@ func (t *testCountVoting) TestMajority() {
 		t.T().Run(
 			c.name,
 			func(*testing.T) {
-				result := majority(c.total, c.threshold, c.yes, c.nop, c.exp)
-				t.Equal(c.expected, result, "%d: %v", i, c.name)
+				result := majority(c.total, c.threshold, c.yes, c.nop)
+				t.Equal(c.expected, result, "%d: %v; %v != %v", i, c.name, c.expected, result)
 			},
 		)
 	}

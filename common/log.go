@@ -67,7 +67,7 @@ func formatLogJSONValue(value interface{}) (result interface{}) {
 	case Time:
 		return v.String()
 	case time.Time:
-		return FormatISO8601(v)
+		return v.Format(TIMEFORMAT_ISO8601)
 	case error:
 		return v.Error()
 	case fmt.Stringer:

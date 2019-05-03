@@ -4,70 +4,56 @@ import (
 	"sort"
 )
 
-func canCountVoting(total, threshold uint, yes, nop, exp int) bool {
+func canCountVoting(total, threshold uint, yes, nop int) bool {
 	if threshold > total {
-		return false
+		threshold = total
 	}
 
 	to := int(total)
-	count := yes + nop + exp
+	count := yes + nop
 	if count >= to {
 		return true
 	}
 
 	th := int(threshold)
 
-	margin := to - th
-
 	// check majority
-	if yes >= th || yes > margin {
+	if yes >= th {
 		return true
 	}
 
-	if nop >= th || nop > margin {
-		return true
-	}
-
-	if exp >= th || exp > margin {
+	if nop >= th {
 		return true
 	}
 
 	// draw
-	var voted = []int{yes, nop, exp}
+	var voted = []int{yes, nop}
 	sort.Ints(voted)
 
-	major := voted[len(voted)-1]
-
-	if major+to-count < th {
+	if voted[0] > to-th { // min over margin
 		return true
 	}
 
 	return false
 }
 
-func majority(total, threshold uint, yes, nop, exp int) VoteResult {
-	if !canCountVoting(total, threshold, yes, nop, exp) {
+func majority(total, threshold uint, yes, nop int) VoteResult {
+	if !canCountVoting(total, threshold, yes, nop) {
 		return VoteResultNotYet // not yet
 	}
 
-	to := int(total)
-	count := yes + nop + exp
-	if count > to {
-		return VoteResultDRAW
+	if threshold > total {
+		threshold = total
 	}
 
 	th := int(threshold)
-
-	if nop >= th {
-		return VoteResultNOP
-	}
 
 	if yes >= th {
 		return VoteResultYES
 	}
 
-	if exp >= th {
-		return VoteResultEXPIRE
+	if nop >= th {
+		return VoteResultNOP
 	}
 
 	return VoteResultDRAW

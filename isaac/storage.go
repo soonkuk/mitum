@@ -20,7 +20,7 @@ func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error)
 
 func (i *DefaultBlockStorage) NewBlock(proposeSeal common.Seal) error {
 	if proposeSeal.Type != ProposeSealType {
-		return InvalidSealTypeError
+		return common.InvalidSealTypeError
 	}
 
 	psHash, _, err := proposeSeal.Hash()
