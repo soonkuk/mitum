@@ -2,7 +2,6 @@ package isaac
 
 import (
 	"sync"
-	"time"
 
 	"github.com/spikeekips/mitum/common"
 )
@@ -13,8 +12,7 @@ type ConsensusBlocker struct {
 	homeNode        *common.HomeNode
 	voteChan        chan common.Seal
 	state           *ConsensusState
-	voting          *Voting
-	stageBlocker    *StageBlocker
+	votingBox       VotingBox
 	sealBroadcaster SealBroadcaster
 	sealPool        SealPool
 }
@@ -22,8 +20,7 @@ type ConsensusBlocker struct {
 func NewConsensusBlocker(
 	homeNode *common.HomeNode,
 	state *ConsensusState,
-	voting *Voting,
-	stageBlocker *StageBlocker,
+	votingBox VotingBox,
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
 ) *ConsensusBlocker {
@@ -31,8 +28,7 @@ func NewConsensusBlocker(
 		homeNode:        homeNode,
 		voteChan:        make(chan common.Seal),
 		state:           state,
-		voting:          voting,
-		stageBlocker:    stageBlocker,
+		votingBox:       votingBox,
 		sealBroadcaster: sealBroadcaster,
 		sealPool:        sealPool,
 	}
@@ -89,47 +85,41 @@ func (c *ConsensusBlocker) Vote(seal common.Seal) {
 func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	var votingResult VoteResultInfo
 	{ // voting
-		rc := c.voting.Vote(seal)
-		select {
-		case <-time.After(time.Second): // TODO duration should be in ConsensusPolicy
-			return VotingFailedError.SetMessage("failed to vote; timeouted: %v", time.Second)
-		case r := <-rc:
-			log.Debug("got voting result", "result", r.Result, "error", r.Err)
-			if r.Err != nil {
-				return r.Err
-			}
+		var err error
 
-			votingResult = r.Result
+		switch seal.Type {
+		case ProposeSealType:
+			votingResult, err = c.votingBox.Open(seal)
+		case BallotSealType:
+			votingResult, err = c.votingBox.Vote(seal)
+		default:
+			return common.InvalidSealTypeError
+		}
+
+		log.Debug("got voting result", "result", votingResult, "error", err)
+		if err != nil {
+			return err
+		}
+
+		if votingResult.NotYet() {
+			return nil
 		}
 	}
 
-	var decision StageBlockerDecision
-	{
-		rc := c.stageBlocker.Check(votingResult)
-		select {
-		case <-time.After(time.Second): // TODO duration should be in ConsensusPolicy
-			return VotingFailedError.SetMessage("failed to vote; timeouted: %v", time.Second)
-		case r := <-rc:
-			log.Debug("got stage blocker result", "decision", r.Decision, "error", r.Err)
-			if r.Err != nil {
-				return r.Err
-			}
-
-			decision = r.Decision
+	switch votingResult.Stage {
+	case VoteStageINIT:
+		if votingResult.Proposed {
+			return c.doProposeAccepted(votingResult)
 		}
-	}
+		// TODO start new round
+	case VoteStageSIGN:
+		if votingResult.Result == VoteResultYES {
+			return c.doGoToNextStage(votingResult)
+		}
 
-	switch decision {
-	case ProposalAccepted:
-		return c.doProposeAccepted(votingResult)
-	case GoToNextStage:
-		return c.doGoToNextStage(votingResult)
-	case FinishRound:
+		// TODO go to next round
+	case VoteStageACCEPT:
 		return c.doFinishRound(votingResult)
-	case GoToNextRound:
-		// TODO implement
-	case StartNewRound:
-		// TODO implement
 	}
 
 	return nil

@@ -20,8 +20,6 @@ type testConsensus struct {
 
 	homeNode        *common.HomeNode
 	nt              *network.NodeTestNetwork
-	voting          *Voting
-	stageBlocker    *StageBlocker
 	sealBroadcaster *DefaultSealBroadcaster
 	blocker         *ConsensusBlocker
 	sealPool        SealPool
@@ -42,11 +40,6 @@ func (t *testConsensus) SetupTest() {
 	policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: t.total, Threshold: t.threshold}
 
 	votingBox := NewDefaultVotingBox(policy)
-	t.voting = NewVoting(votingBox)
-	t.voting.Start()
-
-	t.stageBlocker = NewStageBlocker()
-	t.stageBlocker.Start()
 
 	t.nt = network.NewNodeTestNetwork()
 
@@ -56,7 +49,7 @@ func (t *testConsensus) SetupTest() {
 	t.sealPool = NewDefaultSealPool()
 
 	t.blocker = NewConsensusBlocker(
-		t.homeNode, cstate, t.voting, t.stageBlocker, t.sealBroadcaster, t.sealPool,
+		t.homeNode, cstate, votingBox, t.sealBroadcaster, t.sealPool,
 	)
 	t.blocker.Start()
 
@@ -81,8 +74,6 @@ func (t *testConsensus) TeardownTest() {
 	t.consensus.Stop()
 	t.nt.Stop()
 	t.blocker.Stop()
-	t.stageBlocker.Stop()
-	t.voting.Stop()
 }
 
 func (t *testConsensus) TestNew() {
