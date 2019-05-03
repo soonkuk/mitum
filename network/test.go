@@ -3,20 +3,20 @@
 package network
 
 import (
+	"fmt"
 	"sync"
-	"unsafe"
 
 	"github.com/spikeekips/mitum/common"
 )
 
 type NodeTestNetwork struct {
 	sync.RWMutex
-	chans map[int64]chan<- common.Seal
+	chans map[string]chan<- common.Seal
 }
 
 func NewNodeTestNetwork() *NodeTestNetwork {
 	return &NodeTestNetwork{
-		chans: map[int64]chan<- common.Seal{},
+		chans: map[string]chan<- common.Seal{},
 	}
 }
 
@@ -32,7 +32,7 @@ func (n *NodeTestNetwork) AddReceiver(c chan<- common.Seal) error {
 	n.Lock()
 	defer n.Unlock()
 
-	p := *(*int64)(unsafe.Pointer(&c))
+	p := fmt.Sprintf("%p", c)
 	if _, found := n.chans[p]; found {
 		return ReceiverAlreadyRegisteredError
 	}
@@ -45,7 +45,7 @@ func (n *NodeTestNetwork) RemoveReceiver(c chan common.Seal) error {
 	n.Lock()
 	defer n.Unlock()
 
-	p := *(*int64)(unsafe.Pointer(&c))
+	p := fmt.Sprintf("%p", c)
 	if _, found := n.chans[p]; !found {
 		return ReceiverNotRegisteredError
 	}

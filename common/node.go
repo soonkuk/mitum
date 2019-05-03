@@ -19,7 +19,6 @@ type Node interface {
 }
 
 type BaseNode struct {
-	sync.RWMutex
 	address    Address
 	publish    NetAddr
 	validators map[Address]Validator
@@ -55,7 +54,7 @@ func (n BaseNode) MarshalBinary() ([]byte, error) {
 	var validators [][]byte
 	if len(n.validators) > 0 {
 		var addresses []string
-		for a, _ := range n.validators {
+		for a := range n.validators {
 			addresses = append(addresses, string(a))
 		}
 		sort.Strings(addresses)
@@ -166,17 +165,21 @@ func (n BaseNode) String() string {
 
 type HomeNode struct {
 	BaseNode
+	sync.RWMutex
 	seed Seed
 }
 
-func NewHomeNode(seed Seed, publish NetAddr) HomeNode {
-	return HomeNode{
+func NewHomeNode(seed Seed, publish NetAddr) *HomeNode {
+	return &HomeNode{
 		BaseNode: NewBaseNode(seed.Address(), publish, nil),
 		seed:     seed,
 	}
 }
 
-func (n HomeNode) Seed() Seed {
+func (n *HomeNode) Seed() Seed {
+	n.RLock()
+	defer n.RUnlock()
+
 	return n.seed
 }
 
@@ -194,7 +197,7 @@ func (n *HomeNode) AddValidators(validators ...Validator) {
 
 func (n *HomeNode) RemoveValidators(validators ...Validator) {
 	n.Lock()
-	defer n.RUnlock()
+	defer n.Unlock()
 
 	for _, v := range validators {
 		if _, found := n.validators[v.Address()]; !found {

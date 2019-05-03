@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -56,7 +55,7 @@ func FuncName(f interface{}, full bool) string {
 
 func ContextWithValues(ctx context.Context, args ...interface{}) context.Context {
 	if len(args)%2 != 0 {
-		panic(errors.New(fmt.Sprintf("invalid number of args: %v", len(args))))
+		panic(fmt.Errorf("invalid number of args: %v", len(args)))
 	}
 
 	if ctx == nil {

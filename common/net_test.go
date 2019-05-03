@@ -50,7 +50,8 @@ func (t testNetAddr) TestBaseNode() {
 	}
 
 	for i, c := range cases {
-		c := c
+		i := i // NOTE for govet
+		c := c // NOTE for govet
 		t.T().Run(
 			c.name,
 			func(*testing.T) {

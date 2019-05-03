@@ -57,8 +57,8 @@ func (p Propose) MarshalBinary() ([]byte, error) {
 
 	var transactions [][]byte
 	for _, t := range p.Transactions {
-		hash, err := t.MarshalBinary()
-		if err != nil {
+		var hash []byte
+		if hash, err = t.MarshalBinary(); err != nil {
 			return nil, err
 		}
 		transactions = append(transactions, hash)

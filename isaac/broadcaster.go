@@ -15,13 +15,13 @@ type SealBroadcaster interface {
 type DefaultSealBroadcaster struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
-	homeNode common.HomeNode
+	homeNode *common.HomeNode
 	sender   network.SenderFunc
 }
 
 func NewDefaultSealBroadcaster(
 	policy ConsensusPolicy,
-	homeNode common.HomeNode,
+	homeNode *common.HomeNode,
 ) (*DefaultSealBroadcaster, error) {
 	return &DefaultSealBroadcaster{
 		policy:   policy,
@@ -35,7 +35,7 @@ func (i *DefaultSealBroadcaster) Send(sealType common.SealType, body common.Hash
 		return err
 	}
 
-	if err := seal.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
+	if err = seal.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
 		return err
 	}
 

@@ -10,7 +10,7 @@ import (
 
 type testVotingBox struct {
 	suite.Suite
-	homeNode     common.HomeNode
+	homeNode     *common.HomeNode
 	votingBox    VotingBox
 	seals        map[common.Hash]common.Seal
 	proposeSeals map[common.Hash]Propose
@@ -27,8 +27,8 @@ func (t *testVotingBox) SetupTest() {
 	t.ballotSeals = map[common.Hash]Ballot{}
 }
 
-func (t *testVotingBox) newNodes(n uint) []common.HomeNode {
-	var nodes []common.HomeNode
+func (t *testVotingBox) newNodes(n uint) []*common.HomeNode {
+	var nodes []*common.HomeNode
 	for i := uint(0); i < n; i++ {
 		nodes = append(nodes, common.NewRandomHomeNode())
 	}
@@ -36,26 +36,8 @@ func (t *testVotingBox) newNodes(n uint) []common.HomeNode {
 	return nodes
 }
 
-func (t *testVotingBox) open(node common.HomeNode, round Round) (common.Hash, error) {
-	propose, seal, _ := NewTestSealPropose(node.Address(), nil)
-	_, err := t.votingBox.Open(seal)
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	psHash, _, err := seal.Hash()
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	t.seals[psHash] = seal
-	t.proposeSeals[psHash] = propose
-
-	return psHash, nil
-}
-
 func (t *testVotingBox) newBallot(
-	node common.HomeNode,
+	node *common.HomeNode,
 	psHash common.Hash,
 	height common.Big,
 	stage VoteStage,
@@ -91,7 +73,7 @@ func (t *testVotingBox) newBallot(
 }
 
 func (t *testVotingBox) newBallotVote(
-	node common.HomeNode,
+	node *common.HomeNode,
 	psHash common.Hash,
 	height common.Big,
 	stage VoteStage,
@@ -574,7 +556,8 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 		v0 := common.NewRandomHomeNode()
 		v0Vote := VoteYES
 
-		sHash, _, err := t.newBallotVote(v0, psHash, propose.Block.Height, VoteStageSIGN, round, v0Vote)
+		var sHash common.Hash
+		sHash, _, err = t.newBallotVote(v0, psHash, propose.Block.Height, VoteStageSIGN, round, v0Vote)
 		t.NoError(err)
 
 		// check
@@ -609,7 +592,8 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 		v0 := common.NewRandomHomeNode()
 		v0Vote := VoteYES
 
-		sHash, _, err := t.newBallotVote(v0, psHashUnknown, propose.Block.Height, VoteStageSIGN, round, v0Vote)
+		var sHash common.Hash
+		sHash, _, err = t.newBallotVote(v0, psHashUnknown, propose.Block.Height, VoteStageSIGN, round, v0Vote)
 		t.NoError(err)
 
 		// check

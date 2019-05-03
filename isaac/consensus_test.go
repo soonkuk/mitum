@@ -18,8 +18,7 @@ type testConsensus struct {
 	total     uint
 	threshold uint
 
-	homeNode        common.HomeNode
-	policy          ConsensusPolicy
+	homeNode        *common.HomeNode
 	nt              *network.NodeTestNetwork
 	voting          *Voting
 	stageBlocker    *StageBlocker
@@ -46,7 +45,7 @@ func (t *testConsensus) SetupTest() {
 	t.voting = NewVoting(votingBox)
 	t.voting.Start()
 
-	t.stageBlocker = NewStageBlocker(t.homeNode)
+	t.stageBlocker = NewStageBlocker()
 	t.stageBlocker.Start()
 
 	t.nt = network.NewNodeTestNetwork()
@@ -69,7 +68,7 @@ func (t *testConsensus) SetupTest() {
 	t.NoError(err)
 
 	t.consensus.SetContext(
-		nil,
+		nil, // nolint
 		"policy", policy,
 		"state", cstate,
 		"sealPool", t.sealPool,
@@ -105,7 +104,7 @@ func (t *testConsensus) TestNew() {
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
-	for _ = range ticker.C {
+	for range ticker.C {
 		if state.Height().Equal(propose.Block.Height.Inc()) {
 			break
 		}

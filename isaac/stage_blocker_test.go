@@ -10,15 +10,12 @@ import (
 
 type testStageBlocker struct {
 	suite.Suite
-	homeNode common.HomeNode
 	sb       *StageBlocker
 	sendChan chan common.Seal
 }
 
 func (t *testStageBlocker) SetupTest() {
-	t.homeNode = common.NewRandomHomeNode()
-
-	t.sb = NewStageBlocker(t.homeNode)
+	t.sb = NewStageBlocker()
 	err := t.sb.Start()
 	t.NoError(err)
 

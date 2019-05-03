@@ -34,7 +34,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		if err := seal.UnmarshalBody(&propose); err != nil {
 			return err
 		}
-		c.SetContext("propose", propose)
+		_ = c.SetContext("propose", propose)
 
 		return common.NewChainChecker(
 			"Propose checker",
@@ -51,7 +51,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		if err := seal.UnmarshalBody(&ballot); err != nil {
 			return err
 		}
-		c.SetContext("ballot", ballot)
+		_ = c.SetContext("ballot", ballot)
 
 		return common.NewChainChecker(
 			"ballot checker",

@@ -30,11 +30,7 @@ func canCountVoting(total, threshold uint, yes, nop int) bool {
 	var voted = []int{yes, nop}
 	sort.Ints(voted)
 
-	if voted[0] > to-th { // min over margin
-		return true
-	}
-
-	return false
+	return voted[0] > to-th // min over margin
 }
 
 func majority(total, threshold uint, yes, nop int) VoteResult {

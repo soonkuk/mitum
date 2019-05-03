@@ -36,7 +36,10 @@ func (i *DefaultBlockStorage) NewBlock(proposeSeal common.Seal) error {
 	// TODO store block
 
 	// update state
-	prevState := *i.state
+	prevState := &ConsensusState{}
+	prevState.SetHeight(i.state.Height())
+	prevState.SetBlock(i.state.Block())
+	prevState.SetState(i.state.State())
 
 	i.state.SetHeight(propose.Block.Height.Inc())
 	i.state.SetBlock(propose.Block.Next)

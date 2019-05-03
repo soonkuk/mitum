@@ -121,7 +121,11 @@ end:
 				continue
 			}
 
-			go c.receiveSeal(seal)
+			go func() {
+				if err := c.receiveSeal(seal); err != nil {
+					log.Error("failed to receive seal")
+				}
+			}()
 		}
 	}
 }

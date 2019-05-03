@@ -162,7 +162,7 @@ func (r *DefaultVotingBox) Vote(seal common.Seal) (VoteResultInfo, error) {
 	}
 
 	var ballot Ballot
-	if err := seal.UnmarshalBody(&ballot); err != nil {
+	if err = seal.UnmarshalBody(&ballot); err != nil {
 		return VoteResultInfo{}, err
 	}
 
@@ -207,8 +207,6 @@ func (r *DefaultVotingBox) vote(
 	return r.voteKnown(
 		psHash,
 		source,
-		height,
-		round,
 		stage,
 		vote,
 		sHash,
@@ -218,8 +216,6 @@ func (r *DefaultVotingBox) vote(
 func (r *DefaultVotingBox) voteKnown(
 	psHash common.Hash,
 	source common.Address,
-	height common.Big,
-	round Round,
 	stage VoteStage,
 	vote Vote,
 	sHash common.Hash,
@@ -807,11 +803,7 @@ func (v *VotingBoxUnknown) CanCount(total, threshold uint) bool {
 	v.RLock()
 	defer v.RUnlock()
 
-	if len(v.voted) < int(threshold) {
-		return false
-	}
-
-	return true
+	return len(v.voted) >= int(threshold)
 }
 
 func (v *VotingBoxUnknown) Majority(total, threshold uint) VoteResultInfo {
@@ -895,9 +887,7 @@ func (v *VotingBoxUnknown) MajorityPSHash(total, threshold uint) VoteResultInfo 
 
 	var voted []VotingBoxUnknownVote
 	for _, l := range byPSHash {
-		for _, u := range l {
-			voted = append(voted, u)
-		}
+		voted = append(voted, l...)
 	}
 
 	sort.Slice(voted, func(i, j int) bool {

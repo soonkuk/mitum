@@ -104,7 +104,6 @@ end:
 		switch err.(type) {
 		case *ChainChecker:
 			newChecker = err.(*ChainChecker)
-			err = nil
 			break end
 		case ChainCheckerStop:
 			c.log.Debug("checker stopped")

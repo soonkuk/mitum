@@ -68,13 +68,13 @@ func NewTestSealBallot(
 type TestSealBroadcaster struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
-	homeNode common.HomeNode
+	homeNode *common.HomeNode
 	sendChan chan common.Seal
 }
 
 func NewTestSealBroadcaster(
 	policy ConsensusPolicy,
-	homeNode common.HomeNode,
+	homeNode *common.HomeNode,
 ) (*TestSealBroadcaster, error) {
 	return &TestSealBroadcaster{
 		policy:   policy,

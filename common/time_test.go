@@ -80,6 +80,8 @@ func (t *testTime) TestBetween() {
 	}
 
 	for i, c := range cases {
+		i := i
+		c := c
 		t.T().Run(
 			c.name,
 			func(*testing.T) {

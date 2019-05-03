@@ -51,15 +51,12 @@ type stageBlockerChanFunc func() (VoteResultInfo, chan<- StageBlockerResult)
 
 type StageBlocker struct {
 	sync.RWMutex
-	homeNode common.HomeNode
 	stopChan chan bool
 	voteChan chan stageBlockerChanFunc
-	callback func(VoteResultInfo)
 }
 
-func NewStageBlocker(homeNode common.HomeNode) *StageBlocker {
+func NewStageBlocker() *StageBlocker {
 	return &StageBlocker{
-		homeNode: homeNode,
 		voteChan: make(chan stageBlockerChanFunc),
 	}
 }

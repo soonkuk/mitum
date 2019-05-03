@@ -22,7 +22,7 @@ func CheckerUnmarshalSeal(c *ChainChecker) error {
 		return err
 	}
 
-	c.SetContext("seal", seal)
+	_ = c.SetContext("seal", seal)
 
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 type ConsensusBlocker struct {
 	sync.RWMutex
 	stop            chan bool
-	homeNode        common.HomeNode
+	homeNode        *common.HomeNode
 	voteChan        chan common.Seal
 	state           *ConsensusState
 	voting          *Voting
@@ -20,7 +20,7 @@ type ConsensusBlocker struct {
 }
 
 func NewConsensusBlocker(
-	homeNode common.HomeNode,
+	homeNode *common.HomeNode,
 	state *ConsensusState,
 	voting *Voting,
 	stageBlocker *StageBlocker,

@@ -9,13 +9,16 @@ import (
 
 type ConsensusState struct {
 	sync.RWMutex
-	node   common.HomeNode
+	node   *common.HomeNode
 	height common.Big  // last Block.Height
 	block  common.Hash // Block.Hash()
 	state  []byte      // last State.Root.Hash()
 }
 
-func (c ConsensusState) String() string {
+func (c *ConsensusState) String() string {
+	c.RLock()
+	defer c.RUnlock()
+
 	b, _ := json.Marshal(map[string]interface{}{
 		"node":   c.node,
 		"height": c.height,
@@ -25,7 +28,7 @@ func (c ConsensusState) String() string {
 	return common.TerminalLogString(string(b))
 }
 
-func (c *ConsensusState) Node() common.HomeNode {
+func (c *ConsensusState) Node() *common.HomeNode {
 	c.RLock()
 	defer c.RUnlock()
 

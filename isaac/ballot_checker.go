@@ -60,7 +60,7 @@ func CheckerBallotProposeSeal(c *common.ChainChecker) error {
 		return nil
 	}
 
-	c.SetContext("proposeSeal", seal)
+	_ = c.SetContext("proposeSeal", seal)
 
 	return nil
 }
