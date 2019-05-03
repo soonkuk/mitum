@@ -9,7 +9,6 @@ import (
 type ConsensusBlocker struct {
 	sync.RWMutex
 	stop            chan bool
-	homeNode        *common.HomeNode
 	voteChan        chan common.Seal
 	state           *ConsensusState
 	votingBox       VotingBox
@@ -18,14 +17,12 @@ type ConsensusBlocker struct {
 }
 
 func NewConsensusBlocker(
-	homeNode *common.HomeNode,
 	state *ConsensusState,
 	votingBox VotingBox,
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
-		homeNode:        homeNode,
 		voteChan:        make(chan common.Seal),
 		state:           state,
 		votingBox:       votingBox,
@@ -82,6 +79,7 @@ func (c *ConsensusBlocker) Vote(seal common.Seal) {
 	}()
 }
 
+// vote votes and decides the next action.
 func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	var votingResult VoteResultInfo
 	{ // voting
@@ -111,13 +109,14 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		if votingResult.Proposed {
 			return c.doProposeAccepted(votingResult)
 		}
-		// TODO start new round
+
+		return c.doNewRound(votingResult)
 	case VoteStageSIGN:
 		if votingResult.Result == VoteResultYES {
 			return c.doGoToNextStage(votingResult)
 		}
 
-		// TODO go to next round
+		return c.doNextRound(votingResult)
 	case VoteStageACCEPT:
 		return c.doFinishRound(votingResult)
 	}
@@ -139,7 +138,7 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 
 	ballot, err := NewBallot(
 		votingResult.Proposal,
-		c.homeNode.Address(),
+		c.state.Home().Address(),
 		votingResult.Height,
 		votingResult.Round,
 		VoteStageSIGN,
@@ -153,14 +152,17 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		return err
 	}
 
+	log.Debug("proposal accepted", "result", votingResult)
+
 	return nil
 }
 
+// doGoToNextStage goes to next stage
 func (c *ConsensusBlocker) doGoToNextStage(votingResult VoteResultInfo) error {
 	// broadcast next stage ballot
 	ballot, err := NewBallot(
 		votingResult.Proposal,
-		c.homeNode.Address(),
+		c.state.Home().Address(),
 		votingResult.Height,
 		votingResult.Round,
 		votingResult.Stage.Next(),
@@ -169,6 +171,8 @@ func (c *ConsensusBlocker) doGoToNextStage(votingResult VoteResultInfo) error {
 	if err != nil {
 		return err
 	}
+
+	log.Debug("move to next sage", "result", votingResult, "next", votingResult.Stage.Next())
 
 	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
 		return err
@@ -202,26 +206,59 @@ func (c *ConsensusBlocker) doFinishRound(votingResult VoteResultInfo) error {
 	c.state.SetBlock(propose.Block.Next)
 	c.state.SetState(propose.State.Next)
 
-	/*
-		// TODO remove broadcast next stage ballot
-		ballot, err := NewBallot(
-			common.Hash{},
-			c.homeNode.Address(),
-			votingResult.Height.Inc(),
-			Round(0),
-			VoteStageINIT,
-			VoteYES,
-		)
-		if err != nil {
-			return err
-		}
+	log.Debug("finish round", "result", votingResult, "propose", propose)
 
-		ballot.Proposer = c.homeNode.Address()
+	return nil
+}
 
-		if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
-			return err
-		}
-	*/
+// doNewRound starts new round
+func (c *ConsensusBlocker) doNewRound(votingResult VoteResultInfo) error {
+	log.Debug("start new round", "result", votingResult)
+
+	ballot, err := NewBallot(
+		common.Hash{},
+		c.state.Home().Address(),
+		votingResult.Height,
+		votingResult.Round,
+		VoteStageINIT,
+		VoteYES, // should be yes
+	)
+	if err != nil {
+		return err
+	}
+
+	// TODO Proposer should be selected
+	ballot.Proposer = c.state.Home().Address()
+
+	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// doNextRound starts next round
+func (c *ConsensusBlocker) doNextRound(votingResult VoteResultInfo) error {
+	log.Debug("next round", "result", votingResult)
+
+	ballot, err := NewBallot(
+		common.Hash{},
+		c.state.Home().Address(),
+		votingResult.Height,
+		votingResult.Round+1, // next round
+		VoteStageINIT,
+		VoteYES, // should be yes
+	)
+	if err != nil {
+		return err
+	}
+
+	// TODO Proposer should be selected
+	ballot.Proposer = c.state.Home().Address()
+
+	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
+		return err
+	}
 
 	return nil
 }

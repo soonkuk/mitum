@@ -60,16 +60,16 @@ func CheckerProposeProposerIsFromKnowns(c *common.ChainChecker) error {
 		return err
 	}
 
-	isFromHomeNode := propose.Proposer == state.Node().Address()
-	_ = c.SetContext("isFromHomeNode", isFromHomeNode)
+	isFromHome := propose.Proposer == state.Home().Address()
+	_ = c.SetContext("isFromHome", isFromHome)
 
-	if isFromHomeNode {
+	if isFromHome {
 		var psHash common.Hash
 		if err := c.ContextValue("sHash", &psHash); err != nil {
 			return err
 		}
 
-		c.Log().Debug("Propose is from HomeNode", "seal", psHash)
+		c.Log().Debug("Propose is from home", "seal", psHash)
 	}
 
 	return nil

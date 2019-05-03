@@ -10,7 +10,7 @@ import (
 
 type testVotingBox struct {
 	suite.Suite
-	homeNode     *common.HomeNode
+	home         *common.HomeNode
 	votingBox    VotingBox
 	seals        map[common.Hash]common.Seal
 	proposeSeals map[common.Hash]Propose
@@ -19,7 +19,7 @@ type testVotingBox struct {
 }
 
 func (t *testVotingBox) SetupTest() {
-	t.homeNode = common.NewRandomHomeNode()
+	t.home = common.NewRandomHomeNode()
 	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
 	t.votingBox = NewDefaultVotingBox(t.policy)
 	t.seals = map[common.Hash]common.Seal{}
@@ -99,8 +99,8 @@ func (t *testVotingBox) TestNew() {
 }
 
 func (t *testVotingBox) TestOpen() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
-	seal.Sign(common.TestNetworkID, t.homeNode.Seed())
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
+	seal.Sign(common.TestNetworkID, t.home.Seed())
 
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
@@ -135,8 +135,8 @@ func (t *testVotingBox) TestClose() {
 	t.Nil(votingBox.previous)
 
 	// after open and then close
-	_, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
-	seal.Sign(common.TestNetworkID, t.homeNode.Seed())
+	_, seal, _ := NewTestSealPropose(t.home.Address(), nil)
+	seal.Sign(common.TestNetworkID, t.home.Seed())
 
 	_, err = t.votingBox.Open(seal)
 	t.NoError(err)
@@ -160,7 +160,7 @@ func (t *testVotingBox) TestClose() {
 }
 
 func (t *testVotingBox) TestVoteCurrent() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -223,7 +223,7 @@ func (t *testVotingBox) TestVoteCurrent() {
 func (t *testVotingBox) TestVoteUnknown() {
 	defer common.DebugPanic()
 
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -278,7 +278,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 }
 
 func (t *testVotingBox) TestVoteUnknownCancel() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -540,7 +540,7 @@ func (t *testVotingBox) TestCloseUnknown() {
 }
 
 func (t *testVotingBox) TestAlreadyVotedCurrent() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -578,7 +578,7 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 }
 
 func (t *testVotingBox) TestAlreadyVotedUnknown() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	_, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -610,7 +610,7 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 }
 
 func (t *testVotingBox) TestOpenedVoteResultInfoStageINIT() {
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	result, err := t.votingBox.Open(seal)
 	t.NoError(err)
 
@@ -632,7 +632,7 @@ func (t *testVotingBox) TestOpenedVoteResultInfoStageINIT() {
 // - current should be closed and open new current
 func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 	// open new current
-	propose, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	propose, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	psHash, _, _ := seal.Hash()
 
 	t.votingBox.Open(seal)
@@ -691,7 +691,7 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 
 func (t *testVotingBox) TestNewRoundSignVote() {
 	// open new current
-	_, seal, _ := NewTestSealPropose(t.homeNode.Address(), nil)
+	_, seal, _ := NewTestSealPropose(t.home.Address(), nil)
 	psHash, _, _ := seal.Hash()
 
 	t.votingBox.Open(seal)
@@ -701,7 +701,7 @@ func (t *testVotingBox) TestNewRoundSignVote() {
 	t.False(votingBox.current.SealVoted(psHash))
 	t.False(votingBox.current.Stage(VoteStageSIGN).SealVoted(psHash))
 
-	_, found := votingBox.current.Stage(VoteStageSIGN).Voted(t.homeNode.Address())
+	_, found := votingBox.current.Stage(VoteStageSIGN).Voted(t.home.Address())
 	t.False(found)
 }
 

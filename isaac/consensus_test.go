@@ -18,7 +18,7 @@ type testConsensus struct {
 	total     uint
 	threshold uint
 
-	homeNode        *common.HomeNode
+	home            *common.HomeNode
 	nt              *network.NodeTestNetwork
 	sealBroadcaster *DefaultSealBroadcaster
 	blocker         *ConsensusBlocker
@@ -27,7 +27,7 @@ type testConsensus struct {
 }
 
 func (t *testConsensus) SetupSuite() {
-	t.homeNode = common.NewRandomHomeNode()
+	t.home = common.NewRandomHomeNode()
 	t.height = common.NewBig(0)
 	t.block = common.NewRandomHash("bk")
 	t.state = []byte("sl")
@@ -36,21 +36,19 @@ func (t *testConsensus) SetupSuite() {
 }
 
 func (t *testConsensus) SetupTest() {
-	cstate := &ConsensusState{node: t.homeNode, height: t.height, block: t.block, state: t.state}
+	cstate := &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
 	policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: t.total, Threshold: t.threshold}
 
 	votingBox := NewDefaultVotingBox(policy)
 
 	t.nt = network.NewNodeTestNetwork()
 
-	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.homeNode)
+	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.home)
 	t.sealBroadcaster.SetSender(t.nt.Send)
 
 	t.sealPool = NewDefaultSealPool()
 
-	t.blocker = NewConsensusBlocker(
-		t.homeNode, cstate, votingBox, t.sealBroadcaster, t.sealPool,
-	)
+	t.blocker = NewConsensusBlocker(cstate, votingBox, t.sealBroadcaster, t.sealPool)
 	t.blocker.Start()
 
 	consensus, err := NewConsensus(t.blocker)
@@ -81,7 +79,7 @@ func (t *testConsensus) TestNew() {
 
 	state := t.consensus.Context().Value("state").(*ConsensusState)
 
-	proposerSeed := state.Node().Seed()
+	proposerSeed := state.Home().Seed()
 	var proposeSeal common.Seal
 	var propose Propose
 	{
@@ -91,7 +89,7 @@ func (t *testConsensus) TestNew() {
 		err = proposeSeal.Sign(common.TestNetworkID, proposerSeed)
 		t.NoError(err)
 
-		t.nt.Send(state.Node(), proposeSeal)
+		t.nt.Send(state.Home(), proposeSeal)
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
