@@ -18,6 +18,10 @@ func (a Address) IsValid() (keypair.KP, error) {
 	return keypair.Parse(string(a))
 }
 
+func (a Address) String() string {
+	return string(a)
+}
+
 func (a Address) Alias() string {
 	return fmt.Sprintf("%s.%s", a[:4], a[len(a)-4:])
 }

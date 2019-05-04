@@ -154,6 +154,26 @@ func (h *Hash) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func ParseHash(n string) (Hash, error) {
+	if len(n) < 4 {
+		return Hash{}, InvalidHashError
+	}
+
+	decoded := base58.Decode(string(n[3:]))
+	if len(decoded) != 32 {
+		return Hash{}, InvalidHashError
+	}
+
+	var a [32]byte
+	copy(a[:], decoded)
+
+	h := Hash{}
+	h.h = string(n[:2])
+	h.b = a
+
+	return h, nil
+}
+
 type NetworkID []byte
 
 type Signature []byte

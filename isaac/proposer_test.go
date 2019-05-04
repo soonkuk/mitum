@@ -15,18 +15,22 @@ type testProposer struct {
 
 func (t *testProposer) TestElect() {
 	cases := []struct {
-		name       string
-		height     common.Big
-		round      Round
-		candidates []string // candidates
-		expected   int      // proposer index in the candidates
-		err        error
+		name             string
+		height           common.Big
+		round            Round
+		candidates       []string // candidates
+		block            string
+		expectedProposer string // selected proposer
+		expectedIndex    int    // proposer index in the candidates
+		err              error
 	}{
 		{
-			height:     common.NewBig(0),
-			round:      Round(0),
-			candidates: []string{"GBZIQWDUSKHO3Z3HCEIQX65KVIFYQAH7GN3QW3O3D5VNIG3OXE5WGO3B"},
-			expected:   0,
+			height:           common.NewBig(0),
+			round:            Round(0),
+			candidates:       []string{"GBZIQWDUSKHO3Z3HCEIQX65KVIFYQAH7GN3QW3O3D5VNIG3OXE5WGO3B"},
+			block:            "bk-3BGMn2GASCCPf12UeqLbAVsZxWE9Neoi36a1EMS6XjbW",
+			expectedProposer: "GBZIQWDUSKHO3Z3HCEIQX65KVIFYQAH7GN3QW3O3D5VNIG3OXE5WGO3B",
+			expectedIndex:    0,
 		},
 		{
 			height: common.NewBig(1),
@@ -38,7 +42,9 @@ func (t *testProposer) TestElect() {
 				"GDFA6ZH23ERWEJDDNGUOOKHI4SVTT56JF5RHAUGTB3LTGBVJ3OZGOKYO",
 				"GBUIQ7HEWMYQDNB6PCSO7MYJESUFJP7UGAA2Q2DQATK37LE67QEE4IDZ",
 			},
-			expected: 3,
+			block:            "bk-3MVFdQ2qZoRXAv2PtgyCUMfusTuegTfiHitBY2Ct3Lni",
+			expectedProposer: "GCPVWPESHWGV7B3AHL4VY74JJ5D5OIA3EX2HMATDX62SET56H77VLY52",
+			expectedIndex:    3,
 		},
 		{
 			height: common.NewBig(5),
@@ -50,7 +56,9 @@ func (t *testProposer) TestElect() {
 				"GD2GNOFBHZLLUUWRRFFVBRQFYGOOQXVNDVDAVREQ7234VXLD4CKIN7WG",
 				"GAZM5BNXBFXVFSDD5L3JOBB4WAIGQAX4C56TNO5FTYCEMVWVGLQJUA5S",
 			},
-			expected: 2,
+			block:            "bk-43KGf1y5rR6dq2SsDgaBsPvwXJNoAcaaEcnnMyrrU2tR",
+			expectedProposer: "GAZM5BNXBFXVFSDD5L3JOBB4WAIGQAX4C56TNO5FTYCEMVWVGLQJUA5S",
+			expectedIndex:    1,
 		},
 		{
 			height: common.NewBig(33),
@@ -61,7 +69,9 @@ func (t *testProposer) TestElect() {
 				"GDOK2PAYLLZ3J76P6BBXYNEKATJVZY3HDLWXXILW6U4QF6N2BUNFH5O7",
 				"GCP75GV5JC47X3ERCNY5I3GWYU4T7SEUCWSBPC4AR2WQQNI22HQ3ITLQ",
 			},
-			expected: 3,
+			block:            "bk-D2Rx4dpFRe8LT2WtqgCTybJGqHgQpuPJC7i1hjaBdteP",
+			expectedProposer: "GAQNARCKRAIIY7F7ECYPFFIF7MCQ2CWSKPKTMRQ22FLBO5IO6VL3KHVL",
+			expectedIndex:    0,
 		},
 		{
 			height: common.NewBig(36),
@@ -74,7 +84,9 @@ func (t *testProposer) TestElect() {
 				"GAX5CCEY7R32WII437G27AY72EGR2LSHTDX3RDXF2WOFJNPEKOBFDOEG",
 				"GC266JQQ7OQ42DRACWXNU5LITH4BNDXXT52SVSAYYIHJ3C7CQ6A4OUE4",
 			},
-			expected: 1,
+			block:            "bk-2U1sr32jbu3Zg2SzFRz5rEEHLRZcEA1BNnQ7jRfN7Knw",
+			expectedProposer: "GCUP3CQT4KK3BNSWBAGOWVHRIPQK5CC2TABRFDHTFYCYZONRH7HVUMFM",
+			expectedIndex:    3,
 		},
 		{
 			height: common.NewBig(36),
@@ -85,8 +97,11 @@ func (t *testProposer) TestElect() {
 				"GD4BPMATI4PVEG3UIZUMWK72FZCZGIB3GEUZS5RX6FVB4NQRGSIHUSVH",
 				"GDXE533ZEP2SFWVZE46FYNYDMJERYP23JGYCUFZDHB2NBF7GBWWRPYVF",
 				"GBEARXZKUMSCYDASJHZKH4YIY2BCN7WBM53ZKDOE47YQL7YBLWG7CUMC",
-				"GB53EQECFL7PAK53RBJARLCMLLBZFGBQWWXRUCQ56PAFTDLWOD2GNVMT"},
-			expected: 1,
+				"GB53EQECFL7PAK53RBJARLCMLLBZFGBQWWXRUCQ56PAFTDLWOD2GNVMT",
+			},
+			block:            "bk-HJMZb2eoHfwkGsPwof7Z2oJKJbdpTDMpvBMPZF722Juo",
+			expectedProposer: "GD4BPMATI4PVEG3UIZUMWK72FZCZGIB3GEUZS5RX6FVB4NQRGSIHUSVH",
+			expectedIndex:    4,
 		},
 		{
 			height: common.NewBig(36),
@@ -99,7 +114,9 @@ func (t *testProposer) TestElect() {
 				"GBVPK66ZRDBWTLHUTMNY2CVOXBYUZ7Z4TU5ZXSETAH7USBDOYGYTBRL5",
 				"GD35TLOZEDZC3BY57SPJ24R4LUA2AH5FFUEXLDPCEA2SHKIMDPPVTMJF",
 			},
-			expected: 5,
+			block:            "bk-92wktrdD4CcXSS24vKJBhHBZCGgNBAU7aQgMm2Mfe3wa",
+			expectedProposer: "GA2S3P5PLKVJC3R37UJXBRPE5TCCKZDZEHVLR7C7T4LPZLKM4Y7VFAYL",
+			expectedIndex:    0,
 		},
 		{
 			height: common.NewBig(41),
@@ -112,7 +129,9 @@ func (t *testProposer) TestElect() {
 				"GAEC6ERG6ORZONTLVEWPCLFY7RMCDWTWMTQ7ZYLB6MQJRS5CPF2J32UI",
 				"GCPHMJIMJZJFKJVVN6WUJN6I423AKWMEXPLAGTLANWNVHEGY4ODFJB5U",
 			},
-			expected: 0,
+			block:            "bk-DYejqpU4FsRD4nkAvva3qa8nrd8Qj2eWoi5Pti3mRnvH",
+			expectedProposer: "GD7O6J7R6TSN32RNNZSFYZN3JWABEGBBQXI36EOV2KC2UKCBM4ZXGHEM",
+			expectedIndex:    4,
 		},
 		{
 			height: common.NewBig(41),
@@ -125,7 +144,9 @@ func (t *testProposer) TestElect() {
 				"GCRQKAPXJ2FQG4CCJISUDPTKF25WMT4NPZPE6WMVCF2KPTOCEQZMGQ73",
 				"GBIUVD7IYQFUVGG56TTPVYKIF5JBNILIS2RO6HORUNGRWOKH467M4WFJ",
 			},
-			expected: 3,
+			block:            "bk-74RfuAJ88FBanExrCuMcwTgbKt79hEM2kiPELLj4WWma",
+			expectedProposer: "GCO745ODDL7T63MNJWFT3OTXLLYO6VZPPDW2KMQGQOGHWV2AYO2UUBC4",
+			expectedIndex:    3,
 		},
 		{
 			height: common.NewBig(41),
@@ -138,7 +159,9 @@ func (t *testProposer) TestElect() {
 				"GCAOC7FT5N36G7VRGXXZHBG6VFMDSD6PCYW4F55WIGUPFEDCKDHMX4P4",
 				"GBO2JBVWUZCLOMCBKYRWNLLU3T77MQBN7Q6TSMGJ3YLDPFS3OOFHDVFG",
 			},
-			expected: 0,
+			block:            "bk-49FTVG7MSUSBeyBRYBLknwvSykL7TLBNGbqauoudn6N4",
+			expectedProposer: "GANOCKTM3M6WKH5O5JHU2XSAUGKQZUMWSI5Z7OJ2FTWX5YD5J6IFQWLL",
+			expectedIndex:    0,
 		},
 	}
 
@@ -146,11 +169,13 @@ func (t *testProposer) TestElect() {
 		i := i
 		c := c
 		c.name = fmt.Sprintf(
-			"candidates=%v height=%v round=%v expect=%v",
+			"c=%v block=%s height=%v round=%v proposer=%v index=%v",
 			len(c.candidates),
+			c.block[:5],
 			c.height,
 			c.round,
-			c.expected,
+			common.Address(c.expectedProposer).Alias(),
+			c.expectedIndex,
 		)
 		t.T().Run(
 			c.name,
@@ -166,9 +191,12 @@ func (t *testProposer) TestElect() {
 					nodes = append(nodes, common.NewValidator(a, common.NetAddr{}, nil))
 				}
 
+				block, err := common.ParseHash(c.block)
+				t.NoError(err)
+
 				selector, err := NewDefaultProposerSelector(nodes)
 				t.NoError(err)
-				elected, err := selector.Select(c.height, c.round)
+				selected, err := selector.Select(block, c.height, c.round)
 				if c.err != nil {
 					t.Error(c.err, err)
 					return
@@ -177,7 +205,7 @@ func (t *testProposer) TestElect() {
 				// get index
 				var index int = -1
 				for j, candidate := range addresses {
-					if elected.Address() != candidate {
+					if selected.Address() != candidate {
 						continue
 					}
 					index = j
@@ -185,7 +213,8 @@ func (t *testProposer) TestElect() {
 				}
 
 				t.True(index >= 0)
-				t.Equal(c.expected, index, "%d: %v", i, c.name)
+				t.Equal(c.expectedProposer, selected.Address().String(), "%d: %v", i, c.name)
+				t.Equal(c.expectedIndex, index, "%d: %v", i, c.name)
 			},
 		)
 	}

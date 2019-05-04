@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"sort"
 	"strconv"
-	"sync"
 
 	"github.com/spikeekips/mitum/common"
 )
@@ -14,11 +13,10 @@ var (
 )
 
 type ProposerSelector interface {
-	Select(height common.Big, round Round) (common.Node, error)
+	Select(common.Hash /* block hash */, common.Big /* height */, Round /* round */) (common.Node, error)
 }
 
 type DefaultProposerSelector struct {
-	sync.RWMutex
 	candidates map[common.Address]common.Node
 	addresses  []common.Address
 }
@@ -43,12 +41,15 @@ func NewDefaultProposerSelector(candidates []common.Node) (*DefaultProposerSelec
 	}, nil
 }
 
-func (d *DefaultProposerSelector) Select(height common.Big, round Round) (common.Node, error) {
+// Select selects the next proposer.
+// TODO to make guessing next proposer to be more difficult, we need another
+// variables with current block.
+func (d *DefaultProposerSelector) Select(block common.Hash, height common.Big, round Round) (common.Node, error) {
 	if len(d.addresses) == 1 {
 		return d.candidates[d.addresses[0]], nil
 	}
 
-	var b []byte
+	var b []byte = block.Bytes()
 	for _, a := range d.addresses {
 		b = append(b, []byte(a)...)
 	}
