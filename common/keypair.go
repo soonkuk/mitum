@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/stellar/go/keypair"
 )
@@ -54,6 +55,12 @@ func (a *Address) UnmarshalJSON(b []byte) error {
 	*a = na
 	return nil
 }
+
+type SortAddress []Address
+
+func (a SortAddress) Len() int           { return len(a) }
+func (a SortAddress) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SortAddress) Less(i, j int) bool { return strings.Compare(string(a[i]), string(a[j])) == -1 }
 
 type Seed struct {
 	*keypair.Full

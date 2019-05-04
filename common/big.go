@@ -7,6 +7,7 @@ import (
 
 var (
 	ZeroBigInt *big.Int = new(big.Int).SetInt64(0)
+	ZeroBig    Big      = NewBig(0)
 )
 
 type Big struct {
@@ -88,6 +89,11 @@ func (a Big) MulOK(n Big) (Big, bool) {
 	return Big{Int: b}, true
 }
 
+func (a Big) Div(n Big) Big {
+	b, _ := a.DivOK(n)
+	return b
+}
+
 func (a Big) DivOK(n Big) (Big, bool) {
 	if n.Int.Cmp(ZeroBigInt) == 0 {
 		return Big{}, false
@@ -95,6 +101,21 @@ func (a Big) DivOK(n Big) (Big, bool) {
 
 	var b big.Int
 	b.Div(&a.Int, &n.Int)
+	return Big{Int: b}, true
+}
+
+func (a Big) Rem(n Big) Big {
+	b, _ := a.RemOK(n)
+	return b
+}
+
+func (a Big) RemOK(n Big) (Big, bool) {
+	if n.Int.Cmp(ZeroBigInt) == 0 {
+		return ZeroBig, true
+	}
+
+	var b big.Int
+	b.Rem(&a.Int, &n.Int)
 	return Big{Int: b}, true
 }
 
@@ -113,4 +134,13 @@ func (a Big) Cmp(b Big) int {
 
 func (a Big) Equal(b Big) bool {
 	return a.Int.Cmp(&b.Int) == 0
+}
+
+func (a Big) Uint64() uint64 {
+	b, _ := a.Uint64Ok()
+	return b
+}
+
+func (a Big) Uint64Ok() (uint64, bool) {
+	return (&(a.Int)).Uint64(), (&(a.Int)).IsUint64()
 }

@@ -19,6 +19,7 @@ const (
 	SealAlreadyVotedCode
 	InvalidVoteResultInfoCode
 	VotingFailedCode
+	FailedToElectProposerCode
 )
 
 var (
@@ -37,4 +38,5 @@ var (
 	SealAlreadyVotedError                common.Error = common.NewError("isaac", SealAlreadyVotedCode, "seal is already voted")
 	InvalidVoteResultInfoError           common.Error = common.NewError("isaac", InvalidVoteResultInfoCode, "invalid VoteResultInfo")
 	VotingFailedError                    common.Error = common.NewError("isaac", VotingFailedCode, "voting failed")
+	FailedToElectProposerError           common.Error = common.NewError("isaac", FailedToElectProposerCode, "failed to elect proposer")
 )
