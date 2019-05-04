@@ -111,6 +111,7 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
+		return
 	case receivedSeal = <-bChan:
 	}
 
@@ -177,6 +178,7 @@ func (t *testConsensusBlocker) TestSIGN() {
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
+		return
 	case receivedSeal = <-bChan:
 	}
 
@@ -206,7 +208,7 @@ func (t *testConsensusBlocker) TestACCEPT() {
 	round := Round(1)
 
 	{ // timer is started after propose accepted
-		err := blocker.startTimer(func() error {
+		err := blocker.startTimer(false, func() error {
 			return blocker.broadcastINIT(t.height, round)
 		})
 		t.NoError(err)
@@ -327,6 +329,7 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
+		return
 	case receivedSeal = <-bChan:
 	}
 
@@ -402,6 +405,7 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 	select {
 	case <-time.After(time.Millisecond * 300):
 		t.Empty("timeout to wait receivedSeal")
+		return
 	case receivedSeal = <-bChan:
 		// this ballot is INIT ballot for next round after timeout
 	}
@@ -427,21 +431,22 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 
 	round := Round(1)
 
+	bChan := make(chan common.Seal, 1)
+	defer close(bChan)
+	t.sealBroadcaster.SetSenderChan(bChan)
+
 	{ // timer is started after propose accepted
-		err := blocker.startTimer(func() error {
+		err := blocker.startTimer(false, func() error {
 			return blocker.broadcastINIT(t.height, round+1)
 		})
 		t.NoError(err)
 	}
 
-	bChan := make(chan common.Seal, 1)
-	defer close(bChan)
-	t.sealBroadcaster.SetSenderChan(bChan)
-
 	var receivedSeal common.Seal
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
+		return
 	case receivedSeal = <-bChan:
 		// this ballot is INIT ballot for next round after timeout
 	}

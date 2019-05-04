@@ -2,9 +2,7 @@ package isaac
 
 import (
 	"sync"
-	"time"
 
-	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -19,7 +17,7 @@ type ConsensusBlocker struct {
 	votingBox        VotingBox
 	sealBroadcaster  SealBroadcaster
 	sealPool         SealPool
-	timer            *ConsensusBlockerTimer
+	timer            *common.CallbackTimer
 }
 
 func NewConsensusBlocker(
@@ -100,7 +98,7 @@ end:
 	}
 }
 
-func (c *ConsensusBlocker) startTimer(callback func() error) error {
+func (c *ConsensusBlocker) startTimer(keepRunning bool, callback func() error) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -109,7 +107,7 @@ func (c *ConsensusBlocker) startTimer(callback func() error) error {
 		c.timer = nil
 	}
 
-	c.timer = c.newTimer(callback)
+	c.timer = c.newTimer(callback, keepRunning)
 	return c.timer.Start()
 }
 
@@ -194,7 +192,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error {
 	log.Debug("proposal accepted", "result", votingResult)
 
-	err := c.startTimer(func() error {
+	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(votingResult.Height, votingResult.Round+1)
 	})
 	if err != nil {
@@ -236,7 +234,7 @@ func (c *ConsensusBlocker) goToNextStage(
 ) error {
 	log.Debug("go to next sage", "proposal", proposal, "height", height, "round", round, "next", stage)
 
-	err := c.startTimer(func() error {
+	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -288,7 +286,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 	c.state.SetState(propose.State.Next)
 
 	// propose or wait new proposal
-	err = c.startTimer(func() error {
+	err = c.startTimer(true, func() error {
 		return c.broadcastINIT(propose.Block.Height.Inc(), Round(0))
 	})
 	if err != nil {
@@ -302,7 +300,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
 	log.Debug("start new round", "height", height, "round", round)
 
-	err := c.startTimer(func() error {
+	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -316,7 +314,7 @@ func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
 func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 	log.Debug("run new round", "height", height, "round", round)
 
-	err := c.startTimer(func() error {
+	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -329,14 +327,13 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 	return nil
 }
 
-func (c *ConsensusBlocker) newTimer(callback func() error) *ConsensusBlockerTimer {
-	return &ConsensusBlockerTimer{
-		timeout:  c.policy.TimeoutWaitSeal,
-		callback: callback,
-		log: log.New(log15.Ctx{
-			"timeout": c.policy.TimeoutWaitSeal,
-		}),
-	}
+func (c *ConsensusBlocker) newTimer(callback func() error, keepRunning bool) *common.CallbackTimer {
+	return common.NewCallbackTimer(
+		"consensus_blocker_timer",
+		c.policy.TimeoutWaitSeal,
+		callback,
+		keepRunning,
+	)
 }
 
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
@@ -363,55 +360,4 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	}
 
 	return nil
-}
-
-type ConsensusBlockerTimer struct {
-	timeout  time.Duration
-	stopChan chan bool
-	log      log15.Logger
-	callback func() error
-}
-
-func (c *ConsensusBlockerTimer) Start() error {
-	if c.stopChan != nil {
-		return common.StartStopperAlreadyStartedError
-	}
-
-	c.stopChan = make(chan bool)
-
-	go c.waiting()
-
-	c.log.Debug("ConsensusBlockerTimer started")
-
-	return nil
-}
-
-func (c *ConsensusBlockerTimer) Stop() error {
-	if c.stopChan == nil {
-		return nil
-	}
-
-	c.stopChan <- true
-	close(c.stopChan)
-	c.stopChan = nil
-
-	log.Debug("ConsensusBlockerTimer stopped")
-
-	return nil
-}
-
-func (c *ConsensusBlockerTimer) waiting() {
-end:
-	for {
-		select {
-		case <-c.stopChan:
-			c.log.Debug("timer is stopped")
-			break end
-		case <-time.After(c.timeout):
-			c.log.Debug("wating seal expired")
-			if err := c.callback(); err != nil {
-				log.Error("failed to doTimeout", "error", err)
-			}
-		}
-	}
 }
