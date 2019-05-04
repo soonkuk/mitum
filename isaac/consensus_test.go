@@ -27,7 +27,7 @@ type testConsensus struct {
 }
 
 func (t *testConsensus) SetupSuite() {
-	t.home = common.NewRandomHomeNode()
+	t.home = common.NewRandomHome()
 	t.height = common.NewBig(0)
 	t.block = common.NewRandomHash("bk")
 	t.state = []byte("sl")
@@ -37,7 +37,12 @@ func (t *testConsensus) SetupSuite() {
 
 func (t *testConsensus) SetupTest() {
 	cstate := &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
-	policy := ConsensusPolicy{NetworkID: common.TestNetworkID, Total: t.total, Threshold: t.threshold}
+	policy := ConsensusPolicy{
+		NetworkID:       common.TestNetworkID,
+		Total:           t.total,
+		Threshold:       t.threshold,
+		TimeoutWaitSeal: time.Second * 3,
+	}
 
 	votingBox := NewDefaultVotingBox(policy)
 
@@ -48,7 +53,7 @@ func (t *testConsensus) SetupTest() {
 
 	t.sealPool = NewDefaultSealPool()
 
-	t.blocker = NewConsensusBlocker(cstate, votingBox, t.sealBroadcaster, t.sealPool)
+	t.blocker = NewConsensusBlocker(policy, cstate, votingBox, t.sealBroadcaster, t.sealPool)
 	t.blocker.Start()
 
 	consensus, err := NewConsensus(t.blocker)

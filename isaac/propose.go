@@ -8,6 +8,7 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
+// TODO rename to Proposal
 type Propose struct {
 	Version  common.Version `json:"version"`
 	Proposer common.Address `json:"proposer"`

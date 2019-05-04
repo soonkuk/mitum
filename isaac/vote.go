@@ -113,7 +113,6 @@ func (v *Vote) UnmarshalJSON(b []byte) error {
 
 func (s Vote) IsValid() bool {
 	switch s {
-	case VoteNONE:
 	case VoteYES:
 	case VoteNOP:
 	default:

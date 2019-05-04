@@ -2,28 +2,36 @@ package isaac
 
 import (
 	"sync"
+	"time"
 
+	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
 
+type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
+
 type ConsensusBlocker struct {
 	sync.RWMutex
-	stop            chan bool
-	voteChan        chan common.Seal
-	state           *ConsensusState
-	votingBox       VotingBox
-	sealBroadcaster SealBroadcaster
-	sealPool        SealPool
+	stopBlockingChan chan bool
+	blockingChan     chan ConsensusBlockerBlockingChanFunc
+	policy           ConsensusPolicy
+	state            *ConsensusState
+	votingBox        VotingBox
+	sealBroadcaster  SealBroadcaster
+	sealPool         SealPool
+	timer            *ConsensusBlockerTimer
 }
 
 func NewConsensusBlocker(
+	policy ConsensusPolicy,
 	state *ConsensusState,
 	votingBox VotingBox,
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
-		voteChan:        make(chan common.Seal),
+		blockingChan:    make(chan ConsensusBlockerBlockingChanFunc),
+		policy:          policy,
 		state:           state,
 		votingBox:       votingBox,
 		sealBroadcaster: sealBroadcaster,
@@ -32,25 +40,38 @@ func NewConsensusBlocker(
 }
 
 func (c *ConsensusBlocker) Start() error {
-	if c.stop != nil {
+	if c.stopBlockingChan != nil {
 		return common.StartStopperAlreadyStartedError
 	}
 
-	c.stop = make(chan bool)
+	c.Lock()
+	c.stopBlockingChan = make(chan bool)
+	c.Unlock()
 
 	go c.blocking()
+
+	log.Debug("ConsensusBlocker started")
 
 	return nil
 }
 
 func (c *ConsensusBlocker) Stop() error {
-	if c.stop == nil {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.stopBlockingChan == nil {
 		return nil
 	}
 
-	c.stop <- true
-	close(c.stop)
-	c.stop = nil
+	c.stopBlockingChan <- true
+	close(c.stopBlockingChan)
+	c.stopBlockingChan = nil
+
+	if c.timer != nil {
+		c.timer.Stop()
+	}
+
+	log.Debug("ConsensusBlocker stopped")
 
 	return nil
 }
@@ -59,23 +80,60 @@ func (c *ConsensusBlocker) blocking() {
 end:
 	for {
 		select {
-		case <-c.stop:
+		case <-c.stopBlockingChan:
 			break end
-		case seal, notClosed := <-c.voteChan:
+		case f, notClosed := <-c.blockingChan:
 			if !notClosed {
 				continue
 			}
 
-			if err := c.vote(seal); err != nil {
+			seal, errChan := f()
+
+			err := c.vote(seal)
+			if err != nil {
 				log.Error("failed to vote", "error", err)
+			}
+			if errChan != nil {
+				errChan <- err
 			}
 		}
 	}
 }
 
-func (c *ConsensusBlocker) Vote(seal common.Seal) {
+func (c *ConsensusBlocker) startTimer(callback func() error) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.timer != nil {
+		c.timer.Stop()
+		c.timer = nil
+	}
+
+	c.timer = c.newTimer(callback)
+	return c.timer.Start()
+}
+
+func (c *ConsensusBlocker) stopTimer() error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.timer == nil {
+		return nil
+	}
+
+	if err := c.timer.Stop(); err != nil {
+		return err
+	}
+	c.timer = nil
+
+	return nil
+}
+
+func (c *ConsensusBlocker) Vote(seal common.Seal, errChan chan<- error) {
 	go func() {
-		c.voteChan <- seal
+		c.blockingChan <- func() (common.Seal, chan<- error) {
+			return seal, errChan
+		}
 	}()
 }
 
@@ -110,15 +168,20 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 			return c.doProposeAccepted(votingResult)
 		}
 
-		return c.doNewRound(votingResult)
+		return c.runNewRound(votingResult.Height, votingResult.Round)
 	case VoteStageSIGN:
 		if votingResult.Result == VoteResultYES {
-			return c.doGoToNextStage(votingResult)
+			return c.goToNextStage(
+				votingResult.Proposal,
+				votingResult.Height,
+				votingResult.Round,
+				votingResult.Stage.Next(),
+			)
 		}
 
-		return c.doNextRound(votingResult)
+		return c.startNewRound(votingResult.Height, votingResult.Round+1)
 	case VoteStageACCEPT:
-		return c.doFinishRound(votingResult)
+		return c.finishRound(votingResult.Proposal)
 	}
 
 	return nil
@@ -129,6 +192,15 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 // - decide YES/NOP
 // - broadcast sign ballot
 func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error {
+	log.Debug("proposal accepted", "result", votingResult)
+
+	err := c.startTimer(func() error {
+		return c.broadcastINIT(votingResult.Height, votingResult.Round+1)
+	})
+	if err != nil {
+		return err
+	}
+
 	// TODO validate propose
 	// TODO decide YES/NOP
 
@@ -152,27 +224,37 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		return err
 	}
 
-	log.Debug("proposal accepted", "result", votingResult)
-
 	return nil
 }
 
-// doGoToNextStage goes to next stage
-func (c *ConsensusBlocker) doGoToNextStage(votingResult VoteResultInfo) error {
+// goToNextStage goes to next stage
+func (c *ConsensusBlocker) goToNextStage(
+	proposal common.Hash,
+	height common.Big,
+	round Round,
+	stage VoteStage,
+) error {
+	log.Debug("go to next sage", "proposal", proposal, "height", height, "round", round, "next", stage)
+
+	err := c.startTimer(func() error {
+		return c.broadcastINIT(height, round+1)
+	})
+	if err != nil {
+		return err
+	}
+
 	// broadcast next stage ballot
 	ballot, err := NewBallot(
-		votingResult.Proposal,
+		proposal,
 		c.state.Home().Address(),
-		votingResult.Height,
-		votingResult.Round,
-		votingResult.Stage.Next(),
+		height,
+		round,
+		stage,
 		VoteYES,
 	)
 	if err != nil {
 		return err
 	}
-
-	log.Debug("move to next sage", "result", votingResult, "next", votingResult.Stage.Next())
 
 	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
 		return err
@@ -181,15 +263,14 @@ func (c *ConsensusBlocker) doGoToNextStage(votingResult VoteResultInfo) error {
 	return nil
 }
 
-// doFinishRound will do,
+// finishRound will do,
 // - store block and state
 // - update ConsensusBlockerState
 // - ready to start new block
-func (c *ConsensusBlocker) doFinishRound(votingResult VoteResultInfo) error {
-	c.Lock()
-	defer c.Unlock()
+func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
+	log.Debug("finish round", "proposal", proposal)
 
-	seal, err := c.sealPool.Get(votingResult.Proposal)
+	seal, err := c.sealPool.Get(proposal)
 	if err != nil {
 		return err
 	}
@@ -202,26 +283,72 @@ func (c *ConsensusBlocker) doFinishRound(votingResult VoteResultInfo) error {
 	// TODO store block and state
 
 	// update ConsensusBlockerState
-	c.state.SetHeight(votingResult.Height.Inc())
+	c.state.SetHeight(propose.Block.Height.Inc())
 	c.state.SetBlock(propose.Block.Next)
 	c.state.SetState(propose.State.Next)
 
-	log.Debug("finish round", "result", votingResult, "propose", propose)
+	// propose or wait new proposal
+	err = c.startTimer(func() error {
+		return c.broadcastINIT(propose.Block.Height.Inc(), Round(0))
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-// doNewRound starts new round
-func (c *ConsensusBlocker) doNewRound(votingResult VoteResultInfo) error {
-	log.Debug("start new round", "result", votingResult)
+// startNewRound starts new round
+func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
+	log.Debug("start new round", "height", height, "round", round)
+
+	err := c.startTimer(func() error {
+		return c.broadcastINIT(height, round+1)
+	})
+	if err != nil {
+		return err
+	}
+
+	return c.broadcastINIT(height, round)
+}
+
+// runNewRound starts new round and propose new proposal
+func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
+	log.Debug("run new round", "height", height, "round", round)
+
+	err := c.startTimer(func() error {
+		return c.broadcastINIT(height, round+1)
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO broadcast propsal
+	log.Debug("propose new proposal")
+
+	return nil
+}
+
+func (c *ConsensusBlocker) newTimer(callback func() error) *ConsensusBlockerTimer {
+	return &ConsensusBlockerTimer{
+		timeout:  c.policy.TimeoutWaitSeal,
+		callback: callback,
+		log: log.New(log15.Ctx{
+			"timeout": c.policy.TimeoutWaitSeal,
+		}),
+	}
+}
+
+func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
+	log.Debug("expired; we go to next round", "next", round)
 
 	ballot, err := NewBallot(
 		common.Hash{},
 		c.state.Home().Address(),
-		votingResult.Height,
-		votingResult.Round,
+		height,
+		round,
 		VoteStageINIT,
-		VoteYES, // should be yes
+		VoteYES,
 	)
 	if err != nil {
 		return err
@@ -230,6 +357,7 @@ func (c *ConsensusBlocker) doNewRound(votingResult VoteResultInfo) error {
 	// TODO Proposer should be selected
 	ballot.Proposer = c.state.Home().Address()
 
+	// TODO self-signed ballot should not be needed to broadcast
 	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
 		return err
 	}
@@ -237,28 +365,53 @@ func (c *ConsensusBlocker) doNewRound(votingResult VoteResultInfo) error {
 	return nil
 }
 
-// doNextRound starts next round
-func (c *ConsensusBlocker) doNextRound(votingResult VoteResultInfo) error {
-	log.Debug("next round", "result", votingResult)
+type ConsensusBlockerTimer struct {
+	timeout  time.Duration
+	stopChan chan bool
+	log      log15.Logger
+	callback func() error
+}
 
-	ballot, err := NewBallot(
-		common.Hash{},
-		c.state.Home().Address(),
-		votingResult.Height,
-		votingResult.Round+1, // next round
-		VoteStageINIT,
-		VoteYES, // should be yes
-	)
-	if err != nil {
-		return err
+func (c *ConsensusBlockerTimer) Start() error {
+	if c.stopChan != nil {
+		return common.StartStopperAlreadyStartedError
 	}
 
-	// TODO Proposer should be selected
-	ballot.Proposer = c.state.Home().Address()
+	c.stopChan = make(chan bool)
 
-	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
-		return err
-	}
+	go c.waiting()
+
+	c.log.Debug("ConsensusBlockerTimer started")
 
 	return nil
+}
+
+func (c *ConsensusBlockerTimer) Stop() error {
+	if c.stopChan == nil {
+		return nil
+	}
+
+	c.stopChan <- true
+	close(c.stopChan)
+	c.stopChan = nil
+
+	log.Debug("ConsensusBlockerTimer stopped")
+
+	return nil
+}
+
+func (c *ConsensusBlockerTimer) waiting() {
+end:
+	for {
+		select {
+		case <-c.stopChan:
+			c.log.Debug("timer is stopped")
+			break end
+		case <-time.After(c.timeout):
+			c.log.Debug("wating seal expired")
+			if err := c.callback(); err != nil {
+				log.Error("failed to doTimeout", "error", err)
+			}
+		}
+	}
 }

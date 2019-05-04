@@ -2,6 +2,7 @@ package isaac
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/spikeekips/mitum/common"
 )
@@ -13,6 +14,7 @@ type ConsensusPolicy struct {
 	BaseFee                    common.Big       `json:"base_fee"`  // minimum fee for operation
 	MaxTransactionsInPropose   uint             `json:"max_transactions_in_propose"`
 	MaxOperationsInTransaction uint             `json:"max_operations_in_transaction"`
+	TimeoutWaitSeal            time.Duration    `json:"timeout_wait_seal"`
 }
 
 func (c ConsensusPolicy) String() string {

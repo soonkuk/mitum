@@ -67,23 +67,30 @@ func NewTestSealBallot(
 // TODO remove if unused
 type TestSealBroadcaster struct {
 	sync.RWMutex
-	policy   ConsensusPolicy
-	homeNode *common.HomeNode
-	sendChan chan common.Seal
+	policy     ConsensusPolicy
+	home       *common.HomeNode
+	senderChan chan common.Seal
 }
 
 func NewTestSealBroadcaster(
 	policy ConsensusPolicy,
-	homeNode *common.HomeNode,
+	home *common.HomeNode,
 ) (*TestSealBroadcaster, error) {
 	return &TestSealBroadcaster{
-		policy:   policy,
-		homeNode: homeNode,
+		policy: policy,
+		home:   home,
 	}, nil
 }
 
-func (i *TestSealBroadcaster) SetSendChan(c chan common.Seal) {
-	i.sendChan = c
+func (i *TestSealBroadcaster) SetSenderChan(c chan common.Seal) {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.senderChan != nil {
+		close(i.senderChan)
+	}
+
+	i.senderChan = c
 }
 
 func (i *TestSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
@@ -92,37 +99,40 @@ func (i *TestSealBroadcaster) Send(sealType common.SealType, body common.Hasher,
 		return err
 	}
 
-	if err := seal.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
+	if err := seal.Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
 		return err
 	}
 
-	if i.sendChan == nil {
+	i.RLock()
+	defer i.RUnlock()
+
+	if i.senderChan == nil {
 		return nil
 	}
 
-	i.sendChan <- seal
+	i.senderChan <- seal
 
 	return nil
 }
 
-type TestMockVoting struct {
+type TestMockVotingBox struct {
 	result VoteResultInfo
 	err    error
 }
 
-func (t *TestMockVoting) SetResult(result VoteResultInfo, err error) {
+func (t *TestMockVotingBox) SetResult(result VoteResultInfo, err error) {
 	t.result = result
 	t.err = err
 }
 
-func (t *TestMockVoting) Open(common.Seal) (VoteResultInfo, error) {
+func (t *TestMockVotingBox) Open(common.Seal) (VoteResultInfo, error) {
 	return t.result, t.err
 }
 
-func (t *TestMockVoting) Vote(seal common.Seal) (VoteResultInfo, error) {
+func (t *TestMockVotingBox) Vote(seal common.Seal) (VoteResultInfo, error) {
 	return t.result, t.err
 }
 
-func (t *TestMockVoting) Close() error {
+func (t *TestMockVotingBox) Close() error {
 	return nil
 }

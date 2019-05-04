@@ -54,7 +54,7 @@ func (t *testNodeNetwork) newSeal(c uint64) common.Seal {
 func (t *testNodeNetwork) TestMultipleReceiver() {
 	network := NewNodeTestNetwork()
 
-	node := common.NewRandomHomeNode()
+	node := common.NewRandomHome()
 
 	// 2 receiver channel
 	receiver0 := make(chan common.Seal)
@@ -126,7 +126,7 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 func (t *testNodeNetwork) TestRemoveReceiver() {
 	network := NewNodeTestNetwork()
 
-	node := common.NewRandomHomeNode()
+	node := common.NewRandomHome()
 
 	// 1 receiver channel
 	receiver0 := make(chan common.Seal)

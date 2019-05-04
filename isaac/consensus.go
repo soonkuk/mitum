@@ -155,7 +155,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 	}
 
 	go func() {
-		c.blocker.Vote(seal)
+		c.blocker.Vote(seal, nil)
 	}()
 
 	return nil

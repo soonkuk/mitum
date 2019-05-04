@@ -80,27 +80,6 @@ func (r *DefaultVotingBox) Open(seal common.Seal) (VoteResultInfo, error) {
 		}
 	}
 
-	/*
-		result, err := r.voteKnown(
-			psHash,
-			propose.Proposer,
-			propose.Block.Height,
-			propose.Round,
-			VoteStageSIGN,
-			VoteYES,
-			psHash,
-		)
-		if err != nil {
-			return VoteResultInfo{}, err
-		}
-
-		if !result.NotYet() {
-			if err := r.afterMajority(result); err != nil {
-				return VoteResultInfo{}, err
-			}
-		}
-	*/
-
 	// NOTE result will be used to broadcast sign ballot
 	result := VoteResultInfo{
 		Result:      VoteResultYES,
@@ -519,6 +498,7 @@ func (v *VotingBoxProposal) String() string {
 	return common.TerminalLogString(string(b))
 }
 
+// TODO in INIT, ballot.Proposer should be checked
 type VotingBoxStage struct {
 	sync.RWMutex
 	psHash common.Hash

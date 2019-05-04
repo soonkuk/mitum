@@ -169,7 +169,7 @@ type HomeNode struct {
 	seed Seed
 }
 
-func NewHomeNode(seed Seed, publish NetAddr) *HomeNode {
+func NewHome(seed Seed, publish NetAddr) *HomeNode {
 	return &HomeNode{
 		BaseNode: NewBaseNode(seed.Address(), publish, nil),
 		seed:     seed,

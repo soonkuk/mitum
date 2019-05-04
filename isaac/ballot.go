@@ -65,9 +65,13 @@ func (v Ballot) Hash() (common.Hash, []byte, error) {
 }
 
 func (v Ballot) MarshalBinary() ([]byte, error) {
+	version, err := v.Version.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
 	var psHash []byte
-	if v.ProposeSeal.Empty() {
-	} else {
+	if !v.ProposeSeal.Empty() {
 		h, err := v.ProposeSeal.MarshalBinary()
 		if err != nil {
 			return nil, err
@@ -81,7 +85,7 @@ func (v Ballot) MarshalBinary() ([]byte, error) {
 	}
 
 	return common.Encode([]interface{}{
-		v.Version,
+		version,
 		v.Source,
 		psHash,
 		v.Proposer,
@@ -100,8 +104,14 @@ func (v *Ballot) UnmarshalBinary(b []byte) error {
 	}
 
 	var version common.Version
-	if err := common.Decode(m[0], &version); err != nil {
-		return err
+	{
+		var vs []byte
+		if err := common.Decode(m[0], &vs); err != nil {
+			return err
+		}
+		if err := version.UnmarshalBinary(vs); err != nil {
+			return err
+		}
 	}
 
 	var source common.Address

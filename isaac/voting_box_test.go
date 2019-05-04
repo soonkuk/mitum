@@ -19,7 +19,7 @@ type testVotingBox struct {
 }
 
 func (t *testVotingBox) SetupTest() {
-	t.home = common.NewRandomHomeNode()
+	t.home = common.NewRandomHome()
 	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
 	t.votingBox = NewDefaultVotingBox(t.policy)
 	t.seals = map[common.Hash]common.Seal{}
@@ -30,7 +30,7 @@ func (t *testVotingBox) SetupTest() {
 func (t *testVotingBox) newNodes(n uint) []*common.HomeNode {
 	var nodes []*common.HomeNode
 	for i := uint(0); i < n; i++ {
-		nodes = append(nodes, common.NewRandomHomeNode())
+		nodes = append(nodes, common.NewRandomHome())
 	}
 
 	return nodes
@@ -172,7 +172,7 @@ func (t *testVotingBox) TestVoteCurrent() {
 	votingBox := t.votingBox.(*DefaultVotingBox)
 
 	{ // v0 vote the current proposal
-		v0 := common.NewRandomHomeNode()
+		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
 		_, _, err := t.newBallotVote(v0, psHash, propose.Block.Height, VoteStageSIGN, round, v0Vote)
@@ -188,7 +188,7 @@ func (t *testVotingBox) TestVoteCurrent() {
 	}
 
 	{ // v1 vote the current proposal
-		v1 := common.NewRandomHomeNode()
+		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
 		_, _, err := t.newBallotVote(v1, psHash, propose.Block.Height, VoteStageSIGN, round, v1Vote)
@@ -204,7 +204,7 @@ func (t *testVotingBox) TestVoteCurrent() {
 	}
 
 	{ // v2 vote the current proposal
-		v2 := common.NewRandomHomeNode()
+		v2 := common.NewRandomHome()
 		v2Vote := VoteNOP
 
 		_, _, err := t.newBallotVote(v2, psHash, propose.Block.Height, VoteStageSIGN, round, v2Vote)
@@ -235,7 +235,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 	votingBox := t.votingBox.(*DefaultVotingBox)
 
 	{ // v0 vote the current proposal
-		v0 := common.NewRandomHomeNode()
+		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
 		_, _, err := t.newBallotVote(v0, psHash, propose.Block.Height, VoteStageSIGN, round, v0Vote)
@@ -253,7 +253,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 	{ // v1 vote unknown
 		psHash1 := common.NewRandomHash("sl")
 
-		v1 := common.NewRandomHomeNode()
+		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
 		sHash, _, err := t.newBallotVote(v1, psHash1, propose.Block.Height, VoteStageSIGN, round, v1Vote)
@@ -290,7 +290,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 	votingBox := t.votingBox.(*DefaultVotingBox)
 
 	{ // v0 vote the current proposal
-		v0 := common.NewRandomHomeNode()
+		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
 		_, _, err := t.newBallotVote(v0, psHash, propose.Block.Height, VoteStageSIGN, round, v0Vote)
@@ -308,7 +308,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 	{ // v1 vote unknown
 		psHash1 := common.NewRandomHash("sl")
 
-		v1 := common.NewRandomHomeNode()
+		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
 		sHash, _, err := t.newBallotVote(v1, psHash1, propose.Block.Height, VoteStageSIGN, round, v1Vote)
@@ -336,7 +336,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 	// vote record in unknown will be removed
 
 	{ // v1 vote the current proposal
-		v1 := common.NewRandomHomeNode()
+		v1 := common.NewRandomHome()
 		v1Vote := VoteYES
 
 		_, _, err := t.newBallotVote(v1, psHash, propose.Block.Height, VoteStageSIGN, round, v1Vote)
@@ -519,7 +519,7 @@ func (t *testVotingBox) TestCloseUnknown() {
 
 	var created []common.Time
 	for i := 0; i < 5; i++ {
-		address := common.NewRandomHomeNode().Address()
+		address := common.NewRandomHome().Address()
 		_, err := un.Vote(
 			common.NewRandomHash("sl"),
 			address,
@@ -553,7 +553,7 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 
 	var votedSeal common.Seal
 	{ // v0 vote the current proposal
-		v0 := common.NewRandomHomeNode()
+		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
 		var sHash common.Hash
@@ -589,7 +589,7 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 	var votedSeal common.Seal
 	{ // v0 vote the unknown proposal
 		psHashUnknown := common.NewRandomHash("sl")
-		v0 := common.NewRandomHomeNode()
+		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
 		var sHash common.Hash
@@ -639,7 +639,7 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 
 	{ // node votes the current proposal
 		_, _, err := t.newBallotVote(
-			common.NewRandomHomeNode(),
+			common.NewRandomHome(),
 			psHash,
 			propose.Block.Height,
 			VoteStageSIGN,
@@ -659,7 +659,7 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 	var result VoteResultInfo
 	{ // others vote the unknown over threshold
 		for i := 0; i < int(t.policy.Threshold); i++ {
-			other := common.NewRandomHomeNode()
+			other := common.NewRandomHome()
 
 			_, r, err := t.newBallotVote(
 				other,
