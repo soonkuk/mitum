@@ -22,7 +22,7 @@ func (t *testHash) TestNew() {
 
 	raw := RawHash(body)
 	t.Equal(raw, hash.Body())
-	t.Equal(raw[:], hash.Bytes())
+	t.Equal([]byte(hash.String()), hash.Bytes())
 }
 
 func (t *testHash) TestString() {

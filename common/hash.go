@@ -89,11 +89,11 @@ func (h Hash) Empty() bool {
 }
 
 func (h Hash) Bytes() []byte {
-	return h.b[:]
+	return []byte(h.String())
 }
 
 func (h Hash) String() string {
-	return h.Hint() + "-" + base58.Encode(h.Bytes())
+	return h.Hint() + "-" + base58.Encode(h.b[:])
 }
 
 func (h Hash) Equal(n Hash) bool {
@@ -105,7 +105,7 @@ func (h Hash) MarshalBinary() ([]byte, error) {
 		return nil, EmptyHashError
 	}
 
-	return append([]byte(h.Hint()), h.Bytes()...), nil
+	return append([]byte(h.Hint()), h.b[:]...), nil
 }
 
 func (h *Hash) UnmarshalBinary(b []byte) error {
