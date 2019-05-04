@@ -3,6 +3,7 @@ package isaac
 import (
 	"sync"
 
+	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -17,6 +18,7 @@ type ConsensusBlocker struct {
 	votingBox        VotingBox
 	sealBroadcaster  SealBroadcaster
 	sealPool         SealPool
+	proposerSelector ProposerSelector
 	timer            *common.CallbackTimer
 }
 
@@ -26,14 +28,16 @@ func NewConsensusBlocker(
 	votingBox VotingBox,
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
+	proposerSelector ProposerSelector,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
-		blockingChan:    make(chan ConsensusBlockerBlockingChanFunc),
-		policy:          policy,
-		state:           state,
-		votingBox:       votingBox,
-		sealBroadcaster: sealBroadcaster,
-		sealPool:        sealPool,
+		blockingChan:     make(chan ConsensusBlockerBlockingChanFunc),
+		policy:           policy,
+		state:            state,
+		votingBox:        votingBox,
+		sealBroadcaster:  sealBroadcaster,
+		sealPool:         sealPool,
+		proposerSelector: proposerSelector,
 	}
 }
 
@@ -337,7 +341,14 @@ func (c *ConsensusBlocker) newTimer(callback func() error, keepRunning bool) *co
 }
 
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
-	log.Debug("expired; we go to next round", "next", round)
+	log_ := log.New(log15.Ctx{"height": height, "round": round})
+	log_.Debug("broadcast INIT ballot")
+
+	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
+	if err != nil {
+		return err
+	}
+	log_.Debug("proposer selected", "block", c.state.Block())
 
 	ballot, err := NewBallot(
 		common.Hash{},
@@ -350,9 +361,7 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO Proposer should be selected
-	ballot.Proposer = c.state.Home().Address()
+	ballot.Proposer = proposer.Address()
 
 	// TODO self-signed ballot should not be needed to broadcast
 	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {

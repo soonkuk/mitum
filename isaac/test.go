@@ -93,7 +93,11 @@ func (i *TestSealBroadcaster) SetSenderChan(c chan common.Seal) {
 	i.senderChan = c
 }
 
-func (i *TestSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
+func (i *TestSealBroadcaster) Send(
+	sealType common.SealType,
+	body common.Hasher,
+	excludes ...common.Address,
+) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
 		return err
@@ -135,4 +139,27 @@ func (t *TestMockVotingBox) Vote(seal common.Seal) (VoteResultInfo, error) {
 
 func (t *TestMockVotingBox) Close() error {
 	return nil
+}
+
+type TProposerSelector struct {
+	sync.RWMutex
+	proposer common.Node
+}
+
+func NewTProposerSelector() *TProposerSelector {
+	return &TProposerSelector{}
+}
+
+func (t *TProposerSelector) SetProposer(proposer common.Node) {
+	t.Lock()
+	defer t.Unlock()
+
+	t.proposer = proposer
+}
+
+func (t *TProposerSelector) Select(block common.Hash, height common.Big, round Round) (common.Node, error) {
+	t.RLock()
+	defer t.RUnlock()
+
+	return t.proposer, nil
 }

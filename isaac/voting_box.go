@@ -171,7 +171,8 @@ func (r *DefaultVotingBox) vote(
 	sHash common.Hash,
 ) (VoteResultInfo, error) {
 	// vote for unknown
-	if (r.current == nil || !r.current.psHash.Equal(psHash)) && (r.previous == nil || !r.previous.psHash.Equal(psHash)) {
+	if (r.current == nil || !r.current.psHash.Equal(psHash)) &&
+		(r.previous == nil || !r.previous.psHash.Equal(psHash)) {
 		return r.voteUnknown(
 			psHash,
 			source,

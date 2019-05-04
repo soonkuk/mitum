@@ -27,7 +27,14 @@ type Ballot struct {
 	encoded []byte
 }
 
-func NewBallot(psHash common.Hash, source common.Address, height common.Big, round Round, stage VoteStage, vote Vote) (Ballot, error) {
+func NewBallot(
+	psHash common.Hash,
+	source common.Address,
+	height common.Big,
+	round Round,
+	stage VoteStage,
+	vote Vote,
+) (Ballot, error) {
 	b := Ballot{
 		Version:     CurrentBallotVersion,
 		Source:      source,

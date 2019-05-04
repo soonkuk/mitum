@@ -20,13 +20,14 @@ type testConsensusBlocker struct {
 	total     uint
 	threshold uint
 
-	home            *common.HomeNode
-	cstate          *ConsensusState
-	policy          ConsensusPolicy
-	votingBox       *TestMockVotingBox
-	sealBroadcaster *TestSealBroadcaster
-	sealPool        SealPool
-	blocker         *ConsensusBlocker
+	home             *common.HomeNode
+	cstate           *ConsensusState
+	policy           ConsensusPolicy
+	votingBox        *TestMockVotingBox
+	sealBroadcaster  *TestSealBroadcaster
+	sealPool         SealPool
+	blocker          *ConsensusBlocker
+	proposerSelector *TProposerSelector
 }
 
 func (t *testConsensusBlocker) SetupSuite() {
@@ -45,6 +46,8 @@ func (t *testConsensusBlocker) SetupTest() {
 	t.votingBox = &TestMockVotingBox{}
 	t.sealBroadcaster, _ = NewTestSealBroadcaster(t.policy, t.home)
 	t.sealPool = NewDefaultSealPool()
+	t.proposerSelector = NewTProposerSelector()
+	t.proposerSelector.SetProposer(t.home)
 }
 
 func (t *testConsensusBlocker) newBlocker() *ConsensusBlocker {
@@ -54,6 +57,7 @@ func (t *testConsensusBlocker) newBlocker() *ConsensusBlocker {
 		t.votingBox,
 		t.sealBroadcaster,
 		t.sealPool,
+		t.proposerSelector,
 	)
 	b.Start()
 

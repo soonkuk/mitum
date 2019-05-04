@@ -29,7 +29,11 @@ func NewDefaultSealBroadcaster(
 	}, nil
 }
 
-func (i *DefaultSealBroadcaster) Send(sealType common.SealType, body common.Hasher, excludes ...common.Address) error {
+func (i *DefaultSealBroadcaster) Send(
+	sealType common.SealType,
+	body common.Hasher,
+	excludes ...common.Address,
+) error {
 	seal, err := common.NewSeal(sealType, body)
 	if err != nil {
 		return err
