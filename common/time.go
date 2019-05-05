@@ -9,6 +9,10 @@ const (
 	TIMEFORMAT_ISO8601 string = "2006-01-02T15:04:05.000000000Z07:00"
 )
 
+var (
+	ZeroTime Time = Time{Time: time.Time{}}
+)
+
 func FormatISO8601(t Time) string {
 	return t.Time.Format(TIMEFORMAT_ISO8601)
 }
@@ -91,6 +95,14 @@ func (t Time) Between(c Time, d time.Duration) bool {
 	}
 
 	return t.Time.Before(c.Time.Add(d)) && t.Time.After(c.Time.Add(d*-1))
+}
+
+func (t Time) IsZero() bool {
+	return t.Time.Equal(ZeroTime.Time)
+}
+
+func (t Time) Equal(a Time) bool {
+	return t.Time.Equal(a.Time)
 }
 
 func Now() Time {

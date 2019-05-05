@@ -19,6 +19,7 @@ const (
 	InvalidNetAddrCode
 	StartStopperAlreadyStartedCode
 	InvalidSealTypeCode
+	InvalidSignatureCode
 )
 
 var (
@@ -39,4 +40,5 @@ var (
 	InvalidNetAddrError              Error = NewError("common", InvalidNetAddrCode, "invalid NetAddr")
 	StartStopperAlreadyStartedError  Error = NewError("common", StartStopperAlreadyStartedCode, "StartStopper already started")
 	InvalidSealTypeError             Error = NewError("isaac", InvalidSealTypeCode, "invalid SealType")
+	InvalidSignatureError            Error = NewError("isaac", InvalidSignatureCode, "invalid Signature found")
 )

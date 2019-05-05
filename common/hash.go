@@ -77,6 +77,7 @@ func (h Hash) Body() [32]byte {
 	return h.b
 }
 
+// TODO rename to `IsValid`
 func (h Hash) Empty() bool {
 	if h.b == emptyRawHash {
 		return true
@@ -180,6 +181,14 @@ type Signature []byte
 
 func NewSignature(networkID NetworkID, seed Seed, hash Hash) (Signature, error) {
 	return seed.Sign(append(networkID, hash.Bytes()...))
+}
+
+func (s Signature) IsValid() error {
+	if len(s) < 1 {
+		return InvalidSignatureError
+	}
+
+	return nil
 }
 
 func (s Signature) MarshalJSON() ([]byte, error) {

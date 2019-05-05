@@ -6,6 +6,10 @@ import (
 	"github.com/Masterminds/semver"
 )
 
+var (
+	ZeroVersion Version = Version{}
+)
+
 type Version semver.Version
 
 func NewVersion(s string) (Version, error) {

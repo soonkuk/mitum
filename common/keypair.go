@@ -8,6 +8,11 @@ import (
 	"github.com/stellar/go/keypair"
 )
 
+type Signer interface {
+	Sign(NetworkID, Seed) error
+	CheckSignature(NetworkID) error
+}
+
 type Address string
 
 func (a Address) IsValid() (keypair.KP, error) {
