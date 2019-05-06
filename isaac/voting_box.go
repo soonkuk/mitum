@@ -969,7 +969,7 @@ func NewVotingBoxUnknownVote(
 }
 
 func (v VotingBoxUnknownVote) Empty() bool {
-	return v.psHash.Empty()
+	return !v.psHash.IsValid()
 }
 
 func (v VotingBoxUnknownVote) MarshalJSON() ([]byte, error) {

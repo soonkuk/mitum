@@ -64,7 +64,7 @@ func (v Ballot) makeHash() (common.Hash, []byte, error) {
 }
 
 func (v Ballot) Hash() (common.Hash, []byte, error) {
-	if v.hash.Empty() {
+	if !v.hash.IsValid() {
 		return v.makeHash()
 	}
 
@@ -78,7 +78,7 @@ func (v Ballot) MarshalBinary() ([]byte, error) {
 	}
 
 	var psHash []byte
-	if !v.ProposeSeal.Empty() {
+	if v.ProposeSeal.IsValid() {
 		h, err := v.ProposeSeal.MarshalBinary()
 		if err != nil {
 			return nil, err
@@ -214,7 +214,7 @@ func (v Ballot) Wellformed() error {
 			return BallotNotWellformedError.SetMessage("Proposer is empty for INIT")
 		}
 
-		if !v.ProposeSeal.Empty() {
+		if v.ProposeSeal.IsValid() {
 			return BallotNotWellformedError.SetMessage("ProposeSeal is not empty")
 		}
 	} else {
@@ -222,7 +222,7 @@ func (v Ballot) Wellformed() error {
 			return BallotNotWellformedError.SetMessage("Proposer is not empty for not INIT")
 		}
 
-		if v.ProposeSeal.Empty() {
+		if !v.ProposeSeal.IsValid() {
 			return BallotNotWellformedError.SetMessage("ProposeSeal is empty")
 		}
 	}

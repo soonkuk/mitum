@@ -77,16 +77,15 @@ func (h Hash) Body() [32]byte {
 	return h.b
 }
 
-// TODO rename to `IsValid`
-func (h Hash) Empty() bool {
+func (h Hash) IsValid() bool {
 	if h.b == emptyRawHash {
-		return true
+		return false
 	}
 	if len(h.h) < 1 {
-		return true
+		return false
 	}
 
-	return false
+	return true
 }
 
 func (h Hash) Bytes() []byte {
@@ -102,7 +101,7 @@ func (h Hash) Equal(n Hash) bool {
 }
 
 func (h Hash) MarshalBinary() ([]byte, error) {
-	if h.Empty() {
+	if !h.IsValid() {
 		return nil, EmptyHashError
 	}
 
@@ -125,7 +124,7 @@ func (h Hash) MarshalJSON() ([]byte, error) {
 	// if h.Empty() {
 	// 	return nil, EmptyHashError
 	// }
-	if h.Empty() {
+	if !h.IsValid() {
 		return json.Marshal("")
 	}
 

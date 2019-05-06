@@ -79,7 +79,7 @@ func (s Seal) makeHash() (Hash, []byte, error) {
 }
 
 func (s Seal) Hash() (Hash, []byte, error) {
-	if s.hash.Empty() {
+	if !s.hash.IsValid() {
 		return s.makeHash()
 	}
 
@@ -331,11 +331,11 @@ func (s Seal) Wellformed() error {
 		return SealNotWellformedError.SetMessage("Seal.Signature is empty")
 	}
 
-	if s.hash.Empty() {
+	if !s.hash.IsValid() {
 		return EmptyHashError.SetMessage("Seal.hash is empty")
 	}
 
-	if s.bodyHash.Empty() {
+	if !s.bodyHash.IsValid() {
 		return EmptyHashError.SetMessage("Seal.bodyHash is empty")
 	}
 

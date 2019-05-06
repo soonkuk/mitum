@@ -349,7 +349,7 @@ func (r RawSeal) WellformedRaw() error {
 }
 
 func (r RawSeal) wellformed() error {
-	if r.hash.Empty() {
+	if !r.hash.IsValid() {
 		return errors.New("empty hash")
 	}
 

@@ -303,7 +303,7 @@ func (t *testSealV1) TestCustomSealGenerateHash() {
 
 	h, err := r.GenerateHash()
 	t.NoError(err)
-	t.False(h.Empty())
+	t.True(h.IsValid())
 
 	t.Equal(r.Hint(), h.Hint())
 }

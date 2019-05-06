@@ -38,7 +38,7 @@ func (p Propose) makeHash() (common.Hash, []byte, error) {
 }
 
 func (p Propose) Hash() (common.Hash, []byte, error) {
-	if p.hash.Empty() {
+	if !p.hash.IsValid() {
 		return p.makeHash()
 	}
 
@@ -187,7 +187,7 @@ func (p Propose) Wellformed() error {
 	}
 
 	for _, th := range p.Transactions {
-		if th.Empty() {
+		if !th.IsValid() {
 			return ProposeNotWellformedError.SetMessage(
 				"empty Hash found in Propose.Transactions",
 			)
@@ -255,11 +255,11 @@ func (bb *ProposeBlock) UnmarshalBinary(b []byte) error {
 }
 
 func (bb ProposeBlock) Wellformed() error {
-	if bb.Current.Empty() {
+	if !bb.Current.IsValid() {
 		return ProposeNotWellformedError.SetMessage("Propose.Block.Current is empty")
 	}
 
-	if bb.Next.Empty() {
+	if !bb.Next.IsValid() {
 		return ProposeNotWellformedError.SetMessage("Propose.Block.Next is empty")
 	}
 
