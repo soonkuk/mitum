@@ -105,7 +105,7 @@ func (t *testSealV1) TestWellFormed() {
 		t.Run(
 			c.name,
 			func() {
-				err := c.getSeal().Wellformed()
+				err := c.getSeal().wellformed()
 				if len(c.err) < 1 {
 					t.NoError(err, "%d: %v", i, c.name)
 				} else {
@@ -135,21 +135,10 @@ func (r CustomSeal) Hint() string {
 }
 
 func (r CustomSeal) SerializeRLP() ([]interface{}, error) {
-	s, err := r.RawSeal.SerializeRLPInside()
-	if err != nil {
-		return nil, err
-	}
-
-	return append(s, r.fieldA, r.fieldB, r.fieldC), nil
+	return []interface{}{r.fieldA, r.fieldB, r.fieldC}, nil
 }
 
 func (r *CustomSeal) UnserializeRLP(m []rlp.RawValue) error {
-	if err := r.RawSeal.UnserializeRLPInside(m); err != nil {
-		return err
-	}
-
-	*r = CustomSeal{RawSeal: r.RawSeal}
-
 	var fieldA string
 	if err := Decode(m[6], &fieldA); err != nil {
 		return err
@@ -170,23 +159,24 @@ func (r *CustomSeal) UnserializeRLP(m []rlp.RawValue) error {
 	return nil
 }
 
-func (r *CustomSeal) UnmarshalBinary(b []byte) error {
-	r.RawSeal.parent = r
-
-	return r.RawSeal.UnmarshalBinaryInside(b)
+func (r CustomSeal) SerializeMap() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"field_a": r.fieldA,
+		"field_b": r.fieldB,
+		"field_c": r.fieldC,
+	}, nil
 }
 
-func (r CustomSeal) SerializeMap() (map[string]interface{}, error) {
-	m, err := r.RawSeal.SerializeMap()
-	if err != nil {
-		return nil, err
+func (r CustomSeal) Wellformed() error {
+	if err := r.RawSeal.WellformedRaw(); err != nil {
+		return err
 	}
 
-	m["field_a"] = r.fieldA
-	m["field_b"] = r.fieldB
-	m["field_c"] = r.fieldC
+	if len(r.fieldA) < 1 || len(r.fieldB) < 1 || len(r.fieldC) < 1 {
+		return SealNotWellformedError
+	}
 
-	return m, nil
+	return nil
 }
 
 func (t *testSealV1) newCustomSeal() CustomSeal {
@@ -214,6 +204,9 @@ func (t *testSealV1) TestCustomSealMarshal() {
 	defer DebugPanic()
 
 	r := t.newCustomSeal()
+	seed := RandomSeed()
+	err := r.Sign(TestNetworkID, seed)
+	t.NoError(err)
 
 	var b []byte
 	{
@@ -224,9 +217,53 @@ func (t *testSealV1) TestCustomSealMarshal() {
 		b = a
 	}
 
+	return
 	var unmarshaled CustomSeal
 	{
-		err := unmarshaled.UnmarshalBinary(b)
+		decoded, err := DecodeSeal(CustomSeal{}, b)
+		t.NoError(err)
+
+		_, ok := decoded.(SealV1)
+		t.True(ok)
+
+		unmarshaled = decoded.(CustomSeal)
+	}
+
+	t.Equal(r.version, unmarshaled.version)
+	t.Equal(r.sealType, unmarshaled.sealType)
+	t.True(r.hash.Equal(unmarshaled.hash))
+	t.Equal(r.source, unmarshaled.source)
+	t.Equal(r.signature, unmarshaled.signature)
+	t.True(r.signedAt.Equal(unmarshaled.signedAt))
+	t.Equal(r.fieldA, unmarshaled.fieldA)
+	t.Equal(r.fieldB, unmarshaled.fieldB)
+	t.Equal(r.fieldC, unmarshaled.fieldC)
+}
+
+func (t *testSealV1) TestCustomSealMarshalAfterSign() {
+	defer DebugPanic()
+
+	r := t.newCustomSeal()
+
+	seed := RandomSeed()
+	err := r.Sign(TestNetworkID, seed)
+	t.NoError(err)
+
+	signature, err := NewSignature(TestNetworkID, seed, r.hash)
+	t.NoError(err)
+
+	var unmarshaled CustomSeal
+	{
+
+		b, err := r.MarshalBinary()
+		t.NoError(err)
+		t.NotEmpty(b)
+
+		decoded, err := DecodeSeal(CustomSeal{}, b)
+		t.NoError(err)
+		unmarshaled = decoded.(CustomSeal)
+
+		err = unmarshaled.Wellformed()
 		t.NoError(err)
 	}
 
@@ -235,6 +272,7 @@ func (t *testSealV1) TestCustomSealMarshal() {
 	t.True(r.hash.Equal(unmarshaled.hash))
 	t.Equal(r.source, unmarshaled.source)
 	t.Equal(r.signature, unmarshaled.signature)
+	t.Equal(signature, unmarshaled.signature)
 	t.True(r.signedAt.Equal(unmarshaled.signedAt))
 	t.Equal(r.fieldA, unmarshaled.fieldA)
 	t.Equal(r.fieldB, unmarshaled.fieldB)
@@ -289,4 +327,126 @@ func (t *testSealV1) TestCustomSealSign() {
 
 func TestSealV1(t *testing.T) {
 	suite.Run(t, new(testSealV1))
+}
+
+type testSealedSeal struct {
+	suite.Suite
+}
+
+func (t *testSealedSeal) TestNew() {
+	seal := testCustomSeal{
+		fieldA: RandomUUID(),
+		fieldB: RandomUUID(),
+		fieldC: []byte(RandomUUID()),
+	}
+
+	sealSeed := RandomSeed()
+	{
+		raw := NewRawSeal(
+			seal,
+			CurrentSealVersion,
+			SealType("custom-seal"),
+		)
+		seal.RawSeal = raw
+
+		err := seal.Sign(TestNetworkID, sealSeed)
+		t.NoError(err)
+	}
+
+	sealed, err := NewSealedSeal(seal)
+	t.NoError(err)
+
+	sealedSeed := RandomSeed()
+	err = sealed.Sign(TestNetworkID, sealedSeed)
+	t.NoError(err)
+	t.NoError(sealed.Wellformed())
+	t.NoError(sealed.CheckSignature(TestNetworkID))
+}
+
+func (t *testSealedSeal) TestMarshal() {
+	seal := testCustomSeal{
+		fieldA: RandomUUID(),
+		fieldB: RandomUUID(),
+		fieldC: []byte(RandomUUID()),
+	}
+
+	sealSeed := RandomSeed()
+	{
+		raw := NewRawSeal(
+			seal,
+			CurrentSealVersion,
+			SealType("custom-seal"),
+		)
+		seal.RawSeal = raw
+
+		_ = seal.Sign(TestNetworkID, sealSeed)
+	}
+
+	sealed, _ := NewSealedSeal(seal)
+
+	sealedSeed := RandomSeed()
+	_ = sealed.Sign(TestNetworkID, sealedSeed)
+
+	b, err := EncodeSeal(sealed) // encode
+	t.NoError(err)
+
+	decoded, err := DecodeSeal(SealedSeal{}, b)
+	t.NoError(err)
+
+	t.Equal(sealed.Version(), decoded.Version())
+	t.Equal(SealedSealType, decoded.Type())
+	t.Equal(sealed.Hint(), decoded.Hint())
+	t.True(sealed.Hash().Equal(decoded.Hash()))
+	t.Equal(sealed.Source(), decoded.Source())
+	t.Equal(sealed.Signature(), decoded.Signature())
+	t.True(sealed.SignedAt().Equal(decoded.SignedAt()))
+}
+
+func (t *testSealedSeal) TestUnmarshalInsideSeal() {
+	seal := testCustomSeal{
+		fieldA: RandomUUID(),
+		fieldB: RandomUUID(),
+		fieldC: []byte(RandomUUID()),
+	}
+
+	sealSeed := RandomSeed()
+	{
+		raw := NewRawSeal(
+			seal,
+			CurrentSealVersion,
+			SealType("custom-seal"),
+		)
+		seal.RawSeal = raw
+
+		_ = seal.Sign(TestNetworkID, sealSeed)
+	}
+
+	sealed, _ := NewSealedSeal(seal)
+
+	sealedSeed := RandomSeed()
+	_ = sealed.Sign(TestNetworkID, sealedSeed)
+
+	b, err := EncodeSeal(sealed) // encode
+	t.NoError(err)
+
+	decoded, err := DecodeSeal(SealedSeal{}, b)
+	t.NoError(err)
+
+	decodedSeal := decoded.(SealedSeal)
+
+	// to decode inside seal, SealType should be known
+	insideSeal, err := DecodeSeal(testCustomSeal{}, decodedSeal.Binary())
+	t.NoError(err)
+
+	t.Equal(seal.Version(), insideSeal.Version())
+	t.Equal(seal.Type(), insideSeal.Type())
+	t.Equal(seal.Hint(), insideSeal.Hint())
+	t.True(seal.Hash().Equal(insideSeal.Hash()))
+	t.Equal(seal.Source(), insideSeal.Source())
+	t.Equal(seal.Signature(), insideSeal.Signature())
+	t.True(seal.SignedAt().Equal(insideSeal.SignedAt()))
+}
+
+func TestSealedSeal(t *testing.T) {
+	suite.Run(t, new(testSealedSeal))
 }

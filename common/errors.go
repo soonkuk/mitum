@@ -1,5 +1,6 @@
 package common
 
+// TODO rename XXXCode  to XXXErrorCode
 const (
 	_ uint = iota
 	OverflowErrorCode

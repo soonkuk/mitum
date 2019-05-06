@@ -1,13 +1,6 @@
 package common
 
-import (
-	"encoding/json"
-	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/suite"
-)
-
+/*
 type testSealType struct {
 	suite.Suite
 }
@@ -217,3 +210,4 @@ func (t *testSeal) TestSealedSeal() {
 func TestSeal(t *testing.T) {
 	suite.Run(t, new(testSeal))
 }
+*/

@@ -1,13 +1,6 @@
 package common
 
-import (
-	"context"
-	"io"
-	"testing"
-
-	"github.com/stretchr/testify/suite"
-)
-
+/*
 type testSealCheckers struct {
 	suite.Suite
 }
@@ -103,3 +96,4 @@ func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 func TestSealCheckers(t *testing.T) {
 	suite.Run(t, new(testSealCheckers))
 }
+*/

@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"errors"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -11,20 +12,23 @@ import (
 type SealV1 interface {
 	encoding.BinaryMarshaler
 	RLPSerializer
+	JSONMapSerializer
+	WellformChecker
 
 	Version() Version
 	Type() SealType
 	Hint() string
 	Hash() Hash
-	GenerateHash() (Hash, error)
 	Source() Address
 	Signature() Signature
 	SignedAt() Time // signed time
-	Wellformed() error
+	GenerateHash() (Hash, error)
+	Raw() RawSeal
 	String() string
 }
 
 type RawSeal struct {
+	sync.RWMutex
 	parent    SealV1
 	version   Version
 	sealType  SealType
@@ -34,7 +38,23 @@ type RawSeal struct {
 	signedAt  Time
 }
 
-func (r RawSeal) SerializeRLPInside() ([]interface{}, error) {
+func NewRawSeal(
+	parent SealV1,
+	version Version,
+	sealType SealType,
+) RawSeal {
+	return RawSeal{
+		parent:   parent,
+		version:  version,
+		sealType: sealType,
+	}
+}
+
+func (r RawSeal) SerializeRLP() ([]interface{}, error) {
+	if r.parent == nil {
+		return nil, errors.New("parent is missing")
+	}
+
 	version, err := r.version.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -42,7 +62,7 @@ func (r RawSeal) SerializeRLPInside() ([]interface{}, error) {
 
 	hash, err := r.hash.MarshalBinary()
 	if err != nil {
-		return nil, err
+		hash = []byte{} // skipped
 	}
 
 	signedAt, err := r.signedAt.MarshalBinary()
@@ -50,19 +70,43 @@ func (r RawSeal) SerializeRLPInside() ([]interface{}, error) {
 		return nil, err
 	}
 
-	return []interface{}{
+	l := []interface{}{
 		hash,
 		r.signature,
 		version,
 		r.sealType,
 		r.source,
 		signedAt,
-	}, nil
+	}
+
+	p, err := r.parent.SerializeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(l, p...), nil
 }
 
-func (r *RawSeal) UnserializeRLPInside(m []rlp.RawValue) error {
+func (r *RawSeal) UnserializeRLP(m []rlp.RawValue) error {
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	}
+
+	var parent RLPUnserializer
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	} else if u, ok := r.parent.(RLPUnserializer); !ok {
+		return errors.New("parent is not RLPUnserializer")
+	} else {
+		parent = u
+	}
+
+	if err := parent.UnserializeRLP(m); err != nil {
+		return err
+	}
+
 	if len(m) < 6 {
-		return SealNotWellformedError
+		return SealNotWellformedError.SetMessage("invalid rlp value count: %d", len(m))
 	}
 
 	var hash Hash
@@ -117,10 +161,6 @@ func (r *RawSeal) UnserializeRLPInside(m []rlp.RawValue) error {
 	r.source = source
 	r.signedAt = signedAt
 
-	if err := r.Wellformed(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -129,7 +169,7 @@ func (r RawSeal) MarshalBinary() ([]byte, error) {
 		return nil, errors.New("parent is missing")
 	}
 
-	s, err := r.parent.SerializeRLP()
+	s, err := r.SerializeRLP()
 	if err != nil {
 		return nil, err
 	}
@@ -137,19 +177,33 @@ func (r RawSeal) MarshalBinary() ([]byte, error) {
 	return Encode(s)
 }
 
+func (r *RawSeal) UnmarshalBinaryRaw(b []byte) error {
+	return nil
+}
+
+func (r *RawSeal) UnmarshalBinary(b []byte) error {
+	var m []rlp.RawValue
+	if err := Decode(b, &m); err != nil {
+		return err
+	}
+
+	if err := r.UnserializeRLP(m); err != nil {
+		return err
+	}
+
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	}
+
+	return nil
+}
+
 func (r RawSeal) GenerateHash() (Hash, error) {
 	if r.parent == nil {
 		return Hash{}, errors.New("parent is missing")
 	}
 
-	var s []interface{}
-	var err error
-	if r.parent != nil {
-		s, err = r.parent.SerializeRLP()
-	} else {
-		s, err = r.SerializeRLPInside()
-	}
-
+	s, err := r.SerializeRLP()
 	if err != nil {
 		return Hash{}, err
 	}
@@ -167,33 +221,34 @@ func (r RawSeal) GenerateHash() (Hash, error) {
 	return hash, nil
 }
 
-func (r *RawSeal) UnmarshalBinaryInside(b []byte) error {
+func (r RawSeal) SerializeMap() (map[string]interface{}, error) {
+	var parent JSONMapSerializer
 	if r.parent == nil {
-		return errors.New("parent is missing")
+		return nil, errors.New("parent is missing")
+	} else if u, ok := r.parent.(JSONMapSerializer); !ok {
+		return nil, errors.New("parent is not JSONMapSerializer")
+	} else {
+		parent = u
 	}
 
-	u, ok := r.parent.(RLPUnserializer)
-	if !ok {
-		return errors.New("parent is not RLPUnserializer")
-	}
-
-	var m []rlp.RawValue
-	if err := Decode(b, &m); err != nil {
-		return err
-	}
-
-	return u.UnserializeRLP(m)
-}
-
-func (r *RawSeal) SerializeMap() (map[string]interface{}, error) {
-	return map[string]interface{}{
+	l := map[string]interface{}{
 		"version":   r.version,
 		"type":      r.sealType,
 		"hash":      r.hash,
 		"source":    r.source,
 		"signature": r.signature,
 		"signedAt":  r.signedAt,
-	}, nil
+	}
+
+	m, err := parent.SerializeMap()
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range m {
+		l[k] = v
+	}
+
+	return l, nil
 }
 
 func (r RawSeal) MarshalJSON() ([]byte, error) {
@@ -201,12 +256,7 @@ func (r RawSeal) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("parent is missing")
 	}
 
-	u, ok := r.parent.(JSONMapSerializer)
-	if !ok {
-		return nil, errors.New("parent is not JSONMapSerializer")
-	}
-
-	m, err := u.SerializeMap()
+	m, err := r.SerializeMap()
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +266,17 @@ func (r RawSeal) MarshalJSON() ([]byte, error) {
 
 func (r RawSeal) String() string {
 	return TerminalLogString(PrintJSON(r, true, false))
+}
+
+func (r RawSeal) Raw() RawSeal {
+	return r
+}
+
+func (r *RawSeal) SetParent(seal SealV1) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.parent = seal
 }
 
 func (r RawSeal) Version() Version {
@@ -269,15 +330,33 @@ func (r RawSeal) SignedAt() Time {
 	return r.signedAt
 }
 
-func (r RawSeal) Wellformed() error {
+func (r RawSeal) WellformedRaw() error {
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	}
+
 	if err := r.wellformed(); err != nil {
 		return SealNotWellformedError.SetMessage(err.Error())
+	}
+
+	if hash, err := r.GenerateHash(); err != nil {
+		return err
+	} else if !r.hash.Equal(hash) {
+		return HashDoesNotMatchError
 	}
 
 	return nil
 }
 
 func (r RawSeal) wellformed() error {
+	if r.hash.Empty() {
+		return errors.New("empty hash")
+	}
+
+	if err := r.signature.IsValid(); err != nil {
+		return err
+	}
+
 	if r.version.Equal(ZeroVersion) {
 		return errors.New("zero version found")
 	}
@@ -286,15 +365,7 @@ func (r RawSeal) wellformed() error {
 		return errors.New("empty SealType")
 	}
 
-	if r.hash.Empty() {
-		return errors.New("empty hash")
-	}
-
 	if _, err := r.source.IsValid(); err != nil {
-		return err
-	}
-
-	if err := r.signature.IsValid(); err != nil {
 		return err
 	}
 
