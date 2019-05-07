@@ -321,7 +321,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 		return err
 	}
 
-	// TODO broadcast propsal
+	// TODO broadcast proposal
 	log.Debug("propose new proposal")
 
 	return nil

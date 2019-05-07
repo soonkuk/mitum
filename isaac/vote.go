@@ -35,9 +35,8 @@ func (v VoteResult) String() string {
 }
 
 type VoteResultInfo struct {
-	Result   VoteResult  `json:"result"`
-	Proposal common.Hash `json:"proposal"`
-	// TODO Proposer
+	Result      VoteResult  `json:"result"`
+	Proposal    common.Hash `json:"proposal"`
 	Height      common.Big  `json:"height"`
 	Round       Round       `json:"round"`
 	Stage       VoteStage   `json:"stage"`

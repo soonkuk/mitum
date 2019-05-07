@@ -332,7 +332,11 @@ type VotingBoxProposal struct {
 	stageACCEPT *VotingBoxStage
 }
 
-func NewVotingBoxProposal(phash common.Hash, height common.Big, round Round) *VotingBoxProposal {
+func NewVotingBoxProposal(
+	phash common.Hash,
+	height common.Big,
+	round Round,
+) *VotingBoxProposal {
 	return &VotingBoxProposal{
 		proposal:    phash,
 		height:      height,
@@ -482,7 +486,12 @@ type VotingBoxStage struct {
 	voted    map[ /* source */ common.Address]VotingBoxStageNode
 }
 
-func NewVotingBoxStage(phash common.Hash, height common.Big, round Round, stage VoteStage) *VotingBoxStage {
+func NewVotingBoxStage(
+	phash common.Hash,
+	height common.Big,
+	round Round,
+	stage VoteStage,
+) *VotingBoxStage {
 	return &VotingBoxStage{
 		proposal: phash,
 		height:   height,

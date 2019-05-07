@@ -333,6 +333,11 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 	// all votes has,
 	// - same proposal
 	// - same stage
+
+	var total uint = 4
+	var threshold uint = 3
+	nodes := t.newNodes(total)
+
 	vo := NewVotingBoxUnknown()
 	t.Equal(0, vo.Len())
 
@@ -340,10 +345,6 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 	height := common.NewBig(200)
 	stage := VoteStageACCEPT
 	round := Round(99)
-
-	var total uint = 4
-	var threshold uint = 3
-	nodes := t.newNodes(total)
 
 	{ // vote under threshold
 		for i, n := range nodes {
@@ -405,15 +406,15 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 	// - same height
 	// - same round
 
+	var total uint = 4
+	var threshold uint = 3
+	nodes := t.newNodes(total)
+
 	vo := NewVotingBoxUnknown()
 	t.Equal(0, vo.Len())
 
 	height := common.NewBig(200)
 	round := Round(99)
-
-	var total uint = 4
-	var threshold uint = 3
-	nodes := t.newNodes(total)
 
 	{ // vote under threshold
 		for i, n := range nodes {
@@ -481,7 +482,12 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 }
 
 func (t *testVotingBox) TestCloseVotingBoxStage() {
-	st := NewVotingBoxStage(common.NewRandomHash("sl"), common.NewBig(33), Round(0), VoteStageSIGN)
+	st := NewVotingBoxStage(
+		common.NewRandomHash("sl"),
+		common.NewBig(33),
+		Round(0),
+		VoteStageSIGN,
+	)
 	t.False(st.Closed())
 
 	st.Close()
@@ -698,7 +704,12 @@ func (t *testVotingBoxStage) makeNodes(c uint) []common.Seed {
 }
 
 func (t *testVotingBoxStage) newVotingBoxStage() *VotingBoxStage {
-	return NewVotingBoxStage(common.NewRandomHash("sl"), common.NewBig(33), Round(0), VoteStageSIGN)
+	return NewVotingBoxStage(
+		common.NewRandomHash("sl"),
+		common.NewBig(33),
+		Round(0),
+		VoteStageSIGN,
+	)
 }
 
 func (t *testVotingBoxStage) TestVote() {

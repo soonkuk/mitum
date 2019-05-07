@@ -72,7 +72,6 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 
 	round := Round(1)
 
-	// TODO rename to proposal
 	proposal := NewTestProposal(t.home.Address(), nil)
 
 	{ // correcting proposal
