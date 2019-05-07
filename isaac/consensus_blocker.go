@@ -2,6 +2,7 @@ package isaac
 
 import (
 	"sync"
+	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
@@ -312,7 +313,8 @@ func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
 
 // runNewRound starts new round and propose new proposal
 func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
-	log.Debug("run new round", "height", height, "round", round)
+	log_ := log.New(log15.Ctx{"height": height, "round": round})
+	log_.Debug("run new round")
 
 	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(height, round+1)
@@ -321,10 +323,19 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 		return err
 	}
 
-	// TODO broadcast proposal
-	log.Debug("propose new proposal")
+	if !height.Equal(c.state.Height()) {
+		log_.Debug("different height found", "init-height", height, "state-height", c.state.Height())
+		return DifferentHeightConsensusError.AppendMessage(
+			"init height=%v, state height=%v",
+			height,
+			c.state.Height(),
+		)
+	}
 
-	return nil
+	delay := c.policy.AvgBlockRoundInterval
+	log_.Debug("propose new proposal", "delay", delay)
+
+	return c.propose(height, round, delay)
 }
 
 func (c *ConsensusBlocker) newTimer(callback func() error, keepRunning bool) *common.CallbackTimer {
@@ -344,7 +355,7 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	if err != nil {
 		return err
 	}
-	log_.Debug("proposer selected", "block", c.state.Block())
+	log_.Debug("proposer selected", "block", c.state.Block(), "proposer", proposer.Address())
 
 	ballot := NewBallot(
 		common.Hash{},
@@ -359,6 +370,50 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	if err := c.sealBroadcaster.Send(&ballot); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Duration) error {
+	log_ := log.New(log15.Ctx{"height": height, "round": round})
+
+	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
+	if err != nil {
+		return err
+	}
+	log_.Debug("proposer selected", "block", c.state.Block(), "proposer", proposer.Address())
+
+	if !proposer.Equal(c.state.Home()) {
+		log_.Debug("proposer is not home; will wait Proposal")
+		return nil
+	}
+
+	// TODO validate transactions.
+	proposal := NewProposal(
+		round,
+		ProposalBlock{
+			Height:  height,
+			Current: c.state.Block(),
+			Next:    common.NewRandomHash("bk"),
+		},
+		ProposalState{
+			Current: c.state.State(),
+			Next:    []byte("next state"),
+		},
+		nil, // TODO transactions
+	)
+
+	go func(proposal Proposal, delay time.Duration) {
+		if delay > 0 {
+			<-time.After(delay)
+		}
+
+		err := c.sealBroadcaster.Send(&proposal)
+		if err != nil {
+			log_.Error("failed to broadcast", "proposal", proposal.Hash())
+		}
+		log_.Debug("proposal broadcasted", "proposal", proposal.Hash(), "delay", delay)
+	}(proposal, delay)
 
 	return nil
 }

@@ -20,6 +20,7 @@ const (
 	InvalidVoteResultInfoCode
 	VotingFailedCode
 	FailedToElectProposerCode
+	DifferentHeightConsensusCode
 )
 
 var (
@@ -39,4 +40,5 @@ var (
 	InvalidVoteResultInfoError           common.Error = common.NewError("isaac", InvalidVoteResultInfoCode, "invalid VoteResultInfo")
 	VotingFailedError                    common.Error = common.NewError("isaac", VotingFailedCode, "voting failed")
 	FailedToElectProposerError           common.Error = common.NewError("isaac", FailedToElectProposerCode, "failed to elect proposer")
+	DifferentHeightConsensusError        common.Error = common.NewError("isaac", DifferentHeightConsensusCode, "consensused, but different height found")
 )

@@ -15,6 +15,7 @@ type Node interface {
 	Address() Address
 	Publish() NetAddr
 	Validators() map[Address]Validator
+	Equal(Node) bool
 	String() string
 }
 

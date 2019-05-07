@@ -36,10 +36,11 @@ func (t *testConsensusBlocker) SetupSuite() {
 
 func (t *testConsensusBlocker) SetupTest() {
 	t.policy = ConsensusPolicy{
-		NetworkID:       common.TestNetworkID,
-		Total:           t.total,
-		Threshold:       t.threshold,
-		TimeoutWaitSeal: time.Second * 3,
+		NetworkID:             common.TestNetworkID,
+		Total:                 t.total,
+		Threshold:             t.threshold,
+		TimeoutWaitSeal:       time.Second * 3,
+		AvgBlockRoundInterval: time.Millisecond * 300,
 	}
 	t.cstate = &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
 
@@ -448,6 +449,70 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageINIT, receivedBallot.Stage)
 	t.Equal(VoteYES, receivedBallot.Vote)
+}
+
+// TestProposeNewProposal simulates, init ballots consensused, blocker will,
+// - start next round after given time
+func (t *testConsensusBlocker) TestProposeNewProposalNextRound() {
+	blocker := t.newBlocker()
+	defer blocker.Stop()
+
+	round := Round(1)
+
+	votingResult := VoteResultInfo{
+		Proposed: false,
+		Proposal: common.NewRandomHash("pp"),
+		Result:   VoteResultYES,
+		Height:   t.height,
+		Round:    round + 1,
+		Stage:    VoteStageINIT,
+	}
+	t.votingBox.SetResult(votingResult, nil)
+
+	ballot := NewBallot(
+		votingResult.Proposal,
+		t.home.Address(),
+		t.height,
+		votingResult.Round,
+		votingResult.Stage,
+		VoteYES,
+	)
+	_ = ballot.Sign(common.TestNetworkID, t.home.Seed())
+	_ = t.sealPool.Add(ballot)
+
+	bChan := make(chan common.Seal, 1)
+	defer close(bChan)
+	t.sealBroadcaster.SetSenderChan(bChan)
+
+	errChan := make(chan error)
+	blocker.Vote(ballot, errChan)
+	t.NoError(<-errChan)
+
+	var receivedSeal common.Seal
+	var receivedProposal Proposal
+end:
+	for {
+		select {
+		case <-time.After(time.Second):
+			t.Empty("timeout to wait receivedSeal")
+			return
+		case receivedSeal = <-bChan:
+			if receivedSeal.Type() != ProposalSealType {
+				continue
+			}
+
+			receivedProposal = receivedSeal.(Proposal)
+			break end
+		}
+	}
+
+	proposer, _ := t.proposerSelector.Select(t.cstate.block, t.cstate.height, round+1)
+
+	t.Equal(t.cstate.height, receivedProposal.Block.Height)
+	t.Equal(t.cstate.block, receivedProposal.Block.Current)
+	t.Equal(t.cstate.state, receivedProposal.State.Current)
+	t.Equal(votingResult.Round, receivedProposal.Round)
+	t.Equal(proposer.Address(), receivedProposal.Source())
 }
 
 func TestConsensusBlockerTotal4Threshold3(t *testing.T) {

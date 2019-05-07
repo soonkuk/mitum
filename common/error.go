@@ -60,6 +60,17 @@ func (e Error) SetMessage(format string, args ...interface{}) Error {
 	return Error{code: e.code, message: fmt.Sprintf(format, args...)}
 }
 
+func (e Error) AppendMessage(format string, args ...interface{}) Error {
+	return Error{
+		code: e.code,
+		message: fmt.Sprintf(
+			"%s; %s",
+			e.message,
+			fmt.Sprintf(format, args...),
+		),
+	}
+}
+
 func (e Error) Equal(n error) bool {
 	ne, found := n.(Error)
 	if !found {

@@ -148,7 +148,27 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 	}
 
 	go func() {
-		c.blocker.Vote(seal, nil)
+		errChan := make(chan error)
+		c.blocker.Vote(seal, errChan)
+		select {
+		case err := <-errChan:
+			if err == nil {
+				return
+			}
+
+			log.Error("failed to vote", "error", err)
+
+			cerr, ok := err.(common.Error)
+			if !ok {
+				return
+			}
+
+			// TODO detect sync
+			switch cerr.Code() {
+			case DifferentHeightConsensusError.Code():
+				//
+			}
+		}
 	}()
 
 	return nil

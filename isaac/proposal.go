@@ -130,7 +130,12 @@ func (p Proposal) SerializeMap() (map[string]interface{}, error) {
 		"transactions": p.Transactions,
 	}, nil
 }
+
 func (p Proposal) Wellformed() error {
+	if p.RawSeal.Type() != ProposalSealType {
+		return common.InvalidSealTypeError.AppendMessage("not Proposal")
+	}
+
 	if err := p.Block.Wellformed(); err != nil {
 		return err
 	}

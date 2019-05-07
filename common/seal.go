@@ -66,6 +66,14 @@ func NewRawSeal(
 	}
 }
 
+func (r RawSeal) Type() SealType {
+	return r.sealType
+}
+
+func (r RawSeal) Hint() string {
+	return r.hint
+}
+
 func (r RawSeal) SerializeRLP() ([]interface{}, error) {
 	if r.parent == nil {
 		return nil, errors.New("parent is missing")
@@ -286,13 +294,6 @@ func (r RawSeal) String() string {
 
 func (r RawSeal) Raw() RawSeal {
 	return r
-}
-
-func (r *RawSeal) SetParent(seal Seal) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.parent = seal
 }
 
 func (r RawSeal) Version() Version {

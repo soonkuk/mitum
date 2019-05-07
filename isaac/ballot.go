@@ -130,6 +130,10 @@ func (b Ballot) SerializeMap() (map[string]interface{}, error) {
 }
 
 func (b Ballot) Wellformed() error {
+	if b.RawSeal.Type() != BallotSealType {
+		return common.InvalidSealTypeError.AppendMessage("not ballot")
+	}
+
 	if err := b.RawSeal.WellformedRaw(); err != nil {
 		return err
 	}
