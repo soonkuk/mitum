@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -385,6 +386,21 @@ func (r RawSeal) wellformed() error {
 	if r.signedAt.IsZero() {
 		return errors.New("zero signedAt")
 	}
+
+	return nil
+}
+
+func CheckSeal(seal Seal, toSeal Seal) error {
+	if seal.Type() != toSeal.Type() {
+		return InvalidSealTypeError.SetMessage("sealType does not match")
+	}
+
+	rt := reflect.ValueOf(toSeal).Elem().Type()
+	if !reflect.TypeOf(seal).AssignableTo(rt) {
+		return InvalidSealTypeError.SetMessage("not assignable to toSeal, %v", rt.Name())
+	}
+
+	reflect.ValueOf(toSeal).Elem().Set(reflect.ValueOf(seal))
 
 	return nil
 }

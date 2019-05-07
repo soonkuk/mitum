@@ -110,7 +110,7 @@ func (c *Consensus) Receiver() chan common.Seal {
 
 // TODO Please correct this boring method name, `schedule` :(
 func (c *Consensus) schedule() {
-	// NOTE these seal should be verified that is well-formed.
+	// NOTE these seal should be verified that is wellformed.
 end:
 	for {
 		select {
@@ -134,7 +134,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 	log_ := log.New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	checker := common.NewChainChecker(
-		"received-seal-checker",
+		"receiveSeal",
 		common.ContextWithValues(
 			c.ctx,
 			"seal", seal,
@@ -147,9 +147,10 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		return err
 	}
 
-	go func() {
+	go func(seal common.Seal) {
 		errChan := make(chan error)
 		c.blocker.Vote(seal, errChan)
+
 		select {
 		case err := <-errChan:
 			if err == nil {
@@ -169,7 +170,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 				//
 			}
 		}
-	}()
+	}(seal)
 
 	return nil
 }

@@ -148,9 +148,19 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 
 		switch seal.Type() {
 		case ProposalSealType:
-			votingResult, err = c.votingBox.Open(seal.(Proposal))
+			var proposal Proposal
+			if err := common.CheckSeal(seal, &proposal); err != nil {
+				return err
+			}
+
+			votingResult, err = c.votingBox.Open(proposal)
 		case BallotSealType:
-			votingResult, err = c.votingBox.Vote(seal.(Ballot))
+			var ballot Ballot
+			if err := common.CheckSeal(seal, &ballot); err != nil {
+				return err
+			}
+
+			votingResult, err = c.votingBox.Vote(ballot)
 		default:
 			return common.InvalidSealTypeError
 		}
@@ -273,10 +283,8 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	}
 
 	var proposal Proposal
-	if p, ok := seal.(Proposal); !ok {
-		return common.UnknownSealTypeError.SetMessage("not Proposal")
-	} else {
-		proposal = p
+	if err := common.CheckSeal(seal, &proposal); err != nil {
+		return common.UnknownSealTypeError.SetMessage(err.Error())
 	}
 
 	// TODO store block and state
