@@ -238,7 +238,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
-		sHash, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		ballot, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
 		t.NoError(err)
 
 		// check
@@ -255,7 +255,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 		t.Equal(VoteStageSIGN, unknown.stage)
 		t.Equal(v1Vote, unknown.vote)
 
-		t.Equal(sHash, unknown.seal)
+		t.Equal(ballot.Hash(), unknown.seal)
 	}
 }
 
@@ -290,7 +290,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
-		sHash, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		ballot, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
 		t.NoError(err)
 
 		// check
@@ -307,7 +307,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		t.Equal(VoteStageSIGN, unknown.stage)
 		t.Equal(v1Vote, unknown.vote)
 
-		t.Equal(sHash, unknown.seal)
+		t.Equal(ballot.Hash(), unknown.seal)
 	}
 
 	// 1. v1 voted in unknown

@@ -84,7 +84,9 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 		proposal.Round = round
 	}
 
-	err := t.sealPool.Add(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+	err = t.sealPool.Add(proposal)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
@@ -119,12 +121,12 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	}
 
 	// sign ballot is received
-	t.Equal(BallotSealType, receivedSeal.Type)
+	t.Equal(BallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round, receivedBallot.Round)
-	t.Equal(t.home.Address(), receivedBallot.Source)
+	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageSIGN, receivedBallot.Stage)
 	t.True(receivedBallot.Vote.IsValid())
 }
@@ -148,7 +150,9 @@ func (t *testConsensusBlocker) TestSIGN() {
 		VoteYES,
 	)
 
-	err := t.sealPool.Add(ballot)
+	err := ballot.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+	err = t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
@@ -183,12 +187,12 @@ func (t *testConsensusBlocker) TestSIGN() {
 	}
 
 	// sign ballot is received
-	t.Equal(BallotSealType, receivedSeal.Type)
+	t.Equal(BallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round, receivedBallot.Round)
-	t.Equal(t.home.Address(), receivedBallot.Source)
+	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageACCEPT, receivedBallot.Stage)
 	t.True(receivedBallot.Vote.IsValid())
 }
@@ -223,6 +227,8 @@ func (t *testConsensusBlocker) TestACCEPT() {
 			proposal.State.Next = []byte("showme")
 			proposal.Round = round
 		}
+		err = proposal.Sign(common.TestNetworkID, t.home.Seed())
+		t.NoError(err)
 
 		err = t.sealPool.Add(proposal)
 		t.NoError(err)
@@ -236,8 +242,10 @@ func (t *testConsensusBlocker) TestACCEPT() {
 		VoteStageACCEPT,
 		VoteYES,
 	)
+	err := ballot.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
 
-	err := t.sealPool.Add(ballot)
+	err = t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
@@ -286,7 +294,9 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 		VoteNOP,
 	)
 
-	err := t.sealPool.Add(ballot)
+	err := ballot.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+	err = t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
@@ -320,14 +330,14 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 		receivedBallot = b
 	}
 
-	t.Equal(BallotSealType, receivedSeal.Type)
+	t.Equal(BallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
 	// should be round + 1
 	t.Equal(round+1, receivedBallot.Round)
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
-	t.Equal(t.home.Address(), receivedBallot.Source)
+	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageINIT, receivedBallot.Stage)
 	t.True(receivedBallot.Vote.IsValid())
 }
@@ -353,7 +363,9 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 		proposal.Round = round
 	}
 
-	err := t.sealPool.Add(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+	err = t.sealPool.Add(proposal)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
@@ -393,7 +405,7 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round+1, receivedBallot.Round)
-	t.Equal(t.home.Address(), receivedBallot.Source)
+	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageINIT, receivedBallot.Stage)
 	t.Equal(VoteYES, receivedBallot.Vote)
 }
@@ -434,7 +446,7 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 
 	t.True(t.height.Equal(receivedBallot.Height))
 	t.Equal(round+1, receivedBallot.Round)
-	t.Equal(t.home.Address(), receivedBallot.Source)
+	t.Equal(t.home.Address(), receivedBallot.Source())
 	t.Equal(VoteStageINIT, receivedBallot.Stage)
 	t.Equal(VoteYES, receivedBallot.Vote)
 }

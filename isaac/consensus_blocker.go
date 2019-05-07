@@ -219,7 +219,7 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		vote,
 	)
 
-	if err := c.sealBroadcaster.Send(ballot); err != nil {
+	if err := c.sealBroadcaster.Send(&ballot); err != nil {
 		return err
 	}
 
@@ -252,7 +252,7 @@ func (c *ConsensusBlocker) goToNextStage(
 		VoteYES,
 	)
 
-	if err := c.sealBroadcaster.Send(ballot); err != nil {
+	if err := c.sealBroadcaster.Send(&ballot); err != nil {
 		return err
 	}
 
@@ -356,7 +356,7 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	)
 
 	// TODO self-signed ballot should not be needed to broadcast
-	if err := c.sealBroadcaster.Send(ballot); err != nil {
+	if err := c.sealBroadcaster.Send(&ballot); err != nil {
 		return err
 	}
 

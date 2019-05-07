@@ -30,13 +30,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 
 	switch seal.Type() {
 	case ProposalSealType:
-		var proposal Proposal
-		if p, ok := seal.(Proposal); !ok {
-			return common.UnknownSealTypeError.SetMessage("not Proposal")
-		} else {
-			proposal = p
-		}
-		_ = c.SetContext("proposal", proposal)
+		_ = c.SetContext("proposal", seal.(Proposal))
 
 		return common.NewChainChecker(
 			"Proposal checker",
@@ -49,13 +43,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerProposalState,
 		)
 	case BallotSealType:
-		var ballot Ballot
-		if b, ok := seal.(Ballot); !ok {
-			return common.UnknownSealTypeError.SetMessage("not Ballot")
-		} else {
-			ballot = b
-		}
-		_ = c.SetContext("ballot", ballot)
+		_ = c.SetContext("ballot", seal.(Ballot))
 
 		return common.NewChainChecker(
 			"ballot checker",
@@ -70,7 +58,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 	case common.SealedSealType:
 		// TODO decapsule sealed seal
 	default:
-		return common.InvalidSealTypeError
+		return common.UnknownSealTypeError.SetMessage("not Proposal")
 	}
 
 	return nil

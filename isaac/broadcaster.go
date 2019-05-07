@@ -9,7 +9,7 @@ import (
 )
 
 type SealBroadcaster interface {
-	Send(common.Seal /* seal */, ...common.Address /* excludes */) error
+	Send(common.Signer /* seal */, ...common.Address /* excludes */) error
 }
 
 type DefaultSealBroadcaster struct {
@@ -30,10 +30,17 @@ func NewDefaultSealBroadcaster(
 }
 
 func (i *DefaultSealBroadcaster) Send(
-	seal common.Seal,
+	message common.Signer,
 	excludes ...common.Address,
 ) error {
-	if err := seal.(common.Signer).Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
+	var seal common.Seal
+	if s, ok := message.(common.Seal); !ok {
+		return common.InvalidSealTypeError
+	} else {
+		seal = s
+	}
+
+	if err := message.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
 		return err
 	}
 

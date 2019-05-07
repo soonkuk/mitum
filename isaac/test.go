@@ -3,6 +3,7 @@
 package isaac
 
 import (
+	"reflect"
 	"sync"
 
 	"github.com/spikeekips/mitum/common"
@@ -68,10 +69,10 @@ func (i *TestSealBroadcaster) SetSenderChan(c chan common.Seal) {
 }
 
 func (i *TestSealBroadcaster) Send(
-	seal common.Seal,
+	seal common.Signer,
 	excludes ...common.Address,
 ) error {
-	if err := seal.(common.Signer).Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
+	if err := seal.Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
 		return err
 	}
 
@@ -82,7 +83,7 @@ func (i *TestSealBroadcaster) Send(
 		return nil
 	}
 
-	i.senderChan <- seal
+	i.senderChan <- reflect.ValueOf(seal.(common.Seal)).Elem().Interface().(common.Seal)
 
 	return nil
 }
