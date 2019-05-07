@@ -11,7 +11,7 @@ const (
 	KnownSealFoundCode
 	SealNotFoundCode
 	SomethingWrongVotingCode
-	ProposeNotWellformedCode
+	ProposalNotWellformedCode
 	BallotNotWellformedCode
 	ConsensusNotReadyCode
 	AnotherProposalIsOpenedCode
@@ -30,7 +30,7 @@ var (
 	KnownSealFoundError                  common.Error = common.NewError("isaac", KnownSealFoundCode, "known seal found")
 	SealNotFoundError                    common.Error = common.NewError("isaac", SealNotFoundCode, "seal not found")
 	SomethingWrongVotingError            common.Error = common.NewError("isaac", SomethingWrongVotingCode, "")
-	ProposeNotWellformedError            common.Error = common.NewError("isaac", ProposeNotWellformedCode, "")
+	ProposalNotWellformedError           common.Error = common.NewError("isaac", ProposalNotWellformedCode, "")
 	BallotNotWellformedError             common.Error = common.NewError("isaac", BallotNotWellformedCode, "")
 	ConsensusNotReadyError               common.Error = common.NewError("isaac", ConsensusNotReadyCode, "consensus is not ready yet")
 	AnotherProposalIsOpenedError         common.Error = common.NewError("isaac", AnotherProposalIsOpenedCode, "another opened proposal is running")

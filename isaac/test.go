@@ -8,60 +8,34 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-func NewTestPropose(proposer common.Address, transactions []common.Hash) (Propose, error) {
-	currentBlockHash, err := common.NewHash("bk", []byte(common.RandomUUID()))
-	if err != nil {
-		return Propose{}, err
-	}
+func NewTestProposal(proposer common.Address, transactions []common.Hash) Proposal {
+	currentBlockHash, _ := common.NewHash("bk", []byte(common.RandomUUID()))
+	nextBlockHash, _ := common.NewHash("bk", []byte(common.RandomUUID()))
 
-	nextBlockHash, err := common.NewHash("bk", []byte(common.RandomUUID()))
-	if err != nil {
-		return Propose{}, err
-	}
-
-	return Propose{
-		Version:  CurrentBallotVersion,
-		Proposer: proposer,
-		Round:    0,
-		Block: ProposeBlock{
+	return NewProposal(
+		Round(0),
+		ProposalBlock{
 			Height:  common.NewBig(99),
 			Current: currentBlockHash,
 			Next:    nextBlockHash,
 		},
-		State: ProposeState{
+		ProposalState{
 			Current: []byte(common.RandomUUID()),
 			Next:    []byte(common.RandomUUID()),
 		},
-		ProposedAt:   common.Now(),
-		Transactions: transactions,
-	}, nil
-}
-
-func NewTestSealPropose(proposer common.Address, transactions []common.Hash) (Propose, common.Seal, error) {
-	propose, err := NewTestPropose(proposer, transactions)
-	if err != nil {
-		return Propose{}, common.Seal{}, err
-	}
-
-	seal, err := common.NewSeal(ProposeSealType, propose)
-	return propose, seal, err
+		transactions,
+	)
 }
 
 func NewTestSealBallot(
-	psHash common.Hash,
-	source common.Address,
+	phash common.Hash,
+	proposer common.Address,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 	vote Vote,
-) (Ballot, common.Seal, error) {
-	ballot, err := NewBallot(psHash, source, height, round, stage, vote)
-	if err != nil {
-		return Ballot{}, common.Seal{}, err
-	}
-
-	seal, err := common.NewSeal(BallotSealType, ballot)
-	return ballot, seal, err
+) Ballot {
+	return NewBallot(phash, proposer, height, round, stage, vote)
 }
 
 // TODO remove if unused
@@ -94,16 +68,10 @@ func (i *TestSealBroadcaster) SetSenderChan(c chan common.Seal) {
 }
 
 func (i *TestSealBroadcaster) Send(
-	sealType common.SealType,
-	body common.Hasher,
+	seal common.Seal,
 	excludes ...common.Address,
 ) error {
-	seal, err := common.NewSeal(sealType, body)
-	if err != nil {
-		return err
-	}
-
-	if err := seal.Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
+	if err := seal.(common.Signer).Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
 		return err
 	}
 
@@ -129,11 +97,11 @@ func (t *TestMockVotingBox) SetResult(result VoteResultInfo, err error) {
 	t.err = err
 }
 
-func (t *TestMockVotingBox) Open(common.Seal) (VoteResultInfo, error) {
+func (t *TestMockVotingBox) Open(Proposal) (VoteResultInfo, error) {
 	return t.result, t.err
 }
 
-func (t *TestMockVotingBox) Vote(seal common.Seal) (VoteResultInfo, error) {
+func (t *TestMockVotingBox) Vote(Ballot) (VoteResultInfo, error) {
 	return t.result, t.err
 }
 

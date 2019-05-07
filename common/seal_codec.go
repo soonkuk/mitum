@@ -30,7 +30,7 @@ func (s *SealCodec) Registered() []SealType {
 	return types
 }
 
-func (s *SealCodec) Register(seal SealV1) error {
+func (s *SealCodec) Register(seal Seal) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -47,7 +47,7 @@ func (s *SealCodec) Register(seal SealV1) error {
 	return nil
 }
 
-func (s *SealCodec) Encode(seal SealV1) ([]byte, error) {
+func (s *SealCodec) Encode(seal Seal) ([]byte, error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -58,7 +58,7 @@ func (s *SealCodec) Encode(seal SealV1) ([]byte, error) {
 	return EncodeSeal(seal)
 }
 
-func (s *SealCodec) Decode(b []byte) (SealV1, error) {
+func (s *SealCodec) Decode(b []byte) (Seal, error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -82,11 +82,11 @@ func (s *SealCodec) Decode(b []byte) (SealV1, error) {
 	return decodeSeal(rt, b, rawValues)
 }
 
-func EncodeSeal(seal SealV1) ([]byte, error) {
+func EncodeSeal(seal Seal) ([]byte, error) {
 	return seal.MarshalBinary()
 }
 
-func DecodeSeal(sealStruct interface{}, b []byte) (SealV1, error) {
+func DecodeSeal(sealStruct interface{}, b []byte) (Seal, error) {
 	rt := reflect.TypeOf(sealStruct)
 
 	ptrSeal := reflect.New(rt)
@@ -97,7 +97,7 @@ func DecodeSeal(sealStruct interface{}, b []byte) (SealV1, error) {
 	return decodeSeal(rt, b, nil)
 }
 
-func decodeSeal(rt reflect.Type, b []byte, rawValues []rlp.RawValue) (SealV1, error) {
+func decodeSeal(rt reflect.Type, b []byte, rawValues []rlp.RawValue) (Seal, error) {
 	// get types
 	if rawValues == nil {
 		if err := Decode(b, &rawValues); err != nil {
@@ -113,7 +113,7 @@ func decodeSeal(rt reflect.Type, b []byte, rawValues []rlp.RawValue) (SealV1, er
 	ptrSeal := reflect.New(rt)
 
 	raw := reflect.New(reflect.TypeOf(RawSeal{})).Interface().(*RawSeal)
-	raw.parent = ptrSeal.Interface().(SealV1)
+	raw.parent = ptrSeal.Interface().(Seal)
 
 	if err := raw.UnserializeRLP(rawValues); err != nil {
 		return nil, err
@@ -125,9 +125,9 @@ func decodeSeal(rt reflect.Type, b []byte, rawValues []rlp.RawValue) (SealV1, er
 	nestedRaw.parent = nil
 	parent.FieldByName("RawSeal").Set(reflect.ValueOf(nestedRaw))
 
-	raw.parent = parent.Interface().(SealV1)
+	raw.parent = parent.Interface().(Seal)
 
 	ptrSeal.Elem().FieldByName("RawSeal").Set(reflect.ValueOf(raw).Elem())
 
-	return ptrSeal.Elem().Interface().(SealV1), nil
+	return ptrSeal.Elem().Interface().(Seal), nil
 }

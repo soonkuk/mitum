@@ -28,10 +28,10 @@ func (s *DefaultSealPool) Exists(sHash common.Hash) bool {
 	return found
 }
 
-func (s *DefaultSealPool) Get(sHash common.Hash) (common.Seal, error) {
-	n, found := s.seals.Load(sHash)
+func (s *DefaultSealPool) Get(hash common.Hash) (common.Seal, error) {
+	n, found := s.seals.Load(hash)
 	if !found {
-		return common.Seal{}, SealNotFoundError
+		return nil, SealNotFoundError
 	}
 
 	return n.(common.Seal), nil
@@ -40,18 +40,13 @@ func (s *DefaultSealPool) Get(sHash common.Hash) (common.Seal, error) {
 func (s *DefaultSealPool) Add(seal common.Seal) error {
 	// NOTE seal should be checked well-formed already
 
-	sHash, _, err := seal.Hash()
-	if err != nil {
-		return err
-	}
-
-	log_ := log.New(log15.Ctx{"sHash": sHash, "type": seal.Type})
-	if _, found := s.seals.Load(sHash); found {
+	log_ := log.New(log15.Ctx{"sHash": seal.Hash(), "type": seal.Type})
+	if _, found := s.seals.Load(seal.Hash()); found {
 		log_.Debug("already received; it will be ignored")
 		return KnownSealFoundError
 	}
 
-	s.seals.Store(sHash, seal)
+	s.seals.Store(seal.Hash(), seal)
 	log_.Debug("seal added")
 
 	return nil

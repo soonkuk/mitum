@@ -5,7 +5,7 @@ import (
 )
 
 type BlockStorage interface {
-	NewBlock(common.Seal /* Seal(Propose) */) error
+	NewBlock(common.Seal /* Seal(Proposal) */) error
 }
 
 type DefaultBlockStorage struct {
@@ -18,19 +18,16 @@ func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error)
 	}, nil
 }
 
-func (i *DefaultBlockStorage) NewBlock(proposeSeal common.Seal) error {
-	if proposeSeal.Type != ProposeSealType {
+func (i *DefaultBlockStorage) NewBlock(seal common.Seal) error {
+	if seal.Type() != ProposalSealType {
 		return common.InvalidSealTypeError
 	}
 
-	psHash, _, err := proposeSeal.Hash()
-	if err != nil {
-		return err
-	}
-
-	var propose Propose
-	if err := proposeSeal.UnmarshalBody(&propose); err != nil {
-		return err
+	var proposal Proposal
+	if p, ok := seal.(Proposal); !ok {
+		return common.UnknownSealTypeError.SetMessage("not Proposal")
+	} else {
+		proposal = p
 	}
 
 	// TODO store block
@@ -41,13 +38,13 @@ func (i *DefaultBlockStorage) NewBlock(proposeSeal common.Seal) error {
 	prevState.SetBlock(i.state.Block())
 	prevState.SetState(i.state.State())
 
-	i.state.SetHeight(propose.Block.Height.Inc())
-	i.state.SetBlock(propose.Block.Next)
-	i.state.SetState(propose.State.Next)
+	i.state.SetHeight(proposal.Block.Height.Inc())
+	i.state.SetBlock(proposal.Block.Next)
+	i.state.SetState(proposal.State.Next)
 
 	log.Debug(
 		"allConfirmed",
-		"psHash", psHash,
+		"proposal", seal.Hash(),
 		"old-block-height", prevState.Height(),
 		"old-block-hash", prevState.Block(),
 		"old-state-hash", prevState.State(),

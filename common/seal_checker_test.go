@@ -1,15 +1,19 @@
 package common
 
-/*
+import (
+	"context"
+	"io"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
 type testSealCheckers struct {
 	suite.Suite
 }
 
-func (t testSealCheckers) newSealMessage() (Seal, []byte) {
-	body := sealTestBody{A: 1, B: "b"}
-
-	st := NewSealType("body")
-	seal, _ := NewSeal(st, body)
+func (t testSealCheckers) newSealMessage() (CustomSeal, []byte) {
+	seal := NewCustomSeal()
 
 	seed := RandomSeed()
 	err := seal.Sign(TestNetworkID, seed)
@@ -24,6 +28,11 @@ func (t testSealCheckers) newSealMessage() (Seal, []byte) {
 func (t testSealCheckers) TestCheckerUnmarshalSeal() {
 	ctx := context.WithValue(context.Background(), "networkID", TestNetworkID)
 
+	sc := NewSealCodec()
+	err := sc.Register(CustomSeal{})
+	t.NoError(err)
+	ctx = context.WithValue(ctx, "sealCodec", sc)
+
 	_, message := t.newSealMessage()
 	ctx = context.WithValue(ctx, "message", message)
 
@@ -33,7 +42,7 @@ func (t testSealCheckers) TestCheckerUnmarshalSeal() {
 		CheckerUnmarshalSeal,
 	)
 
-	err := checker.Check()
+	err = checker.Check()
 	t.NoError(err)
 
 	checkedSeal := checker.Context().Value("seal")
@@ -42,6 +51,11 @@ func (t testSealCheckers) TestCheckerUnmarshalSeal() {
 
 func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 	ctx := context.WithValue(context.Background(), "networkID", TestNetworkID)
+
+	sc := NewSealCodec()
+	err := sc.Register(CustomSeal{})
+	t.NoError(err)
+	ctx = context.WithValue(ctx, "sealCodec", sc)
 
 	var checker *ChainChecker
 
@@ -55,26 +69,25 @@ func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 			CheckerUnmarshalSeal,
 		)
 
-		err := checker.Check()
+		err = checker.Check()
 		t.Equal(io.EOF, err)
 	}
 
 	{ // bad seal
 		seal, _ := t.newSealMessage()
-		seal.hash = NewRandomHash("bad")
+		seal.RawSeal.hash = NewRandomHash("bad")
 		message, err := seal.MarshalBinary()
 		t.NoError(err)
 
 		ctx = ContextWithValues(
 			ctx,
 			"message", message,
-			"networkID", NetworkID("bad-network-id"),
 		)
 
 		checker = checker.New(ctx)
 
 		err = checker.Check()
-		t.True(SignatureVerificationFailedError.Equal(err))
+		t.True(InvalidHashError.Equal(err))
 	}
 
 	{ // invalid networkID
@@ -96,4 +109,3 @@ func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
 func TestSealCheckers(t *testing.T) {
 	suite.Run(t, new(testSealCheckers))
 }
-*/

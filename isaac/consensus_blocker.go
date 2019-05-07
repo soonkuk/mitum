@@ -145,11 +145,11 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	{ // voting
 		var err error
 
-		switch seal.Type {
-		case ProposeSealType:
-			votingResult, err = c.votingBox.Open(seal)
+		switch seal.Type() {
+		case ProposalSealType:
+			votingResult, err = c.votingBox.Open(seal.(Proposal))
 		case BallotSealType:
-			votingResult, err = c.votingBox.Vote(seal)
+			votingResult, err = c.votingBox.Vote(seal.(Ballot))
 		default:
 			return common.InvalidSealTypeError
 		}
@@ -190,7 +190,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 }
 
 // doProposeAccepted will do,
-// - validate propose
+// - validate proposal
 // - decide YES/NOP
 // - broadcast sign ballot
 func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error {
@@ -203,26 +203,23 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		return err
 	}
 
-	// TODO validate propose
+	// TODO validate proposal
 	// TODO decide YES/NOP
 
 	vote := VoteYES
 
 	// broadcast sign ballot
 
-	ballot, err := NewBallot(
+	ballot := NewBallot(
 		votingResult.Proposal,
-		c.state.Home().Address(),
+		"",
 		votingResult.Height,
 		votingResult.Round,
 		VoteStageSIGN,
 		vote,
 	)
-	if err != nil {
-		return err
-	}
 
-	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
+	if err := c.sealBroadcaster.Send(ballot); err != nil {
 		return err
 	}
 
@@ -231,12 +228,12 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 
 // goToNextStage goes to next stage
 func (c *ConsensusBlocker) goToNextStage(
-	proposal common.Hash,
+	phash common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 ) error {
-	log.Debug("go to next sage", "proposal", proposal, "height", height, "round", round, "next", stage)
+	log.Debug("go to next sage", "proposal", phash, "height", height, "round", round, "next", stage)
 
 	err := c.startTimer(true, func() error {
 		return c.broadcastINIT(height, round+1)
@@ -246,19 +243,16 @@ func (c *ConsensusBlocker) goToNextStage(
 	}
 
 	// broadcast next stage ballot
-	ballot, err := NewBallot(
-		proposal,
-		c.state.Home().Address(),
+	ballot := NewBallot(
+		phash,
+		"",
 		height,
 		round,
 		stage,
 		VoteYES,
 	)
-	if err != nil {
-		return err
-	}
 
-	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
+	if err := c.sealBroadcaster.Send(ballot); err != nil {
 		return err
 	}
 
@@ -269,29 +263,31 @@ func (c *ConsensusBlocker) goToNextStage(
 // - store block and state
 // - update ConsensusBlockerState
 // - ready to start new block
-func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
-	log.Debug("finish round", "proposal", proposal)
+func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
+	log.Debug("finish round", "proposal", phash)
 
-	seal, err := c.sealPool.Get(proposal)
+	seal, err := c.sealPool.Get(phash)
 	if err != nil {
 		return err
 	}
 
-	var propose Propose
-	if err := seal.UnmarshalBody(&propose); err != nil {
-		return err
+	var proposal Proposal
+	if p, ok := seal.(Proposal); !ok {
+		return common.UnknownSealTypeError.SetMessage("not Proposal")
+	} else {
+		proposal = p
 	}
 
 	// TODO store block and state
 
 	// update ConsensusBlockerState
-	c.state.SetHeight(propose.Block.Height.Inc())
-	c.state.SetBlock(propose.Block.Next)
-	c.state.SetState(propose.State.Next)
+	c.state.SetHeight(proposal.Block.Height.Inc())
+	c.state.SetBlock(proposal.Block.Next)
+	c.state.SetState(proposal.State.Next)
 
 	// propose or wait new proposal
 	err = c.startTimer(true, func() error {
-		return c.broadcastINIT(propose.Block.Height.Inc(), Round(0))
+		return c.broadcastINIT(proposal.Block.Height.Inc(), Round(0))
 	})
 	if err != nil {
 		return err
@@ -350,21 +346,17 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	}
 	log_.Debug("proposer selected", "block", c.state.Block())
 
-	ballot, err := NewBallot(
+	ballot := NewBallot(
 		common.Hash{},
-		c.state.Home().Address(),
+		proposer.Address(),
 		height,
 		round,
 		VoteStageINIT,
 		VoteYES,
 	)
-	if err != nil {
-		return err
-	}
-	ballot.Proposer = proposer.Address()
 
 	// TODO self-signed ballot should not be needed to broadcast
-	if err := c.sealBroadcaster.Send(BallotSealType, ballot); err != nil {
+	if err := c.sealBroadcaster.Send(ballot); err != nil {
 		return err
 	}
 

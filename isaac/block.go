@@ -20,7 +20,7 @@ type Block struct {
 	proposer   common.Address
 	round      Round
 	proposedAt common.Time
-	propose    common.Hash // Seal(Propose).Hash()
+	proposal   common.Hash // Seal(Proposal).Hash()
 	validators []common.Validator
 
 	transactions []common.Hash

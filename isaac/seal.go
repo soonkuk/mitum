@@ -3,7 +3,7 @@ package isaac
 import "github.com/spikeekips/mitum/common"
 
 var (
-	ProposeSealType     common.SealType = "propose"
-	BallotSealType      common.SealType = "vote"
+	ProposalSealType    common.SealType = "proposal"
+	BallotSealType      common.SealType = "ballot"
 	TransactionSealType common.SealType = "transaction"
 )

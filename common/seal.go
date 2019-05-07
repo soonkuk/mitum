@@ -2,10 +2,9 @@ package common
 
 import (
 	"encoding"
-	"encoding/base64"
 	"encoding/json"
-	"reflect"
-	"strings"
+	"errors"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -24,136 +23,127 @@ type WellformChecker interface {
 	Wellformed() error
 }
 
-func NewSealType(t string) SealType {
-	return SealType(t)
+type Seal interface {
+	encoding.BinaryMarshaler
+	RLPSerializer
+	JSONMapSerializer
+	WellformChecker
+
+	Version() Version
+	Type() SealType
+	Hint() string
+	Hash() Hash
+	Source() Address
+	Signature() Signature
+	SignedAt() Time // signed time
+	GenerateHash() (Hash, error)
+	CheckSignature(NetworkID) error
+	Raw() RawSeal
+	String() string
 }
 
-type Seal struct {
-	Version   Version
-	Type      SealType
+type RawSeal struct {
+	sync.RWMutex
+	parent    Seal
+	version   Version
+	sealType  SealType
+	hint      string
 	hash      Hash
-	Source    Address
-	Signature Signature
-	bodyHash  Hash
-	Body      []byte
-	CreatedAt Time
-
-	encoded []byte
-	body    interface{}
+	source    Address
+	signature Signature
+	signedAt  Time
 }
 
-func NewSeal(t SealType, body Hasher) (Seal, error) {
-	if w, ok := body.(WellformChecker); ok {
-		if err := w.Wellformed(); err != nil {
-			return Seal{}, err
+func NewRawSeal(
+	parent Seal,
+	version Version,
+) RawSeal {
+	return RawSeal{
+		parent:   parent,
+		version:  version,
+		sealType: parent.Type(),
+		hint:     parent.Hint(),
+	}
+}
+
+func (r RawSeal) SerializeRLP() ([]interface{}, error) {
+	if r.parent == nil {
+		return nil, errors.New("parent is missing")
+	}
+
+	version, err := r.version.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := r.hash.MarshalBinary()
+	if err != nil {
+		hash = []byte{} // skipped
+	}
+
+	signedAt, err := r.signedAt.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	l := []interface{}{
+		hash,
+		r.signature,
+		version,
+		r.sealType,
+		r.source,
+		signedAt,
+	}
+
+	p, err := r.parent.SerializeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(l, p...), nil
+}
+
+func (r *RawSeal) UnserializeRLP(m []rlp.RawValue) error {
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	}
+
+	var parent RLPUnserializer
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	} else if u, ok := r.parent.(RLPUnserializer); !ok {
+		return errors.New("parent is not RLPUnserializer")
+	} else {
+		parent = u
+	}
+
+	if err := parent.UnserializeRLP(m); err != nil {
+		return err
+	}
+
+	if len(m) < 6 {
+		return SealNotWellformedError.SetMessage("invalid rlp value count: %d", len(m))
+	}
+
+	var hash Hash
+	{
+		var vs []byte
+		if err := Decode(m[0], &vs); err != nil {
+			return err
+		} else if err := hash.UnmarshalBinary(vs); err != nil {
+			return err
 		}
 	}
 
-	bodyHash, encoded, err := body.Hash()
-	if err != nil {
-		return Seal{}, err
-	}
-
-	s := Seal{
-		Type:     t,
-		Version:  CurrentSealVersion,
-		bodyHash: bodyHash,
-		Body:     encoded,
-	}
-
-	return s, nil
-}
-
-func (s Seal) makeHash() (Hash, []byte, error) {
-	encoded, err := s.MarshalBinary()
-	if err != nil {
-		return Hash{}, nil, err
-	}
-
-	hash, err := NewHash("sl", encoded)
-	if err != nil {
-		return Hash{}, nil, err
-	}
-
-	return hash, encoded, nil
-}
-
-func (s Seal) Hash() (Hash, []byte, error) {
-	if !s.hash.IsValid() {
-		return s.makeHash()
-	}
-
-	return s.hash, s.encoded, nil
-}
-
-func (s Seal) BodyHash() Hash {
-	return s.bodyHash
-}
-
-func (s *Seal) Sign(networkID NetworkID, seed Seed) error {
-	signature, err := NewSignature(networkID, seed, s.bodyHash)
-	if err != nil {
-		return err
-	}
-
-	s.Source = seed.Address()
-	s.Signature = signature
-	s.CreatedAt = Now()
-
-	hash, encoded, err := s.makeHash()
-	if err != nil {
-		return err
-	}
-	s.hash = hash
-	s.encoded = encoded
-
-	return nil
-}
-
-func (s Seal) CheckSignature(networkID NetworkID) error {
-	err := s.Source.Verify(
-		append(networkID, s.bodyHash.Bytes()...),
-		[]byte(s.Signature),
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s Seal) MarshalBinary() ([]byte, error) {
-	version, err := s.Version.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	bodyHash, err := s.bodyHash.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return Encode([]interface{}{
-		version,
-		s.Type,
-		s.Source,
-		s.Signature,
-		bodyHash,
-		s.Body,
-		s.CreatedAt,
-	})
-}
-
-func (s *Seal) UnmarshalBinary(b []byte) error {
-	var m []rlp.RawValue
-	if err := Decode(b, &m); err != nil {
+	var signature Signature
+	if err := Decode(m[1], &signature); err != nil {
 		return err
 	}
 
 	var version Version
 	{
 		var vs []byte
-		if err := Decode(m[0], &vs); err != nil {
+		if err := Decode(m[2], &vs); err != nil {
 			return err
 		} else if err := version.UnmarshalBinary(vs); err != nil {
 			return err
@@ -161,194 +151,238 @@ func (s *Seal) UnmarshalBinary(b []byte) error {
 	}
 
 	var sealType SealType
-	if err := Decode(m[1], &sealType); err != nil {
+	if err := Decode(m[3], &sealType); err != nil {
 		return err
 	}
 
 	var source Address
-	if err := Decode(m[2], &source); err != nil {
+	if err := Decode(m[4], &source); err != nil {
 		return err
 	}
 
-	var signature Signature
-	if err := Decode(m[3], &signature); err != nil {
-		return err
-	}
-
-	var bodyHash Hash
+	var signedAt Time
 	{
 		var vs []byte
-		if err := Decode(m[4], &vs); err != nil {
+		if err := Decode(m[5], &vs); err != nil {
 			return err
-		} else if err := bodyHash.UnmarshalBinary(vs); err != nil {
+		} else if err := signedAt.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
 
-	var body []byte
-	if err := Decode(m[5], &body); err != nil {
-		return err
+	r.hash = hash
+	r.signature = signature
+	r.version = version
+	r.sealType = sealType
+	r.source = source
+	r.signedAt = signedAt
+
+	return nil
+}
+
+func (r RawSeal) MarshalBinary() ([]byte, error) {
+	if r.parent == nil {
+		return nil, errors.New("parent is missing")
 	}
 
-	var createdAt Time
-	if err := Decode(m[6], &createdAt); err != nil {
-		return err
-	}
-
-	s.Version = version
-	s.Type = sealType
-	s.Signature = signature
-	s.Source = source
-	s.Body = body
-	s.bodyHash = bodyHash
-	s.CreatedAt = createdAt
-
-	hash, encoded, err := s.makeHash()
+	s, err := r.SerializeRLP()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	s.hash = hash
-	s.encoded = encoded
 
+	return Encode(s)
+}
+
+func (r *RawSeal) UnmarshalBinaryRaw(b []byte) error {
 	return nil
 }
 
-func (s Seal) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"version":    s.Version,
-		"type":       s.Type,
-		"hash":       s.hash,
-		"source":     s.Source,
-		"signature":  s.Signature,
-		"body_hash":  s.bodyHash,
-		"body":       base64.StdEncoding.EncodeToString(s.Body),
-		"created_at": s.CreatedAt,
-	})
-}
-
-func (s *Seal) UnmarshalJSON(b []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
+func (r *RawSeal) UnmarshalBinary(b []byte) error {
+	var m []rlp.RawValue
+	if err := Decode(b, &m); err != nil {
 		return err
 	}
 
-	var version Version
-	if err := json.Unmarshal(raw["version"], &version); err != nil {
+	if err := r.UnserializeRLP(m); err != nil {
 		return err
 	}
 
-	var source Address
-	if err := json.Unmarshal(raw["source"], &source); err != nil {
-		return err
-	}
-
-	var sealType SealType
-	if err := json.Unmarshal(raw["type"], &sealType); err != nil {
-		return err
-	}
-
-	var signature Signature
-	if err := json.Unmarshal(raw["signature"], &signature); err != nil {
-		return err
-	}
-
-	var hash Hash
-	if err := json.Unmarshal(raw["hash"], &hash); err != nil {
-		return err
-	}
-
-	var bodyHash Hash
-	if err := json.Unmarshal(raw["body_hash"], &bodyHash); err != nil {
-		return err
-	}
-
-	var body []byte
-	{
-		var c string
-		if err := json.Unmarshal(raw["body"], &c); err != nil {
-			return err
-		} else if d, err := base64.StdEncoding.DecodeString(c); err != nil {
-			return err
-		} else {
-			body = d
-		}
-	}
-
-	var createdAt Time
-	if err := json.Unmarshal(raw["created_at"], &createdAt); err != nil {
-		return err
-	}
-
-	s.Version = version
-	s.Type = sealType
-	s.hash = hash
-	s.Source = source
-	s.Signature = signature
-	s.bodyHash = bodyHash
-	s.Body = body
-	s.CreatedAt = createdAt
-
-	{
-		hash, encoded, err := s.makeHash()
-		if err != nil {
-			return err
-		}
-		if !s.hash.Equal(hash) {
-			return HashDoesNotMatchError
-		}
-
-		s.encoded = encoded
+	if r.parent == nil {
+		return errors.New("parent is missing")
 	}
 
 	return nil
 }
 
-func (s *Seal) UnmarshalBody(i encoding.BinaryUnmarshaler) error {
-	if s.body == nil {
-		if err := i.UnmarshalBinary(s.Body); err != nil {
-			return err
-		}
+func (r RawSeal) GenerateHash() (Hash, error) {
+	if r.parent == nil {
+		return Hash{}, errors.New("parent is missing")
+	}
 
-		s.body = reflect.ValueOf(i).Elem().Interface()
+	s, err := r.SerializeRLP()
+	if err != nil {
+		return Hash{}, err
+	}
+
+	encoded, err := Encode(s[2:]) // hash and signature will be excluded for hash
+	if err != nil {
+		return Hash{}, err
+	}
+
+	hash, err := NewHash(r.parent.Hint(), encoded)
+	if err != nil {
+		return Hash{}, err
+	}
+
+	return hash, nil
+}
+
+func (r RawSeal) SerializeMap() (map[string]interface{}, error) {
+	var parent JSONMapSerializer
+	if r.parent == nil {
+		return nil, errors.New("parent is missing")
+	} else if u, ok := r.parent.(JSONMapSerializer); !ok {
+		return nil, errors.New("parent is not JSONMapSerializer")
 	} else {
-		reflect.ValueOf(i).Elem().Set(reflect.ValueOf(s.body))
+		parent = u
+	}
+
+	l := map[string]interface{}{
+		"version":   r.version,
+		"type":      r.sealType,
+		"hash":      r.hash,
+		"source":    r.source,
+		"signature": r.signature,
+		"signedAt":  r.signedAt,
+	}
+
+	m, err := parent.SerializeMap()
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range m {
+		l[k] = v
+	}
+
+	return l, nil
+}
+
+func (r RawSeal) MarshalJSON() ([]byte, error) {
+	if r.parent == nil {
+		return nil, errors.New("parent is missing")
+	}
+
+	m, err := r.SerializeMap()
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(m)
+}
+
+func (r RawSeal) String() string {
+	return TerminalLogString(PrintJSON(r, true, false))
+}
+
+func (r RawSeal) Raw() RawSeal {
+	return r
+}
+
+func (r *RawSeal) SetParent(seal Seal) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.parent = seal
+}
+
+func (r RawSeal) Version() Version {
+	return r.version
+}
+
+func (r RawSeal) Hash() Hash {
+	return r.hash
+}
+
+func (r RawSeal) Source() Address {
+	return r.source
+}
+
+func (r RawSeal) Signature() Signature {
+	return r.signature
+}
+
+func (r *RawSeal) Sign(networkID NetworkID, seed Seed) error {
+	r.source = seed.Address()
+	r.signedAt = Now()
+
+	if hash, err := r.GenerateHash(); err != nil {
+		return err
+	} else {
+		r.hash = hash
+	}
+
+	signature, err := NewSignature(networkID, seed, r.hash)
+	if err != nil {
+		return err
+	}
+
+	r.signature = signature
+
+	return nil
+}
+
+func (r RawSeal) CheckSignature(networkID NetworkID) error {
+	return r.source.Verify(
+		append(networkID, r.hash.Bytes()...),
+		[]byte(r.signature),
+	)
+}
+
+func (r RawSeal) SignedAt() Time {
+	return r.signedAt
+}
+
+func (r RawSeal) WellformedRaw() error {
+	if r.parent == nil {
+		return errors.New("parent is missing")
+	}
+
+	if err := r.wellformed(); err != nil {
+		return SealNotWellformedError.SetMessage(err.Error())
+	}
+
+	if hash, err := r.GenerateHash(); err != nil {
+		return err
+	} else if !r.hash.Equal(hash) {
+		return HashDoesNotMatchError
 	}
 
 	return nil
 }
 
-func (s Seal) String() string {
-	b, _ := json.Marshal(s)
-	return strings.Replace(string(b), "\"", "'", -1)
-}
+func (r RawSeal) wellformed() error {
+	if !r.hash.IsValid() {
+		return errors.New("empty hash")
+	}
 
-func (s Seal) Wellformed() error {
-	if _, err := s.Source.IsValid(); err != nil {
+	if err := r.signature.IsValid(); err != nil {
 		return err
 	}
 
-	if len(s.Signature) < 1 {
-		return SealNotWellformedError.SetMessage("Seal.Signature is empty")
+	if r.version.Equal(ZeroVersion) {
+		return errors.New("zero version found")
 	}
 
-	if !s.hash.IsValid() {
-		return EmptyHashError.SetMessage("Seal.hash is empty")
+	if len(r.sealType) < 1 {
+		return errors.New("empty SealType")
 	}
 
-	if !s.bodyHash.IsValid() {
-		return EmptyHashError.SetMessage("Seal.bodyHash is empty")
-	}
-
-	if len(s.Body) < 1 {
-		return SealNotWellformedError.SetMessage("Seal.Body is empty")
-	}
-
-	hash, _, err := s.makeHash()
-	if err != nil {
+	if _, err := r.source.IsValid(); err != nil {
 		return err
 	}
-	if !s.hash.Equal(hash) {
-		return SealNotWellformedError.SetMessage("Seal.hash does not match")
+
+	if r.signedAt.IsZero() {
+		return errors.New("zero signedAt")
 	}
 
 	return nil

@@ -11,8 +11,13 @@ func CheckerUnmarshalSeal(c *ChainChecker) error {
 		return err
 	}
 
-	var seal Seal
-	if err := seal.UnmarshalBinary(message); err != nil {
+	var sealCodec *SealCodec
+	if err := c.ContextValue("sealCodec", &sealCodec); err != nil {
+		return err
+	}
+
+	seal, err := sealCodec.Decode(message)
+	if err != nil {
 		return err
 	}
 

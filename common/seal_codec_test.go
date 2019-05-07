@@ -3,87 +3,21 @@ package common
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/suite"
 )
-
-type testCustomSeal struct {
-	RawSeal
-	fieldA string
-	fieldB string
-	fieldC []byte
-}
-
-func (r testCustomSeal) Type() SealType {
-	return SealType("showme-type")
-}
-
-func (r testCustomSeal) Hint() string {
-	return "cs"
-}
-
-func (r testCustomSeal) SerializeRLP() ([]interface{}, error) {
-	return []interface{}{r.fieldA, r.fieldB, r.fieldC}, nil
-}
-
-func (r *testCustomSeal) UnserializeRLP(m []rlp.RawValue) error {
-	var fieldA string
-	if err := Decode(m[6], &fieldA); err != nil {
-		return err
-	}
-	var fieldB string
-	if err := Decode(m[7], &fieldB); err != nil {
-		return err
-	}
-	var fieldC []byte
-	if err := Decode(m[8], &fieldC); err != nil {
-		return err
-	}
-
-	r.fieldA = fieldA
-	r.fieldB = fieldB
-	r.fieldC = fieldC
-
-	return nil
-}
-
-func (r testCustomSeal) SerializeMap() (map[string]interface{}, error) {
-	return map[string]interface{}{
-		"field_a": r.fieldA,
-		"field_b": r.fieldB,
-		"field_c": r.fieldC,
-	}, nil
-}
-
-func (r testCustomSeal) Wellformed() error {
-	if err := r.RawSeal.WellformedRaw(); err != nil {
-		return err
-	}
-
-	if len(r.fieldA) < 1 || len(r.fieldB) < 1 || len(r.fieldC) < 1 {
-		return SealNotWellformedError
-	}
-
-	return nil
-}
 
 type testSealCodec struct {
 	suite.Suite
 }
 
-func (t *testSealCodec) newCustomSeal() testCustomSeal {
-	r := testCustomSeal{
+func (t *testSealCodec) newCustomSeal() TestNewSeal {
+	r := TestNewSeal{
 		fieldA: RandomUUID(),
 		fieldB: RandomUUID(),
 		fieldC: []byte(RandomUUID()),
 	}
 
-	raw := NewRawSeal(
-		r,
-		CurrentSealVersion,
-		r.Type(),
-		r.Hint(),
-	)
+	raw := NewRawSeal(r, CurrentSealVersion)
 	r.RawSeal = raw
 
 	return r
@@ -97,15 +31,15 @@ func (t *testSealCodec) TestNew() {
 func (t *testSealCodec) TestRegister() {
 	sc := NewSealCodec()
 
-	err := sc.Register(testCustomSeal{})
+	err := sc.Register(TestNewSeal{})
 	t.NoError(err)
-	t.Equal(testCustomSeal{}.Type(), sc.Registered()[0])
+	t.Equal(TestNewSeal{}.Type(), sc.Registered()[0])
 }
 
 func (t *testSealCodec) TestEncode() {
 	sc := NewSealCodec()
 
-	_ = sc.Register(testCustomSeal{})
+	_ = sc.Register(TestNewSeal{})
 
 	r := t.newCustomSeal()
 
@@ -121,7 +55,7 @@ func (t *testSealCodec) TestEncode() {
 func (t *testSealCodec) TestDecode() {
 	sc := NewSealCodec()
 
-	_ = sc.Register(testCustomSeal{})
+	_ = sc.Register(TestNewSeal{})
 
 	r := t.newCustomSeal()
 	t.Error(r.Wellformed())
@@ -141,7 +75,7 @@ func (t *testSealCodec) TestDecode() {
 	t.NoError(decoded.Wellformed())
 
 	// check signature
-	t.NoError(decoded.(testCustomSeal).CheckSignature(TestNetworkID))
+	t.NoError(decoded.(TestNewSeal).CheckSignature(TestNetworkID))
 
 	t.Equal(r.Version(), decoded.Version())
 	t.Equal(r.Type(), decoded.Type())
@@ -162,7 +96,7 @@ func (t *testSealCodec) TestDecode() {
 func (t *testSealCodec) TestDecodeNestedParentNil() {
 	sc := NewSealCodec()
 
-	_ = sc.Register(testCustomSeal{})
+	_ = sc.Register(TestNewSeal{})
 
 	r := t.newCustomSeal()
 
@@ -172,9 +106,9 @@ func (t *testSealCodec) TestDecodeNestedParentNil() {
 	b, _ := sc.Encode(r)
 	decoded, _ := sc.Decode(b)
 
-	unmarshaledSeal := decoded.(testCustomSeal)
+	unmarshaledSeal := decoded.(TestNewSeal)
 
-	t.Nil(unmarshaledSeal.RawSeal.parent.(testCustomSeal).RawSeal.parent)
+	t.Nil(unmarshaledSeal.RawSeal.parent.(TestNewSeal).RawSeal.parent)
 }
 
 func TestSealCodec(t *testing.T) {

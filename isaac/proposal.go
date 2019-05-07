@@ -8,44 +8,43 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-// TODO rename to Proposal
-type Propose struct {
-	Version  common.Version `json:"version"`
-	Proposer common.Address `json:"proposer"`
+type Proposal struct {
+	common.RawSeal
 	// TODO // Validators   []common.Validator `json:validators`
 	Round        Round         `json:"round"`
-	Block        ProposeBlock  `json:"block"`
-	State        ProposeState  `json:"state"`
+	Block        ProposalBlock `json:"block"`
+	State        ProposalState `json:"state"`
 	Transactions []common.Hash `json:"transactions"` // NOTE check Hash.p is 'tx'
-	ProposedAt   common.Time   `json:"proposed_at"`
-
-	hash    common.Hash
-	encoded []byte
 }
 
-func (p Propose) makeHash() (common.Hash, []byte, error) {
-	encoded, err := p.MarshalBinary()
-	if err != nil {
-		return common.Hash{}, nil, err
+func NewProposal(
+	round Round,
+	block ProposalBlock,
+	state ProposalState,
+	transactions []common.Hash,
+) Proposal {
+	p := Proposal{
+		Round:        round,
+		Block:        block,
+		State:        state,
+		Transactions: transactions,
 	}
 
-	hash, err := common.NewHash("pb", encoded)
-	if err != nil {
-		return common.Hash{}, nil, err
-	}
+	raw := common.NewRawSeal(p, CurrentBallotVersion)
+	p.RawSeal = raw
 
-	return hash, encoded, nil
+	return p
 }
 
-func (p Propose) Hash() (common.Hash, []byte, error) {
-	if !p.hash.IsValid() {
-		return p.makeHash()
-	}
-
-	return p.hash, p.encoded, nil
+func (p Proposal) Type() common.SealType {
+	return ProposalSealType
 }
 
-func (p Propose) MarshalBinary() ([]byte, error) {
+func (p Proposal) Hint() string {
+	return "pp"
+}
+
+func (p Proposal) SerializeRLP() ([]interface{}, error) {
 	block, err := p.Block.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -65,62 +64,34 @@ func (p Propose) MarshalBinary() ([]byte, error) {
 		transactions = append(transactions, hash)
 	}
 
-	version, err := p.Version.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return common.Encode([]interface{}{
-		version,
-		p.Proposer,
+	return []interface{}{
 		p.Round,
 		block,
 		state,
 		transactions,
-		p.ProposedAt,
-	})
+	}, nil
 }
 
-func (p *Propose) UnmarshalBinary(b []byte) error {
-	var m []rlp.RawValue
-	if err := common.Decode(b, &m); err != nil {
-		return err
-	}
-
-	var version common.Version
-	{
-		var vs []byte
-		if err := common.Decode(m[0], &vs); err != nil {
-			return err
-		} else if err := version.UnmarshalBinary(vs); err != nil {
-			return err
-		}
-	}
-
-	var proposer common.Address
-	if err := common.Decode(m[1], &proposer); err != nil {
-		return err
-	}
-
+func (p *Proposal) UnserializeRLP(m []rlp.RawValue) error {
 	var round Round
-	if err := common.Decode(m[2], &round); err != nil {
+	if err := common.Decode(m[6], &round); err != nil {
 		return err
 	}
 
-	var block ProposeBlock
+	var block ProposalBlock
 	{
 		var vs []byte
-		if err := common.Decode(m[3], &vs); err != nil {
+		if err := common.Decode(m[7], &vs); err != nil {
 			return err
 		} else if err := block.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
 
-	var state ProposeState
+	var state ProposalState
 	{
 		var vs []byte
-		if err := common.Decode(m[4], &vs); err != nil {
+		if err := common.Decode(m[8], &vs); err != nil {
 			return err
 		} else if err := state.UnmarshalBinary(vs); err != nil {
 			return err
@@ -130,7 +101,7 @@ func (p *Propose) UnmarshalBinary(b []byte) error {
 	var transactions []common.Hash
 	{
 		var vs [][]byte
-		if err := common.Decode(m[5], &vs); err != nil {
+		if err := common.Decode(m[9], &vs); err != nil {
 			return err
 		}
 
@@ -144,40 +115,22 @@ func (p *Propose) UnmarshalBinary(b []byte) error {
 		}
 	}
 
-	var proposedAt common.Time
-	if err := common.Decode(m[6], &proposedAt); err != nil {
-		return err
-	}
-
-	p.Version = version
-	p.Proposer = proposer
 	p.Round = round
 	p.Block = block
 	p.State = state
 	p.Transactions = transactions
-	p.ProposedAt = proposedAt
-
-	hash, encoded, err := p.makeHash()
-	if err != nil {
-		return err
-	}
-
-	p.hash = hash
-	p.encoded = encoded
 
 	return nil
 }
-
-func (p Propose) String() string {
-	b, _ := json.Marshal(p)
-	return common.TerminalLogString(string(b))
+func (p Proposal) SerializeMap() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"round":        p.Round,
+		"block":        p.Block,
+		"state":        p.State,
+		"transactions": p.Transactions,
+	}, nil
 }
-
-func (p Propose) Wellformed() error {
-	if _, err := p.Proposer.IsValid(); err != nil {
-		return err
-	}
-
+func (p Proposal) Wellformed() error {
 	if err := p.Block.Wellformed(); err != nil {
 		return err
 	}
@@ -188,8 +141,8 @@ func (p Propose) Wellformed() error {
 
 	for _, th := range p.Transactions {
 		if !th.IsValid() {
-			return ProposeNotWellformedError.SetMessage(
-				"empty Hash found in Propose.Transactions",
+			return ProposalNotWellformedError.SetMessage(
+				"empty Hash found in Proposal.Transactions",
 			)
 		}
 	}
@@ -197,13 +150,13 @@ func (p Propose) Wellformed() error {
 	return nil
 }
 
-type ProposeBlock struct {
+type ProposalBlock struct {
 	Height  common.Big  `json:"height"`
 	Current common.Hash `json:"current"`
 	Next    common.Hash `json:"next"`
 }
 
-func (bb ProposeBlock) MarshalBinary() ([]byte, error) {
+func (bb ProposalBlock) MarshalBinary() ([]byte, error) {
 	currentHash, err := bb.Current.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -221,7 +174,7 @@ func (bb ProposeBlock) MarshalBinary() ([]byte, error) {
 	})
 }
 
-func (bb *ProposeBlock) UnmarshalBinary(b []byte) error {
+func (bb *ProposalBlock) UnmarshalBinary(b []byte) error {
 	var m []rlp.RawValue
 	if err := common.Decode(b, &m); err != nil {
 		return err
@@ -254,31 +207,31 @@ func (bb *ProposeBlock) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (bb ProposeBlock) Wellformed() error {
+func (bb ProposalBlock) Wellformed() error {
 	if !bb.Current.IsValid() {
-		return ProposeNotWellformedError.SetMessage("Propose.Block.Current is empty")
+		return ProposalNotWellformedError.SetMessage("Proposal.Block.Current is empty")
 	}
 
 	if !bb.Next.IsValid() {
-		return ProposeNotWellformedError.SetMessage("Propose.Block.Next is empty")
+		return ProposalNotWellformedError.SetMessage("Proposal.Block.Next is empty")
 	}
 
 	return nil
 }
 
-type ProposeState struct {
+type ProposalState struct {
 	Current []byte
 	Next    []byte
 }
 
-func (bb ProposeState) MarshalBinary() ([]byte, error) {
+func (bb ProposalState) MarshalBinary() ([]byte, error) {
 	return common.Encode([]interface{}{
 		bb.Current,
 		bb.Next,
 	})
 }
 
-func (bb *ProposeState) UnmarshalBinary(b []byte) error {
+func (bb *ProposalState) UnmarshalBinary(b []byte) error {
 	var m []rlp.RawValue
 	if err := common.Decode(b, &m); err != nil {
 		return err
@@ -300,14 +253,14 @@ func (bb *ProposeState) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (bb ProposeState) MarshalJSON() ([]byte, error) {
+func (bb ProposalState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
 		"current": base64.StdEncoding.EncodeToString(bb.Current),
 		"next":    base64.StdEncoding.EncodeToString(bb.Next),
 	})
 }
 
-func (bb *ProposeState) UnmarshalJSON(b []byte) error {
+func (bb *ProposalState) UnmarshalJSON(b []byte) error {
 	var a map[string]string
 	if err := json.Unmarshal(b, &a); err != nil {
 		return err
@@ -332,13 +285,13 @@ func (bb *ProposeState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (bb ProposeState) Wellformed() error {
+func (bb ProposalState) Wellformed() error {
 	if len(bb.Current) < 1 {
-		return ProposeNotWellformedError.SetMessage("Propose.State.Current is empty")
+		return ProposalNotWellformedError.SetMessage("Proposal.State.Current is empty")
 	}
 
 	if len(bb.Next) < 1 {
-		return ProposeNotWellformedError.SetMessage("Propose.State.Next is empty")
+		return ProposalNotWellformedError.SetMessage("Proposal.State.Next is empty")
 	}
 
 	return nil

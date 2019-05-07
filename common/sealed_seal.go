@@ -13,7 +13,7 @@ type SealedSeal struct {
 }
 
 // NOTE seal should pass wellformed.
-func NewSealedSeal(seal SealV1) (SealedSeal, error) {
+func NewSealedSeal(seal Seal) (SealedSeal, error) {
 	encoded, err := EncodeSeal(seal)
 	if err != nil {
 		return SealedSeal{}, err
@@ -24,7 +24,7 @@ func NewSealedSeal(seal SealV1) (SealedSeal, error) {
 		binary:   encoded,
 	}
 
-	raw := NewRawSeal(s, CurrentSealVersion, SealedSeal{}.Type(), SealedSeal{}.Hint())
+	raw := NewRawSeal(s, CurrentSealVersion)
 	s.RawSeal = raw
 
 	return s, nil

@@ -44,9 +44,10 @@ type testNodeNetwork struct {
 	suite.Suite
 }
 
-func (t *testNodeNetwork) newSeal(c uint64) common.Seal {
-	seal, err := common.NewSeal(common.NewSealType("test"), testHash{I: c})
-	t.NoError(err)
+func (t *testNodeNetwork) newSeal() common.TestNewSeal {
+	seal := common.NewTestNewSeal()
+
+	_ = seal.Sign(common.TestNetworkID, common.RandomSeed())
 
 	return seal
 }
@@ -73,6 +74,11 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 
 	var counted uint64
 
+	var seals []common.TestNewSeal
+	for i := 0; i < count; i++ {
+		seals = append(seals, t.newSeal())
+	}
+
 	go func() {
 	end:
 		for {
@@ -96,14 +102,14 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 		}
 	}()
 
-	var send func(uint64)
-	send = func(c uint64) {
-		seal := t.newSeal(c)
+	var send func(int)
+	send = func(c int) {
+		seal := seals[c]
 
 		if err := network.Send(node, seal); err != nil {
 			return
 		}
-		if c == uint64(count)-1 {
+		if c == count-1 {
 			return
 		}
 
@@ -136,39 +142,38 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 	t.NoError(err)
 
 	count := 10
-	var stop uint64 = 3
+	var seals []common.TestNewSeal
+	for i := 0; i < count; i++ {
+		seals = append(seals, t.newSeal())
+	}
+
+	var stop common.Hash = seals[2].Hash()
 
 	var wg sync.WaitGroup
 	wg.Add(count)
 
 	var counted uint64
 	go func() {
-		receive := func(seal common.Seal, notClosed bool) (testHash, bool) {
+		receive := func(seal common.Seal, notClosed bool) (common.Hash, bool) {
 			if !notClosed {
-				return testHash{}, false
+				return common.Hash{}, false
 			}
 			defer wg.Done()
 
-			var th testHash
-			err := seal.UnmarshalBody(&th)
-			if err != nil {
-				return testHash{}, true
-			}
-
-			return th, true
+			return seal.Hash(), true
 		}
 
 	end:
 		for {
 			select {
 			case seal, notClosed := <-receiver0:
-				th, received := receive(seal, notClosed)
+				hash, received := receive(seal, notClosed)
 				if !received {
 					break end
 				}
 				atomic.AddUint64(&counted, 1)
 
-				if th.I == stop-1 {
+				if hash.Equal(stop) {
 					network.RemoveReceiver(receiver0)
 				}
 			case <-time.After(time.Millisecond * 100):
@@ -185,7 +190,7 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 
 	var send func(uint64)
 	send = func(c uint64) {
-		seal := t.newSeal(c)
+		seal := seals[c]
 
 		if err := network.Send(node, seal); err != nil {
 			return
@@ -205,7 +210,7 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 	wg.Wait()
 
 	countedFinal := atomic.LoadUint64(&counted)
-	t.Equal(stop, countedFinal)
+	t.Equal(3, int(countedFinal))
 }
 
 func TestNodeNetwork(t *testing.T) {

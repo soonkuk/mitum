@@ -1,10 +1,7 @@
 package isaac
 
 import (
-	"encoding/json"
-
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -13,233 +10,165 @@ var (
 )
 
 type Ballot struct {
-	Version     common.Version `json:"version"`
-	Source      common.Address `json:"source"`
-	ProposeSeal common.Hash    `json:"propose_seal"` // NOTE ProposeSeal.Hash() // TODO rename Proposal
-	Proposer    common.Address `json:"proposer"`     // NOTE only for `INIT`
-	Height      common.Big     `json:"height"`
-	Round       Round          `json:"round"`
-	Stage       VoteStage      `json:"stage"`
-	Vote        Vote           `json:"vote"`
-	VotedAt     common.Time    `json:"voted_at"`
-
-	hash    common.Hash
-	encoded []byte
+	common.RawSeal
+	Proposal common.Hash    `json:"proposal"` // NOTE Proposal.Hash()
+	Proposer common.Address `json:"proposer"` // NOTE only for `INIT`
+	Height   common.Big     `json:"height"`
+	Round    Round          `json:"round"`
+	Stage    VoteStage      `json:"stage"`
+	Vote     Vote           `json:"vote"`
 }
 
 func NewBallot(
-	psHash common.Hash,
-	source common.Address,
+	proposal common.Hash,
+	proposer common.Address,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 	vote Vote,
-) (Ballot, error) {
+) Ballot {
 	b := Ballot{
-		Version:     CurrentBallotVersion,
-		Source:      source,
-		ProposeSeal: psHash,
-		Height:      height,
-		Round:       round,
-		Stage:       stage,
-		Vote:        vote,
-		VotedAt:     common.Now(),
+		Proposal: proposal,
+		Proposer: proposer,
+		Height:   height,
+		Round:    round,
+		Stage:    stage,
+		Vote:     vote,
 	}
 
-	return b, nil
+	raw := common.NewRawSeal(b, CurrentBallotVersion)
+	b.RawSeal = raw
+
+	return b
 }
 
-func (v Ballot) makeHash() (common.Hash, []byte, error) {
-	encoded, err := v.MarshalBinary()
-	if err != nil {
-		return common.Hash{}, nil, err
-	}
-
-	hash, err := common.NewHash("vb", encoded)
-	if err != nil {
-		return common.Hash{}, nil, err
-	}
-
-	return hash, encoded, nil
+func (b Ballot) Type() common.SealType {
+	return common.SealType("ballot")
 }
 
-func (v Ballot) Hash() (common.Hash, []byte, error) {
-	if !v.hash.IsValid() {
-		return v.makeHash()
-	}
-
-	return v.hash, v.encoded, nil
+func (b Ballot) Hint() string {
+	return "bt"
 }
 
-func (v Ballot) MarshalBinary() ([]byte, error) {
-	version, err := v.Version.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	var psHash []byte
-	if v.ProposeSeal.IsValid() {
-		h, err := v.ProposeSeal.MarshalBinary()
+func (b Ballot) SerializeRLP() ([]interface{}, error) {
+	var proposal []byte
+	if b.Proposal.IsValid() {
+		h, err := b.Proposal.MarshalBinary()
 		if err != nil {
 			return nil, err
 		}
-		psHash = h
+		proposal = h
 	}
 
-	votedAt, err := v.VotedAt.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return common.Encode([]interface{}{
-		version,
-		v.Source,
-		psHash,
-		v.Proposer,
-		v.Height,
-		v.Round,
-		v.Stage,
-		v.Vote,
-		votedAt,
-	})
+	return []interface{}{
+		proposal,
+		b.Proposer,
+		b.Height,
+		b.Round,
+		b.Stage,
+		b.Vote,
+	}, nil
 }
 
-func (v *Ballot) UnmarshalBinary(b []byte) error {
-	var m []rlp.RawValue
-	if err := common.Decode(b, &m); err != nil {
-		return err
-	}
-
-	var version common.Version
+func (b *Ballot) UnserializeRLP(m []rlp.RawValue) error {
+	var proposal common.Hash
 	{
 		var vs []byte
-		if err := common.Decode(m[0], &vs); err != nil {
-			return err
-		}
-		if err := version.UnmarshalBinary(vs); err != nil {
-			return err
-		}
-	}
-
-	var source common.Address
-	if err := common.Decode(m[1], &source); err != nil {
-		return err
-	}
-
-	var psHash common.Hash
-	{
-		var vs []byte
-		if err := common.Decode(m[2], &vs); err != nil {
+		if err := common.Decode(m[6], &vs); err != nil {
 			return err
 		} else if len(vs) < 1 {
 			//
-		} else if err := psHash.UnmarshalBinary(vs); err != nil {
+		} else if err := proposal.UnmarshalBinary(vs); err != nil {
 			return err
 		}
 	}
 
 	var proposer common.Address
-	if err := common.Decode(m[3], &proposer); err != nil {
+	if err := common.Decode(m[7], &proposer); err != nil {
 		return err
 	}
 
 	var height common.Big
-	if err := common.Decode(m[4], &height); err != nil {
+	if err := common.Decode(m[8], &height); err != nil {
 		return err
 	}
 
 	var round Round
-	if err := common.Decode(m[5], &round); err != nil {
+	if err := common.Decode(m[9], &round); err != nil {
 		return err
 	}
 
 	var stage VoteStage
-	if err := common.Decode(m[6], &stage); err != nil {
+	if err := common.Decode(m[10], &stage); err != nil {
 		return err
 	}
 
 	var vote Vote
-	if err := common.Decode(m[7], &vote); err != nil {
+	if err := common.Decode(m[11], &vote); err != nil {
 		return err
 	}
 
-	var votedAt common.Time
-	{
-		var vs []byte
-		if err := common.Decode(m[8], &vs); err != nil {
-			return err
-		}
-		if err := votedAt.UnmarshalBinary(vs); err != nil {
-			return err
-		}
-	}
-
-	v.Version = version
-	v.Source = source
-	v.ProposeSeal = psHash
-	v.Proposer = proposer
-	v.Height = height
-	v.Round = round
-	v.Stage = stage
-	v.Vote = vote
-	v.VotedAt = votedAt
-
-	hash, encoded, err := v.makeHash()
-	if err != nil {
-		return err
-	}
-
-	v.hash = hash
-	v.encoded = encoded
+	b.Proposal = proposal
+	b.Proposer = proposer
+	b.Height = height
+	b.Round = round
+	b.Stage = stage
+	b.Vote = vote
 
 	return nil
 }
 
-func (v Ballot) String() string {
-	b, _ := json.Marshal(v)
-	return common.TerminalLogString(string(b))
+func (b Ballot) SerializeMap() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"proposal": b.Proposal,
+		"proposer": b.Proposer,
+		"height":   b.Height,
+		"round":    b.Round,
+		"stage":    b.Stage,
+		"vote":     b.Vote,
+	}, nil
 }
 
-func (v Ballot) Wellformed() error {
-	if _, err := v.Source.IsValid(); err != nil {
+func (b Ballot) Wellformed() error {
+	if err := b.RawSeal.WellformedRaw(); err != nil {
 		return err
 	}
 
-	if !v.Stage.CanVote() {
+	if !b.Stage.CanVote() {
 		return BallotNotWellformedError.SetMessage("Stage is not for vote")
 	}
 
-	if v.Stage == VoteStageINIT {
-		if len(v.Proposer) < 1 {
+	if b.Stage == VoteStageINIT {
+		if len(b.Proposer) < 1 {
 			return BallotNotWellformedError.SetMessage("Proposer is empty for INIT")
 		}
 
-		if v.ProposeSeal.IsValid() {
-			return BallotNotWellformedError.SetMessage("ProposeSeal is not empty")
+		if b.Proposal.IsValid() {
+			return BallotNotWellformedError.SetMessage("Proposal is not empty")
 		}
 	} else {
-		if len(v.Proposer) > 0 {
+		if len(b.Proposer) > 0 {
 			return BallotNotWellformedError.SetMessage("Proposer is not empty for not INIT")
 		}
 
-		if !v.ProposeSeal.IsValid() {
-			return BallotNotWellformedError.SetMessage("ProposeSeal is empty")
+		if !b.Proposal.IsValid() {
+			return BallotNotWellformedError.SetMessage("Proposal is empty")
 		}
 	}
 
-	if !v.Stage.IsValid() {
+	if !b.Stage.IsValid() {
 		return BallotNotWellformedError.SetMessage("Stage is invalid")
 	}
 
-	if !v.Vote.IsValid() {
+	if !b.Vote.IsValid() {
 		return BallotNotWellformedError.SetMessage("Vote is invalid")
 	}
 
-	if !v.Vote.CanVote() {
+	if !b.Vote.CanVote() {
 		return BallotNotWellformedError.SetMessage("Vote is not for vote")
 	}
 
-	if v.Vote != VoteYES && v.Stage != VoteStageSIGN {
+	if b.Vote != VoteYES && b.Stage != VoteStageSIGN {
 		return BallotNotWellformedError.SetMessage("except sign stage, vote should be yes")
 	}
 

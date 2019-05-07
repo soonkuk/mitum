@@ -6,11 +6,6 @@ import (
 
 func CheckerBallotIsValid(c *common.ChainChecker) error {
 	// TODO test
-	var seal common.Seal
-	if err := c.ContextValue("seal", &seal); err != nil {
-		return err
-	}
-
 	var ballot Ballot
 	if err := c.ContextValue("ballot", &ballot); err != nil {
 		return err
@@ -18,15 +13,6 @@ func CheckerBallotIsValid(c *common.ChainChecker) error {
 
 	if err := ballot.Wellformed(); err != nil {
 		return err
-	}
-
-	// source must be same
-	if seal.Source != ballot.Source {
-		return BallotNotWellformedError.SetMessage(
-			"Seal.Source does not match with Ballot.Source; '%s' != '%s'",
-			seal.Source,
-			ballot.Source,
-		)
 	}
 
 	return nil
@@ -39,9 +25,9 @@ func CheckerBallotTimeIsValid(c *common.ChainChecker) error {
 	return nil
 }
 
-// CheckerBallotProposeSeal checks `Ballot.ProposeSeal`
+// CheckerBallotProposal checks `Ballot.Proposal`
 // exists; if not, request to other nodes and then open new voting
-func CheckerBallotProposeSeal(c *common.ChainChecker) error {
+func CheckerBallotProposal(c *common.ChainChecker) error {
 	// TODO test
 
 	var sealPool SealPool
@@ -54,13 +40,13 @@ func CheckerBallotProposeSeal(c *common.ChainChecker) error {
 		return err
 	}
 
-	seal, err := sealPool.Get(ballot.ProposeSeal)
+	seal, err := sealPool.Get(ballot.Proposal)
 	if SealNotFoundError.Equal(err) {
-		// TODO unknown ProposeSeal found, request from other nodes
+		// TODO unknown Proposal found, request from other nodes
 		return nil
 	}
 
-	_ = c.SetContext("proposeSeal", seal)
+	_ = c.SetContext("proposal", seal)
 
 	return nil
 }

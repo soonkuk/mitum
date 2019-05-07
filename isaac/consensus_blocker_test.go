@@ -72,29 +72,24 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 
 	round := Round(1)
 
-	propose, err := NewTestPropose(t.home.Address(), nil)
-	t.NoError(err)
+	// TODO rename to proposal
+	proposal := NewTestProposal(t.home.Address(), nil)
 
-	{ // correcting propose
-		propose.Block.Height = t.height
-		propose.Block.Current = t.block
-		propose.Block.Next = common.NewRandomHash("bk")
-		propose.State.Current = t.state
-		propose.State.Next = []byte("showme")
-		propose.Round = round
+	{ // correcting proposal
+		proposal.Block.Height = t.height
+		proposal.Block.Current = t.block
+		proposal.Block.Next = common.NewRandomHash("bk")
+		proposal.State.Current = t.state
+		proposal.State.Next = []byte("showme")
+		proposal.Round = round
 	}
 
-	seal, err := common.NewSeal(ProposeSealType, propose)
-	t.NoError(err)
-	err = t.sealPool.Add(seal)
-	t.NoError(err)
-
-	psHash, _, err := seal.Hash()
+	err := t.sealPool.Add(proposal)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
 		Proposed: true,
-		Proposal: psHash,
+		Proposal: proposal.Hash(),
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -108,24 +103,24 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	t.sealBroadcaster.SetSenderChan(bChan)
 
 	errChan := make(chan error)
-	blocker.Vote(seal, errChan)
+	blocker.Vote(proposal, errChan)
 	t.NoError(<-errChan)
 
 	var receivedSeal common.Seal
+	var receivedBallot Ballot
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
 		return
 	case receivedSeal = <-bChan:
+		b, ok := receivedSeal.(Ballot)
+		t.True(ok)
+		receivedBallot = b
 	}
 
 	// sign ballot is received
 	t.Equal(BallotSealType, receivedSeal.Type)
 	t.NoError(receivedSeal.Wellformed())
-
-	var receivedBallot Ballot
-	err = receivedSeal.UnmarshalBody(&receivedBallot)
-	t.NoError(err)
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round, receivedBallot.Round)
@@ -142,26 +137,23 @@ func (t *testConsensusBlocker) TestSIGN() {
 
 	round := Round(1)
 
-	psHash := common.NewRandomHash("sl")
+	phash := common.NewRandomHash("sl")
 
-	ballot, err := NewBallot(
-		psHash,
+	ballot := NewBallot(
+		phash,
 		t.home.Address(),
 		t.height,
 		round,
 		VoteStageSIGN,
 		VoteYES,
 	)
-	t.NoError(err)
 
-	seal, err := common.NewSeal(BallotSealType, ballot)
-	t.NoError(err)
-	err = t.sealPool.Add(seal)
+	err := t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
-		Proposal: psHash,
+		Proposal: phash,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -175,24 +167,24 @@ func (t *testConsensusBlocker) TestSIGN() {
 	t.sealBroadcaster.SetSenderChan(bChan)
 
 	errChan := make(chan error)
-	blocker.Vote(seal, errChan)
+	blocker.Vote(ballot, errChan)
 	t.NoError(<-errChan)
 
+	var receivedBallot Ballot
 	var receivedSeal common.Seal
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
 		return
 	case receivedSeal = <-bChan:
+		b, ok := receivedSeal.(Ballot)
+		t.True(ok)
+		receivedBallot = b
 	}
 
 	// sign ballot is received
 	t.Equal(BallotSealType, receivedSeal.Type)
 	t.NoError(receivedSeal.Wellformed())
-
-	var receivedBallot Ballot
-	err = receivedSeal.UnmarshalBody(&receivedBallot)
-	t.NoError(err)
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round, receivedBallot.Round)
@@ -211,56 +203,46 @@ func (t *testConsensusBlocker) TestACCEPT() {
 
 	round := Round(1)
 
-	{ // timer is started after propose accepted
+	{ // timer is started after proposal accepted
 		err := blocker.startTimer(false, func() error {
 			return blocker.broadcastINIT(t.height, round)
 		})
 		t.NoError(err)
 	}
 
-	var psHash common.Hash
-	var propose Propose
+	var proposal Proposal
 	{ // store proposal seal first
 		var err error
-		propose, err = NewTestPropose(t.home.Address(), nil)
-		t.NoError(err)
+		proposal = NewTestProposal(t.home.Address(), nil)
 
-		{ // correcting propose
-			propose.Block.Height = t.height
-			propose.Block.Current = t.block
-			propose.Block.Next = common.NewRandomHash("bk")
-			propose.State.Current = t.state
-			propose.State.Next = []byte("showme")
-			propose.Round = round
+		{ // correcting proposal
+			proposal.Block.Height = t.height
+			proposal.Block.Current = t.block
+			proposal.Block.Next = common.NewRandomHash("bk")
+			proposal.State.Current = t.state
+			proposal.State.Next = []byte("showme")
+			proposal.Round = round
 		}
 
-		seal, err := common.NewSeal(ProposeSealType, propose)
-		t.NoError(err)
-		err = t.sealPool.Add(seal)
-		t.NoError(err)
-
-		psHash, _, err = seal.Hash()
+		err = t.sealPool.Add(proposal)
 		t.NoError(err)
 	}
 
-	ballot, err := NewBallot(
-		psHash,
+	ballot := NewBallot(
+		proposal.Hash(),
 		t.home.Address(),
 		t.height,
 		round,
 		VoteStageACCEPT,
 		VoteYES,
 	)
-	t.NoError(err)
 
-	seal, err := common.NewSeal(BallotSealType, ballot)
-	t.NoError(err)
-	err = t.sealPool.Add(seal)
+	err := t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
-		Proposal: psHash,
+		Proposal: proposal.Hash(),
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -272,13 +254,13 @@ func (t *testConsensusBlocker) TestACCEPT() {
 	currentTimer := fmt.Sprintf("%p", blocker.timer)
 
 	errChan := make(chan error)
-	blocker.Vote(seal, errChan)
+	blocker.Vote(ballot, errChan)
 	t.NoError(<-errChan)
 
 	{ //check state
-		t.True(propose.Block.Height.Inc().Equal(t.cstate.Height()))
-		t.True(propose.Block.Next.Equal(t.cstate.Block()))
-		t.Equal(propose.State.Next, t.cstate.State())
+		t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
+		t.True(proposal.Block.Next.Equal(t.cstate.Block()))
+		t.Equal(proposal.State.Next, t.cstate.State())
 	}
 
 	// new timer is started
@@ -293,26 +275,23 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 	defer blocker.Stop()
 
 	round := Round(1)
-	psHash := common.NewRandomHash("sl")
+	phash := common.NewRandomHash("sl")
 
-	ballot, err := NewBallot(
-		psHash,
+	ballot := NewBallot(
+		phash,
 		t.home.Address(),
 		t.height,
 		round,
 		VoteStageSIGN,
 		VoteNOP,
 	)
-	t.NoError(err)
 
-	seal, err := common.NewSeal(BallotSealType, ballot)
-	t.NoError(err)
-	err = t.sealPool.Add(seal)
+	err := t.sealPool.Add(ballot)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
-		Proposal: psHash,
+		Proposal: phash,
 		Result:   VoteResultNOP,
 		Height:   t.height,
 		Round:    round,
@@ -326,23 +305,23 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 	t.sealBroadcaster.SetSenderChan(bChan)
 
 	errChan := make(chan error)
-	blocker.Vote(seal, errChan)
+	blocker.Vote(ballot, errChan)
 	t.NoError(<-errChan)
 
 	var receivedSeal common.Seal
+	var receivedBallot Ballot
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
 		return
 	case receivedSeal = <-bChan:
+		b, ok := receivedSeal.(Ballot)
+		t.True(ok)
+		receivedBallot = b
 	}
 
 	t.Equal(BallotSealType, receivedSeal.Type)
 	t.NoError(receivedSeal.Wellformed())
-
-	var receivedBallot Ballot
-	err = receivedSeal.UnmarshalBody(&receivedBallot)
-	t.NoError(err)
 
 	// should be round + 1
 	t.Equal(round+1, receivedBallot.Round)
@@ -363,29 +342,23 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 
 	round := Round(1)
 
-	propose, err := NewTestPropose(t.home.Address(), nil)
-	t.NoError(err)
+	proposal := NewTestProposal(t.home.Address(), nil)
 
-	{ // correcting propose
-		propose.Block.Height = t.height
-		propose.Block.Current = t.block
-		propose.Block.Next = common.NewRandomHash("bk")
-		propose.State.Current = t.state
-		propose.State.Next = []byte("showme")
-		propose.Round = round
+	{ // correcting proposal
+		proposal.Block.Height = t.height
+		proposal.Block.Current = t.block
+		proposal.Block.Next = common.NewRandomHash("bk")
+		proposal.State.Current = t.state
+		proposal.State.Next = []byte("showme")
+		proposal.Round = round
 	}
 
-	seal, err := common.NewSeal(ProposeSealType, propose)
-	t.NoError(err)
-	err = t.sealPool.Add(seal)
-	t.NoError(err)
-
-	psHash, _, err := seal.Hash()
+	err := t.sealPool.Add(proposal)
 	t.NoError(err)
 
 	votingResult := VoteResultInfo{
 		Proposed: true,
-		Proposal: psHash,
+		Proposal: proposal.Hash(),
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -399,24 +372,24 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 	t.sealBroadcaster.SetSenderChan(bChan)
 
 	errChan := make(chan error)
-	blocker.Vote(seal, errChan)
+	blocker.Vote(proposal, errChan)
 	t.NoError(<-errChan)
 
 	<-bChan // this ballot is SIGN ballot
 	<-time.After(t.policy.TimeoutWaitSeal)
 
 	var receivedSeal common.Seal
+	var receivedBallot Ballot
 	select {
 	case <-time.After(time.Millisecond * 300):
 		t.Empty("timeout to wait receivedSeal")
 		return
 	case receivedSeal = <-bChan:
 		// this ballot is INIT ballot for next round after timeout
+		b, ok := receivedSeal.(Ballot)
+		t.True(ok)
+		receivedBallot = b
 	}
-
-	var receivedBallot Ballot
-	err = receivedSeal.UnmarshalBody(&receivedBallot)
-	t.NoError(err)
 
 	t.True(votingResult.Height.Equal(receivedBallot.Height))
 	t.Equal(round+1, receivedBallot.Round)
@@ -439,7 +412,7 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 	defer close(bChan)
 	t.sealBroadcaster.SetSenderChan(bChan)
 
-	{ // timer is started after propose accepted
+	{ // timer is started after proposal accepted
 		err := blocker.startTimer(false, func() error {
 			return blocker.broadcastINIT(t.height, round+1)
 		})
@@ -447,17 +420,17 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 	}
 
 	var receivedSeal common.Seal
+	var receivedBallot Ballot
 	select {
 	case <-time.After(time.Second):
 		t.Empty("timeout to wait receivedSeal")
 		return
 	case receivedSeal = <-bChan:
 		// this ballot is INIT ballot for next round after timeout
+		b, ok := receivedSeal.(Ballot)
+		t.True(ok)
+		receivedBallot = b
 	}
-
-	var receivedBallot Ballot
-	err := receivedSeal.UnmarshalBody(&receivedBallot)
-	t.NoError(err)
 
 	t.True(t.height.Equal(receivedBallot.Height))
 	t.Equal(round+1, receivedBallot.Round)

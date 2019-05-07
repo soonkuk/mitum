@@ -131,26 +131,19 @@ end:
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
-	sHash, _, err := seal.Hash()
-	if err != nil {
-		log.Error("failed to get Seal.Hash()", "error", err, "seal", seal)
-		return err
-	}
-
-	log_ := log.New(log15.Ctx{"seal": sHash, "seal-type": seal.Type})
+	log_ := log.New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	checker := common.NewChainChecker(
 		"received-seal-checker",
 		common.ContextWithValues(
 			c.ctx,
 			"seal", seal,
-			"sHash", sHash,
 		),
 		CheckerSealPool,
 		CheckerSealTypes,
 	)
 	if err := checker.Check(); err != nil {
-		log_.Error("failed to checker for seal", "error", err, "seal", sHash)
+		log_.Error("failed to checker for seal", "error", err)
 		return err
 	}
 

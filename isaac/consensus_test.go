@@ -89,29 +89,28 @@ func (t *testConsensus) TestNew() {
 	state := t.consensus.Context().Value("state").(*ConsensusState)
 
 	proposerSeed := state.Home().Seed()
-	var proposeSeal common.Seal
-	var propose Propose
+	var proposal Proposal
 	{
 		var err error
-		propose, proposeSeal, err = NewTestSealPropose(proposerSeed.Address(), nil)
+		proposal = NewTestProposal(proposerSeed.Address(), nil)
 		t.NoError(err)
-		err = proposeSeal.Sign(common.TestNetworkID, proposerSeed)
+		err = proposal.Sign(common.TestNetworkID, proposerSeed)
 		t.NoError(err)
 
-		t.nt.Send(state.Home(), proposeSeal)
+		t.nt.Send(state.Home(), proposal)
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	for range ticker.C {
-		if state.Height().Equal(propose.Block.Height.Inc()) {
+		if state.Height().Equal(proposal.Block.Height.Inc()) {
 			break
 		}
 	}
 	ticker.Stop()
 
-	t.True(propose.Block.Height.Inc().Equal(state.Height()))
-	t.True(propose.Block.Next.Equal(state.Block()))
-	t.Equal(propose.State.Next, state.State())
+	t.True(proposal.Block.Height.Inc().Equal(state.Height()))
+	t.True(proposal.Block.Next.Equal(state.Block()))
+	t.Equal(proposal.State.Next, state.State())
 }
 
 func TestConsensus(t *testing.T) {

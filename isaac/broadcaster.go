@@ -9,7 +9,7 @@ import (
 )
 
 type SealBroadcaster interface {
-	Send(common.SealType, common.Hasher /* body */, ...common.Address /* excludes */) error
+	Send(common.Seal /* seal */, ...common.Address /* excludes */) error
 }
 
 type DefaultSealBroadcaster struct {
@@ -30,25 +30,14 @@ func NewDefaultSealBroadcaster(
 }
 
 func (i *DefaultSealBroadcaster) Send(
-	sealType common.SealType,
-	body common.Hasher,
+	seal common.Seal,
 	excludes ...common.Address,
 ) error {
-	seal, err := common.NewSeal(sealType, body)
-	if err != nil {
+	if err := seal.(common.Signer).Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
 		return err
 	}
 
-	if err = seal.Sign(i.policy.NetworkID, i.homeNode.Seed()); err != nil {
-		return err
-	}
-
-	sHash, _, err := seal.Hash()
-	if err != nil {
-		return err
-	}
-
-	log_ := log.New(log15.Ctx{"seal": sHash})
+	log_ := log.New(log15.Ctx{"seal": seal.Hash()})
 	log_.Debug("seal will be broadcasted")
 
 	var targets = []common.Node{i.homeNode}

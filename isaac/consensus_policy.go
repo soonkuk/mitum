@@ -12,7 +12,7 @@ type ConsensusPolicy struct {
 	Total                      uint             `json:"total"`     // total number of validators
 	Threshold                  uint             `json:"threshold"` // consensus threshold
 	BaseFee                    common.Big       `json:"base_fee"`  // minimum fee for operation
-	MaxTransactionsInPropose   uint             `json:"max_transactions_in_propose"`
+	MaxTransactionsInProposal  uint             `json:"max_transactions_in_proposal"`
 	MaxOperationsInTransaction uint             `json:"max_operations_in_transaction"`
 	TimeoutWaitSeal            time.Duration    `json:"timeout_wait_seal"`
 }
