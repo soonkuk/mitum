@@ -24,7 +24,7 @@ func NewSealedSeal(seal SealV1) (SealedSeal, error) {
 		binary:   encoded,
 	}
 
-	raw := NewRawSeal(s, CurrentSealVersion, SealedSealType)
+	raw := NewRawSeal(s, CurrentSealVersion, SealedSeal{}.Type(), SealedSeal{}.Hint())
 	s.RawSeal = raw
 
 	return s, nil
@@ -32,6 +32,10 @@ func NewSealedSeal(seal SealV1) (SealedSeal, error) {
 
 func (r SealedSeal) Binary() []byte {
 	return r.binary
+}
+
+func (r SealedSeal) Type() SealType {
+	return SealedSealType
 }
 
 func (r SealedSeal) Hint() string {

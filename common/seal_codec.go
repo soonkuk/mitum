@@ -30,7 +30,7 @@ func (s *SealCodec) Registered() []SealType {
 	return types
 }
 
-func (s *SealCodec) Register(sealType SealType, seal SealV1) error {
+func (s *SealCodec) Register(seal SealV1) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -42,7 +42,7 @@ func (s *SealCodec) Register(sealType SealType, seal SealV1) error {
 		return UnknownSealTypeError.SetMessage("not RLPUnserializer")
 	}
 
-	s.types[sealType] = rt
+	s.types[seal.Type()] = rt
 
 	return nil
 }

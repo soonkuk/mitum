@@ -130,6 +130,10 @@ type CustomSeal struct {
 	fieldC []byte
 }
 
+func (r CustomSeal) Type() SealType {
+	return SealType("custom-seal")
+}
+
 func (r CustomSeal) Hint() string {
 	return "cs"
 }
@@ -345,7 +349,8 @@ func (t *testSealedSeal) TestNew() {
 		raw := NewRawSeal(
 			seal,
 			CurrentSealVersion,
-			SealType("custom-seal"),
+			seal.Type(),
+			seal.Hint(),
 		)
 		seal.RawSeal = raw
 
@@ -375,7 +380,8 @@ func (t *testSealedSeal) TestMarshal() {
 		raw := NewRawSeal(
 			seal,
 			CurrentSealVersion,
-			SealType("custom-seal"),
+			seal.Type(),
+			seal.Hint(),
 		)
 		seal.RawSeal = raw
 
@@ -414,7 +420,8 @@ func (t *testSealedSeal) TestUnmarshalInsideSeal() {
 		raw := NewRawSeal(
 			seal,
 			CurrentSealVersion,
-			SealType("custom-seal"),
+			seal.Type(),
+			seal.Hint(),
 		)
 		seal.RawSeal = raw
 

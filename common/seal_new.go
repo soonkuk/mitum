@@ -32,6 +32,7 @@ type RawSeal struct {
 	parent    SealV1
 	version   Version
 	sealType  SealType
+	hint      string
 	hash      Hash
 	source    Address
 	signature Signature
@@ -42,11 +43,13 @@ func NewRawSeal(
 	parent SealV1,
 	version Version,
 	sealType SealType,
+	hint string,
 ) RawSeal {
 	return RawSeal{
 		parent:   parent,
 		version:  version,
 		sealType: sealType,
+		hint:     hint,
 	}
 }
 
@@ -285,6 +288,10 @@ func (r RawSeal) Version() Version {
 
 func (r RawSeal) Type() SealType {
 	return r.sealType
+}
+
+func (r RawSeal) Hint() string {
+	return r.hint
 }
 
 func (r RawSeal) Hash() Hash {
