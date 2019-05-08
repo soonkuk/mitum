@@ -132,3 +132,29 @@ func (t *TProposerSelector) Select(block common.Hash, height common.Big, round R
 
 	return t.proposer, nil
 }
+
+type TBlockStorage struct {
+	sync.RWMutex
+	proposals []Proposal
+}
+
+func NewTBlockStorage() *TBlockStorage {
+	return &TBlockStorage{}
+}
+
+func (t *TBlockStorage) Proposals() []Proposal {
+	t.RLock()
+	defer t.RUnlock()
+
+	return t.proposals
+}
+
+func (t *TBlockStorage) NewBlock(proposal Proposal) error {
+	t.Lock()
+	defer t.Unlock()
+
+	t.proposals = append(t.proposals, proposal)
+
+	log.Debug("new block created", "proposal", proposal.Hash())
+	return nil
+}

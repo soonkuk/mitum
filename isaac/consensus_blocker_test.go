@@ -28,6 +28,7 @@ type testConsensusBlocker struct {
 	sealPool         SealPool
 	blocker          *ConsensusBlocker
 	proposerSelector *TProposerSelector
+	blockStorage     *TBlockStorage
 }
 
 func (t *testConsensusBlocker) SetupSuite() {
@@ -43,6 +44,7 @@ func (t *testConsensusBlocker) SetupTest() {
 		AvgBlockRoundInterval: time.Millisecond * 300,
 	}
 	t.cstate = &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
+	t.blockStorage = NewTBlockStorage()
 
 	t.votingBox = &TestMockVotingBox{}
 	t.sealBroadcaster, _ = NewTestSealBroadcaster(t.policy, t.home)
@@ -59,6 +61,7 @@ func (t *testConsensusBlocker) newBlocker() *ConsensusBlocker {
 		t.sealBroadcaster,
 		t.sealPool,
 		t.proposerSelector,
+		t.blockStorage,
 	)
 	b.Start()
 
@@ -269,6 +272,8 @@ func (t *testConsensusBlocker) TestACCEPT() {
 		t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
 		t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 		t.Equal(proposal.State.Next, t.cstate.State())
+		t.NotEmpty(t.blockStorage.Proposals())
+		t.True(t.blockStorage.Proposals()[0].Hash().Equal(proposal.Hash()))
 	}
 
 	// new timer is started

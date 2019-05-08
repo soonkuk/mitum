@@ -25,6 +25,7 @@ type testConsensus struct {
 	sealPool         SealPool
 	consensus        *Consensus
 	proposerSelector *TProposerSelector
+	blockStorage     *TBlockStorage
 }
 
 func (t *testConsensus) SetupSuite() {
@@ -57,7 +58,16 @@ func (t *testConsensus) SetupTest() {
 	t.proposerSelector = NewTProposerSelector()
 	t.proposerSelector.SetProposer(t.home)
 
-	t.blocker = NewConsensusBlocker(policy, cstate, votingBox, t.sealBroadcaster, t.sealPool, t.proposerSelector)
+	t.blockStorage = NewTBlockStorage()
+	t.blocker = NewConsensusBlocker(
+		policy,
+		cstate,
+		votingBox,
+		t.sealBroadcaster,
+		t.sealPool,
+		t.proposerSelector,
+		t.blockStorage,
+	)
 	t.blocker.Start()
 
 	consensus, err := NewConsensus(t.blocker)

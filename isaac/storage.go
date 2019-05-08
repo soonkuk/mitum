@@ -1,11 +1,7 @@
 package isaac
 
-import (
-	"github.com/spikeekips/mitum/common"
-)
-
 type BlockStorage interface {
-	NewBlock(common.Seal /* Seal(Proposal) */) error
+	NewBlock(Proposal) error
 }
 
 type DefaultBlockStorage struct {
@@ -21,10 +17,7 @@ func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error)
 func (i *DefaultBlockStorage) NewBlock(proposal Proposal) error {
 	// TODO store block
 
-	log.Debug(
-		"new block created",
-		"proposal", proposal,
-	)
+	log.Debug("new block created", "proposal", proposal)
 
 	return nil
 }

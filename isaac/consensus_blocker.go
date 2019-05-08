@@ -22,6 +22,7 @@ type ConsensusBlocker struct {
 	sealBroadcaster  SealBroadcaster
 	sealPool         SealPool
 	proposerSelector ProposerSelector
+	blockStorage     BlockStorage
 }
 
 func NewConsensusBlocker(
@@ -31,6 +32,7 @@ func NewConsensusBlocker(
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
 	proposerSelector ProposerSelector,
+	blockStorage BlockStorage,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
 		blockingChan:     make(chan ConsensusBlockerBlockingChanFunc),
@@ -40,6 +42,7 @@ func NewConsensusBlocker(
 		sealBroadcaster:  sealBroadcaster,
 		sealPool:         sealPool,
 		proposerSelector: proposerSelector,
+		blockStorage:     blockStorage,
 	}
 }
 
@@ -289,6 +292,9 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	}
 
 	// TODO store block and state
+	if err := c.blockStorage.NewBlock(proposal); err != nil {
+		return err
+	}
 
 	// update ConsensusBlockerState
 	{
