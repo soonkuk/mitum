@@ -5,7 +5,7 @@ type NodeState uint
 const (
 	_ NodeState = iota
 	NodeStateBooting
-	NodeStateJoining
+	NodeStateJoin
 	NodeStateConsensus
 	NodeStateSync
 	NodeStateStopped
@@ -14,7 +14,7 @@ const (
 func (n NodeState) IsValid() error {
 	switch n {
 	case NodeStateBooting:
-	case NodeStateJoining:
+	case NodeStateJoin:
 	case NodeStateConsensus:
 	case NodeStateSync:
 	case NodeStateStopped:
@@ -29,8 +29,8 @@ func (n NodeState) String() string {
 	switch n {
 	case NodeStateBooting:
 		return "booting"
-	case NodeStateJoining:
-		return "joining"
+	case NodeStateJoin:
+		return "join"
 	case NodeStateConsensus:
 		return "consensus"
 	case NodeStateSync:
