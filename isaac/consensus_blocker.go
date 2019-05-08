@@ -292,22 +292,13 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	}
 
 	// TODO store block and state
-	if err := c.blockStorage.NewBlock(proposal); err != nil {
+	if _, err := c.blockStorage.NewBlock(proposal); err != nil {
 		return err
 	}
 
 	// update ConsensusBlockerState
 	{
-		prevState := &ConsensusState{}
-		if err := prevState.SetHeight(c.state.Height()); err != nil {
-			return err
-		}
-		if err := prevState.SetBlock(c.state.Block()); err != nil {
-			return err
-		}
-		if err := prevState.SetState(c.state.State()); err != nil {
-			return err
-		}
+		prevState := *c.state
 
 		if err := c.state.SetHeight(proposal.Block.Height.Inc()); err != nil {
 			return err

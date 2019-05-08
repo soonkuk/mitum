@@ -1,7 +1,9 @@
 package isaac
 
+// TODO state should be considered
 type BlockStorage interface {
-	NewBlock(Proposal) error
+	NewBlock(Proposal) (Block, error)
+	LatestBlock() (Block, error)
 }
 
 type DefaultBlockStorage struct {
@@ -14,10 +16,14 @@ func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error)
 	}, nil
 }
 
-func (i *DefaultBlockStorage) NewBlock(proposal Proposal) error {
+func (i *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 	// TODO store block
 
 	log.Debug("new block created", "proposal", proposal)
 
-	return nil
+	return Block{}, nil
+}
+
+func (i *DefaultBlockStorage) LatestBlock() (Block, error) {
+	return Block{}, nil
 }

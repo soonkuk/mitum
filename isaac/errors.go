@@ -22,6 +22,7 @@ const (
 	FailedToElectProposerErrorCode
 	DifferentHeightConsensusErrorCode
 	InvalidNodeStateErrorCode
+	BlockNotFoundErrorCode
 )
 
 var (
@@ -43,4 +44,5 @@ var (
 	FailedToElectProposerError           common.Error = common.NewError("isaac", FailedToElectProposerErrorCode, "failed to elect proposer")
 	DifferentHeightConsensusError        common.Error = common.NewError("isaac", DifferentHeightConsensusErrorCode, "consensused, but different height found")
 	InvalidNodeStateError                common.Error = common.NewError("isaac", InvalidNodeStateErrorCode, "invalid NodeState")
+	BlockNotFoundError                   common.Error = common.NewError("isaac", BlockNotFoundErrorCode, "block not found")
 )

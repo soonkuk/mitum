@@ -24,6 +24,7 @@ type testConsensus struct {
 	blocker          *ConsensusBlocker
 	sealPool         SealPool
 	consensus        *Consensus
+	cstate           *ConsensusState
 	proposerSelector *TProposerSelector
 	blockStorage     *TBlockStorage
 }
@@ -38,7 +39,11 @@ func (t *testConsensus) SetupSuite() {
 }
 
 func (t *testConsensus) SetupTest() {
-	cstate := &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
+	t.cstate = NewConsensusState(t.home)
+	t.cstate.SetHeight(t.height)
+	t.cstate.SetBlock(t.block)
+	t.cstate.SetState(t.state)
+
 	policy := ConsensusPolicy{
 		NetworkID:       common.TestNetworkID,
 		Total:           t.total,
@@ -61,7 +66,7 @@ func (t *testConsensus) SetupTest() {
 	t.blockStorage = NewTBlockStorage()
 	t.blocker = NewConsensusBlocker(
 		policy,
-		cstate,
+		t.cstate,
 		votingBox,
 		t.sealBroadcaster,
 		t.sealPool,
@@ -80,7 +85,7 @@ func (t *testConsensus) SetupTest() {
 	t.consensus.SetContext(
 		nil, // nolint
 		"policy", policy,
-		"state", cstate,
+		"state", t.cstate,
 		"sealPool", t.sealPool,
 	)
 
@@ -96,31 +101,28 @@ func (t *testConsensus) TeardownTest() {
 func (t *testConsensus) TestNew() {
 	defer common.DebugPanic()
 
-	state := t.consensus.Context().Value("state").(*ConsensusState)
-
-	proposerSeed := state.Home().Seed()
 	var proposal Proposal
 	{
 		var err error
-		proposal = NewTestProposal(proposerSeed.Address(), nil)
+		proposal = NewTestProposal(t.cstate.Home().Address(), nil)
 		t.NoError(err)
-		err = proposal.Sign(common.TestNetworkID, proposerSeed)
+		err = proposal.Sign(common.TestNetworkID, t.cstate.Home().Seed())
 		t.NoError(err)
 
-		t.nt.Send(state.Home(), proposal)
+		t.nt.Send(t.cstate.Home(), proposal)
 	}
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	for range ticker.C {
-		if state.Height().Equal(proposal.Block.Height.Inc()) {
+		if t.cstate.Height().Equal(proposal.Block.Height.Inc()) {
 			break
 		}
 	}
 	ticker.Stop()
 
-	t.True(proposal.Block.Height.Inc().Equal(state.Height()))
-	t.True(proposal.Block.Next.Equal(state.Block()))
-	t.Equal(proposal.State.Next, state.State())
+	t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
+	t.True(proposal.Block.Next.Equal(t.cstate.Block()))
+	t.Equal(proposal.State.Next, t.cstate.State())
 }
 
 func TestConsensus(t *testing.T) {

@@ -1,6 +1,8 @@
 package isaac
 
 import (
+	"encoding/json"
+
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -48,4 +50,22 @@ func (b Block) PrevState() []byte {
 
 func (b Block) Transactions() []common.Hash {
 	return b.transactions
+}
+
+func (b Block) String() string {
+	by, _ := json.Marshal(map[string]interface{}{
+		"version":      b.version,
+		"hash":         b.hash,
+		"prev_hash":    b.prevHash,
+		"state":        b.state,
+		"prev_state":   b.prevState,
+		"proposer":     b.proposer,
+		"round":        b.round,
+		"proposed_at":  b.proposedAt,
+		"proposal":     b.proposal,
+		"validators":   b.validators,
+		"transactions": b.transactions,
+	})
+
+	return common.TerminalLogString(string(by))
 }

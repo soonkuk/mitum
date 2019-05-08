@@ -43,7 +43,11 @@ func (t *testConsensusBlocker) SetupTest() {
 		TimeoutWaitSeal:       time.Second * 3,
 		AvgBlockRoundInterval: time.Millisecond * 300,
 	}
-	t.cstate = &ConsensusState{home: t.home, height: t.height, block: t.block, state: t.state}
+	t.cstate = NewConsensusState(t.home)
+	t.cstate.SetHeight(t.height)
+	t.cstate.SetBlock(t.block)
+	t.cstate.SetState(t.state)
+
 	t.blockStorage = NewTBlockStorage()
 
 	t.votingBox = &TestMockVotingBox{}
@@ -272,8 +276,8 @@ func (t *testConsensusBlocker) TestACCEPT() {
 		t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
 		t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 		t.Equal(proposal.State.Next, t.cstate.State())
-		t.NotEmpty(t.blockStorage.Proposals())
-		t.True(t.blockStorage.Proposals()[0].Hash().Equal(proposal.Hash()))
+		t.NotEmpty(t.blockStorage.Blocks())
+		t.True(t.blockStorage.Blocks()[0].proposal.Equal(proposal.Hash()))
 	}
 
 	// new timer is started
