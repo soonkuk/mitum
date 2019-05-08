@@ -9,10 +9,18 @@ import (
 
 type ConsensusState struct {
 	sync.RWMutex
-	home   *common.HomeNode
-	height common.Big  // last Block.Height
-	block  common.Hash // Block.Hash()
-	state  []byte      // last State.Root.Hash()
+	home      *common.HomeNode
+	height    common.Big  // last Block.Height
+	block     common.Hash // Block.Hash()
+	state     []byte      // last State.Root.Hash()
+	nodeState NodeState
+}
+
+func NewConsensusState(home *common.HomeNode) *ConsensusState {
+	return &ConsensusState{
+		home:      home,
+		nodeState: NodeStateBooting,
+	}
 }
 
 func (c *ConsensusState) String() string {
@@ -42,11 +50,13 @@ func (c *ConsensusState) Height() common.Big {
 	return c.height
 }
 
-func (c *ConsensusState) SetHeight(height common.Big) {
+func (c *ConsensusState) SetHeight(height common.Big) error {
 	c.Lock()
 	defer c.Unlock()
 
 	c.height = height
+
+	return nil
 }
 
 func (c *ConsensusState) Block() common.Hash {
@@ -56,11 +66,13 @@ func (c *ConsensusState) Block() common.Hash {
 	return c.block
 }
 
-func (c *ConsensusState) SetBlock(block common.Hash) {
+func (c *ConsensusState) SetBlock(block common.Hash) error {
 	c.Lock()
 	defer c.Unlock()
 
 	c.block = block
+
+	return nil
 }
 
 func (c *ConsensusState) State() []byte {
@@ -70,9 +82,31 @@ func (c *ConsensusState) State() []byte {
 	return c.state
 }
 
-func (c *ConsensusState) SetState(state []byte) {
+func (c *ConsensusState) SetState(state []byte) error {
 	c.Lock()
 	defer c.Unlock()
 
 	c.state = state
+
+	return nil
+}
+
+func (c *ConsensusState) NodeState() NodeState {
+	c.RLock()
+	defer c.RUnlock()
+
+	return c.nodeState
+}
+
+func (c *ConsensusState) SetNodeState(state NodeState) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if err := state.IsValid(); err != nil {
+		return err
+	}
+
+	c.nodeState = state
+
+	return nil
 }

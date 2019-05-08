@@ -53,12 +53,10 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerBallotProposal,
 		)
 	case TransactionSealType:
-		// TODO store transaction
+		// TODO handle transaction
 		return common.ChainCheckerStop{}
-	case common.SealedSealType:
-		// TODO decapsule sealed seal
 	default:
-		return common.UnknownSealTypeError.SetMessage("not Proposal")
+		return common.UnknownSealTypeError.SetMessage("tyep=%v", seal.Type())
 	}
 
 	return nil

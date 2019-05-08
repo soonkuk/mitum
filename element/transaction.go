@@ -10,10 +10,6 @@ var (
 	CurrentTransactionVersion common.Version = common.MustParseVersion("0.1.0-proto")
 )
 
-func NewTransactionHash(t Transaction) (common.Hash, error) {
-	return common.NewHashFromObject("tx", t)
-}
-
 type Transaction struct {
 	Version    common.Version
 	Source     common.Address
@@ -34,8 +30,9 @@ func NewTransaction(source common.Address, checkpoint []byte, baseFee common.Big
 	}
 }
 
-func (t Transaction) Hash() (common.Hash, error) {
-	return NewTransactionHash(t)
+func (t Transaction) Hash() common.Hash {
+	hash, _ := common.NewHashFromObject("tx", t)
+	return hash
 }
 
 func (t Transaction) MarshalJSON() ([]byte, error) {

@@ -11,16 +11,16 @@ func CheckerProposalIsValid(c *common.ChainChecker) error {
 		return err
 	}
 
-	var policy ConsensusPolicy
-	if err := c.ContextValue("policy", &policy); err != nil {
-		return err
-	}
-
 	var proposal Proposal
 	if p, ok := seal.(Proposal); !ok {
 		return common.UnknownSealTypeError.SetMessage("not Proposal")
 	} else {
 		proposal = p
+	}
+
+	var policy ConsensusPolicy
+	if err := c.ContextValue("policy", &policy); err != nil {
+		return err
 	}
 
 	if len(proposal.Transactions) > int(policy.MaxTransactionsInProposal) {

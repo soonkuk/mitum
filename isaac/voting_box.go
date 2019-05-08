@@ -327,7 +327,6 @@ type VotingBoxProposal struct {
 	height      common.Big
 	round       Round
 	stage       VoteStage
-	stageINIT   *VotingBoxStage
 	stageSIGN   *VotingBoxStage
 	stageACCEPT *VotingBoxStage
 }
@@ -342,7 +341,6 @@ func NewVotingBoxProposal(
 		height:      height,
 		round:       round,
 		stage:       VoteStageINIT,
-		stageINIT:   NewVotingBoxStage(phash, height, round, VoteStageINIT),
 		stageSIGN:   NewVotingBoxStage(phash, height, round, VoteStageSIGN),
 		stageACCEPT: NewVotingBoxStage(phash, height, round, VoteStageACCEPT),
 	}
@@ -350,8 +348,6 @@ func NewVotingBoxProposal(
 
 func (v *VotingBoxProposal) Stage(stage VoteStage) *VotingBoxStage {
 	switch stage {
-	case VoteStageINIT:
-		return v.stageINIT
 	case VoteStageSIGN:
 		return v.stageSIGN
 	case VoteStageACCEPT:
@@ -365,7 +361,6 @@ func (v *VotingBoxProposal) Opened() []*VotingBoxStage {
 	allStages := []*VotingBoxStage{
 		v.stageACCEPT,
 		v.stageSIGN,
-		v.stageINIT,
 	}
 
 	var opened []*VotingBoxStage
@@ -390,12 +385,10 @@ func (v *VotingBoxProposal) Close(stage VoteStage) error {
 
 	var vs []*VotingBoxStage
 	switch stage {
-	case VoteStageINIT:
-		vs = append(vs, v.stageINIT)
 	case VoteStageSIGN:
-		vs = append(vs, v.stageINIT, v.stageSIGN)
+		vs = append(vs, v.stageSIGN)
 	case VoteStageACCEPT:
-		vs = append(vs, v.stageINIT, v.stageSIGN, v.stageACCEPT)
+		vs = append(vs, v.stageSIGN, v.stageACCEPT)
 	default:
 		return InvalidVoteStageError
 	}
@@ -411,7 +404,6 @@ func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBo
 	allStages := []*VotingBoxStage{
 		v.stageACCEPT,
 		v.stageSIGN,
-		v.stageINIT,
 	}
 
 	voted := map[VoteStage]*VotingBoxStage{}
@@ -427,10 +419,6 @@ func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBo
 
 func (v *VotingBoxProposal) SealVoted(sHash common.Hash) bool {
 	var found bool
-	if found = v.stageINIT.SealVoted(sHash); found {
-		return true
-	}
-
 	if found = v.stageSIGN.SealVoted(sHash); found {
 		return true
 	}
@@ -448,8 +436,6 @@ func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vo
 ) {
 	var vs *VotingBoxStage
 	switch stage {
-	case VoteStageINIT:
-		vs = v.stageINIT
 	case VoteStageSIGN:
 		vs = v.stageSIGN
 	case VoteStageACCEPT:
@@ -467,7 +453,6 @@ func (v *VotingBoxProposal) String() string {
 		"height":      v.height,
 		"round":       v.round,
 		"stage":       v.stage,
-		"stageINIT":   v.stageINIT,
 		"stageSIGN":   v.stageSIGN,
 		"stageACCEPT": v.stageACCEPT,
 	})
@@ -475,7 +460,6 @@ func (v *VotingBoxProposal) String() string {
 	return common.TerminalLogString(string(b))
 }
 
-// TODO in INIT, ballot.Proposer should be checked
 type VotingBoxStage struct {
 	sync.RWMutex
 	proposal common.Hash

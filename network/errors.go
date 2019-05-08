@@ -4,13 +4,13 @@ import "github.com/spikeekips/mitum/common"
 
 const (
 	_ uint = iota
-	ReceiverAlreadyRegisteredCode
-	ReceiverNotRegisteredCode
-	NoReceiversCode
+	ReceiverAlreadyRegisteredErrorCode
+	ReceiverNotRegisteredErrorCode
+	NoReceiversErrorCode
 )
 
 var (
-	ReceiverAlreadyRegisteredError common.Error = common.NewError("network", ReceiverAlreadyRegisteredCode, "receiver already registered")
-	ReceiverNotRegisteredError     common.Error = common.NewError("network", ReceiverNotRegisteredCode, "receiver not registered")
-	NoReceiversError               common.Error = common.NewError("network", NoReceiversCode, "no receivers in network")
+	ReceiverAlreadyRegisteredError common.Error = common.NewError("network", ReceiverAlreadyRegisteredErrorCode, "receiver already registered")
+	ReceiverNotRegisteredError     common.Error = common.NewError("network", ReceiverNotRegisteredErrorCode, "receiver not registered")
+	NoReceiversError               common.Error = common.NewError("network", NoReceiversErrorCode, "no receivers in network")
 )

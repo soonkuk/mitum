@@ -109,7 +109,6 @@ func (t *testVotingBox) TestOpen() {
 	t.Equal(votingBox.current.height, vp.height)
 	t.Equal(votingBox.current.round, vp.round)
 	t.Equal(votingBox.current.stage, vp.stage)
-	t.Equal(0, len(votingBox.current.stageINIT.voted))
 	t.Equal(0, len(votingBox.current.stageSIGN.voted))
 	t.Equal(0, len(votingBox.current.stageACCEPT.voted))
 }
@@ -142,7 +141,6 @@ func (t *testVotingBox) TestClose() {
 
 	// current moves to previous; all the stages in previous should be closed
 	t.True(votingBox.previous.Closed())
-	t.True(votingBox.previous.Stage(VoteStageINIT).Closed())
 	t.True(votingBox.previous.Stage(VoteStageSIGN).Closed())
 	t.True(votingBox.previous.Stage(VoteStageACCEPT).Closed())
 }

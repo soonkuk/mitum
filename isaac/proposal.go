@@ -10,7 +10,8 @@ import (
 
 type Proposal struct {
 	common.RawSeal
-	// TODO // Validators   []common.Validator `json:validators`
+	// TODO
+	// Validators   []common.Validator `json:validators`
 	Round        Round         `json:"round"`
 	Block        ProposalBlock `json:"block"`
 	State        ProposalState `json:"state"`

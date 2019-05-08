@@ -1,45 +1,44 @@
 package common
 
-// TODO rename XXXCode  to XXXErrorCode
 const (
 	_ uint = iota
 	OverflowErrorCode
-	SomethingWrongCode
-	UnknownSealTypeCode
-	JSONUnmarshalCode
-	NotImplementedCode
-	InvalidHashCode
-	EmptyHashCode
-	InvalidHashHintCode
-	InvalidBigStringCode
-	HashDoesNotMatchCode
-	SealNotWellformedCode
-	ContextValueNotFoundCode
-	SignatureVerificationFailedCode
-	InvalidAddressCode
-	InvalidNetAddrCode
-	StartStopperAlreadyStartedCode
-	InvalidSealTypeCode
-	InvalidSignatureCode
+	SomethingWrongErrorCode
+	UnknownSealTypeErrorCode
+	JSONUnmarshalErrorCode
+	NotImplementedErrorCode
+	InvalidHashErrorCode
+	EmptyHashErrorCode
+	InvalidHashHintErrorCode
+	InvalidBigStringErrorCode
+	HashDoesNotMatchErrorCode
+	SealNotWellformedErrorCode
+	ContextValueNotFoundErrorCode
+	SignatureVerificationFailedErrorCode
+	InvalidAddressErrorCode
+	InvalidNetAddrErrorCode
+	StartStopperAlreadyStartedErrorCode
+	InvalidSealTypeErrorCode
+	InvalidSignatureErrorCode
 )
 
 var (
 	OverflowError                    Error = NewError("common", OverflowErrorCode, "overflow number")
-	SomethingWrongError              Error = NewError("common", SomethingWrongCode, "something wrong")
-	UnknownSealTypeError             Error = NewError("common", UnknownSealTypeCode, "unknown seal type found")
-	JSONUnmarshalError               Error = NewError("common", JSONUnmarshalCode, "failed json unmarshal")
-	NotImplementedError              Error = NewError("common", NotImplementedCode, "not implemented")
-	InvalidHashError                 Error = NewError("common", InvalidHashCode, "invalid hash found")
-	EmptyHashError                   Error = NewError("common", EmptyHashCode, "hash is empty")
-	InvalidHashHintError             Error = NewError("common", InvalidHashHintCode, "invalid hash hint")
-	InvalidBigStringError            Error = NewError("common", InvalidBigStringCode, "invalid big string")
-	HashDoesNotMatchError            Error = NewError("common", HashDoesNotMatchCode, "hash does not match")
-	SealNotWellformedError           Error = NewError("common", SealNotWellformedCode, "seal is not wellformed")
-	ContextValueNotFoundError        Error = NewError("common", ContextValueNotFoundCode, "value not found in context")
-	SignatureVerificationFailedError Error = NewError("common", SignatureVerificationFailedCode, "signature verification failed")
-	InvalidAddressError              Error = NewError("common", InvalidAddressCode, "invalid Address")
-	InvalidNetAddrError              Error = NewError("common", InvalidNetAddrCode, "invalid NetAddr")
-	StartStopperAlreadyStartedError  Error = NewError("common", StartStopperAlreadyStartedCode, "StartStopper already started")
-	InvalidSealTypeError             Error = NewError("isaac", InvalidSealTypeCode, "invalid SealType")
-	InvalidSignatureError            Error = NewError("isaac", InvalidSignatureCode, "invalid Signature found")
+	SomethingWrongError              Error = NewError("common", SomethingWrongErrorCode, "something wrong")
+	UnknownSealTypeError             Error = NewError("common", UnknownSealTypeErrorCode, "unknown seal type found")
+	JSONUnmarshalError               Error = NewError("common", JSONUnmarshalErrorCode, "failed json unmarshal")
+	NotImplementedError              Error = NewError("common", NotImplementedErrorCode, "not implemented")
+	InvalidHashError                 Error = NewError("common", InvalidHashErrorCode, "invalid hash found")
+	EmptyHashError                   Error = NewError("common", EmptyHashErrorCode, "hash is empty")
+	InvalidHashHintError             Error = NewError("common", InvalidHashHintErrorCode, "invalid hash hint")
+	InvalidBigStringError            Error = NewError("common", InvalidBigStringErrorCode, "invalid big string")
+	HashDoesNotMatchError            Error = NewError("common", HashDoesNotMatchErrorCode, "hash does not match")
+	SealNotWellformedError           Error = NewError("common", SealNotWellformedErrorCode, "seal is not wellformed")
+	ContextValueNotFoundError        Error = NewError("common", ContextValueNotFoundErrorCode, "value not found in context")
+	SignatureVerificationFailedError Error = NewError("common", SignatureVerificationFailedErrorCode, "signature verification failed")
+	InvalidAddressError              Error = NewError("common", InvalidAddressErrorCode, "invalid Address")
+	InvalidNetAddrError              Error = NewError("common", InvalidNetAddrErrorCode, "invalid NetAddr")
+	StartStopperAlreadyStartedError  Error = NewError("common", StartStopperAlreadyStartedErrorCode, "StartStopper already started")
+	InvalidSealTypeError             Error = NewError("isaac", InvalidSealTypeErrorCode, "invalid SealType")
+	InvalidSignatureError            Error = NewError("isaac", InvalidSignatureErrorCode, "invalid Signature found")
 )

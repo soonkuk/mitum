@@ -13,10 +13,12 @@ type Ballot struct {
 	common.RawSeal
 	Proposal common.Hash    `json:"proposal"` // NOTE Proposal.Hash()
 	Proposer common.Address `json:"proposer"` // NOTE only for `INIT`
-	Height   common.Big     `json:"height"`
-	Round    Round          `json:"round"`
-	Stage    VoteStage      `json:"stage"`
-	Vote     Vote           `json:"vote"`
+	// TODO
+	// Validators   []common.Validator `json:validators`
+	Height common.Big `json:"height"`
+	Round  Round      `json:"round"`
+	Stage  VoteStage  `json:"stage"`
+	Vote   Vote       `json:"vote"`
 }
 
 func NewBallot(

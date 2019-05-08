@@ -15,7 +15,7 @@ var (
 
 type Hasher interface {
 	encoding.BinaryMarshaler
-	Hash() (Hash, []byte, error) // Hash().Body() == RawHash(Hasher.Encode())
+	Hash() Hash
 }
 
 func Encode(i interface{}) ([]byte, error) {

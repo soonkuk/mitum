@@ -30,6 +30,7 @@ type Seal interface {
 	JSONMapSerializer
 	WellformChecker
 
+	SealVersion() Version
 	Version() Version
 	Type() SealType
 	Hint() string
@@ -45,14 +46,15 @@ type Seal interface {
 
 type RawSeal struct {
 	sync.RWMutex
-	parent    Seal
-	version   Version
-	sealType  SealType
-	hint      string
-	hash      Hash
-	source    Address
-	signature Signature
-	signedAt  Time
+	parent      Seal
+	sealVersion Version
+	version     Version
+	sealType    SealType
+	hint        string
+	hash        Hash
+	source      Address
+	signature   Signature
+	signedAt    Time
 }
 
 func NewRawSeal(
@@ -60,10 +62,11 @@ func NewRawSeal(
 	version Version,
 ) RawSeal {
 	return RawSeal{
-		parent:   parent,
-		version:  version,
-		sealType: parent.Type(),
-		hint:     parent.Hint(),
+		parent:      parent,
+		sealVersion: CurrentSealVersion,
+		version:     version,
+		sealType:    parent.Type(),
+		hint:        parent.Hint(),
 	}
 }
 
@@ -295,6 +298,10 @@ func (r RawSeal) String() string {
 
 func (r RawSeal) Raw() RawSeal {
 	return r
+}
+
+func (r RawSeal) SealVersion() Version {
+	return r.sealVersion
 }
 
 func (r RawSeal) Version() Version {

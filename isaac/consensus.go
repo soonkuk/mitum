@@ -164,10 +164,10 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 				return
 			}
 
-			// TODO detect sync
 			switch cerr.Code() {
 			case DifferentHeightConsensusError.Code():
-				//
+				// TODO detect sync
+				//c.state.SetNodeState(NodeStateSync)
 			}
 		}
 	}(seal)

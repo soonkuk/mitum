@@ -30,14 +30,14 @@ func (t *testHash) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (t testHash) Hash() (common.Hash, []byte, error) {
+func (t testHash) Hash() common.Hash {
 	encoded, err := t.MarshalBinary()
 	if err != nil {
-		return common.Hash{}, nil, err
+		return common.Hash{}
 	}
 
 	hash, _ := common.NewHash("th", encoded)
-	return hash, encoded, nil
+	return hash
 }
 
 type testNodeNetwork struct {

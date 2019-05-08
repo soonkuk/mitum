@@ -14,13 +14,14 @@ type ConsensusBlocker struct {
 	sync.RWMutex
 	stopBlockingChan chan bool
 	blockingChan     chan ConsensusBlockerBlockingChanFunc
+	timer            *common.CallbackTimer
+
 	policy           ConsensusPolicy
 	state            *ConsensusState
 	votingBox        VotingBox
 	sealBroadcaster  SealBroadcaster
 	sealPool         SealPool
 	proposerSelector ProposerSelector
-	timer            *common.CallbackTimer
 }
 
 func NewConsensusBlocker(
@@ -290,9 +291,39 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	// TODO store block and state
 
 	// update ConsensusBlockerState
-	c.state.SetHeight(proposal.Block.Height.Inc())
-	c.state.SetBlock(proposal.Block.Next)
-	c.state.SetState(proposal.State.Next)
+	{
+		prevState := &ConsensusState{}
+		if err := prevState.SetHeight(c.state.Height()); err != nil {
+			return err
+		}
+		if err := prevState.SetBlock(c.state.Block()); err != nil {
+			return err
+		}
+		if err := prevState.SetState(c.state.State()); err != nil {
+			return err
+		}
+
+		if err := c.state.SetHeight(proposal.Block.Height.Inc()); err != nil {
+			return err
+		}
+		if err := c.state.SetBlock(proposal.Block.Next); err != nil {
+			return err
+		}
+		if err := c.state.SetState(proposal.State.Next); err != nil {
+			return err
+		}
+
+		log.Debug(
+			"round finished",
+			"proposal", seal.Hash(),
+			"old-block-height", prevState.Height().String(),
+			"old-block-hash", prevState.Block(),
+			"old-state-hash", prevState.State(),
+			"new-block-height", c.state.Height().String(),
+			"new-block-hash", c.state.Block(),
+			"new-state-hash", c.state.State(),
+		)
+	}
 
 	// propose or wait new proposal
 	err = c.startTimer(true, func() error {
