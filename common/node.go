@@ -34,6 +34,10 @@ func NewBaseNode(address Address, publish NetAddr, validators []Validator) BaseN
 	return BaseNode{address: address, publish: publish, validators: vs}
 }
 
+func (n BaseNode) Name() string {
+	return n.address.Alias()
+}
+
 func (n BaseNode) Address() Address {
 	return n.address
 }

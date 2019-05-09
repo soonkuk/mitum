@@ -77,8 +77,12 @@ func (h Hash) Body() [32]byte {
 	return h.b
 }
 
+func (h Hash) Empty() bool {
+	return h.b == emptyRawHash
+}
+
 func (h Hash) IsValid() bool {
-	if h.b == emptyRawHash {
+	if h.Empty() {
 		return false
 	}
 	if len(h.h) < 1 {
@@ -93,6 +97,10 @@ func (h Hash) Bytes() []byte {
 }
 
 func (h Hash) String() string {
+	if h.Empty() {
+		return "<empty hash>"
+	}
+
 	return h.Hint() + "-" + base58.Encode(h.b[:])
 }
 

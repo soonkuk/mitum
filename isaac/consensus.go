@@ -10,20 +10,28 @@ import (
 
 type Consensus struct {
 	sync.RWMutex
+	log      log15.Logger
 	receiver chan common.Seal
 	stop     chan bool
 	voteChan chan common.Seal
 	ctx      context.Context
+	home     *common.HomeNode
 	blocker  *ConsensusBlocker
+	state    *ConsensusState
 }
 
 func NewConsensus(
+	home *common.HomeNode,
+	state *ConsensusState,
 	blocker *ConsensusBlocker,
 ) (*Consensus, error) {
 	c := &Consensus{
+		log:      log.New(log15.Ctx{"node": home.Name()}),
 		receiver: make(chan common.Seal),
 		voteChan: make(chan common.Seal),
 		ctx:      context.Background(),
+		home:     home,
+		state:    state,
 		blocker:  blocker,
 	}
 
@@ -123,7 +131,7 @@ end:
 
 			go func() {
 				if err := c.receiveSeal(seal); err != nil {
-					log.Error("failed to receive seal")
+					c.log.Error("failed to receive seal", "error", err)
 				}
 			}()
 		}
@@ -131,7 +139,7 @@ end:
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
-	log_ := log.New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
+	log_ := c.log.New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	checker := common.NewChainChecker(
 		"receiveSeal",
@@ -147,6 +155,11 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		return err
 	}
 
+	if !c.state.NodeState().CanVote() {
+		log_.Error("node can not vote", "state", c.state.NodeState())
+		return nil
+	}
+
 	go func(seal common.Seal) {
 		errChan := make(chan error)
 		c.blocker.Vote(seal, errChan)
@@ -157,7 +170,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 				return
 			}
 
-			log.Error("failed to vote", "error", err)
+			c.log.Error("failed to vote", "seal", seal.Hash(), "error", err)
 
 			cerr, ok := err.(common.Error)
 			if !ok {
@@ -167,7 +180,16 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 			switch cerr.Code() {
 			case DifferentHeightConsensusError.Code():
 				// TODO detect sync
-				//c.state.SetNodeState(NodeStateSync)
+				log_.Debug("go to sync", "error", err)
+				c.state.SetNodeState(NodeStateSync)
+				c.blocker.Stop()
+				panic(err)
+			case DifferentBlockHashConsensusError.Code():
+				// TODO detect sync
+				log_.Debug("go to sync", "error", err)
+				c.state.SetNodeState(NodeStateSync)
+				c.blocker.Stop()
+				panic(err)
 			}
 		}
 	}(seal)

@@ -146,7 +146,7 @@ func (b Ballot) Wellformed() error {
 
 	if b.Stage == VoteStageINIT {
 		if len(b.Proposer) < 1 {
-			return BallotNotWellformedError.SetMessage("Proposer is empty for INIT")
+			return BallotNotWellformedError.SetMessage("Proposer is empty; INIT")
 		}
 
 		if b.Proposal.IsValid() {
@@ -154,7 +154,7 @@ func (b Ballot) Wellformed() error {
 		}
 	} else {
 		if len(b.Proposer) > 0 {
-			return BallotNotWellformedError.SetMessage("Proposer is not empty for not INIT")
+			return BallotNotWellformedError.SetMessage("Proposer is not empty; not INIT")
 		}
 
 		if !b.Proposal.IsValid() {

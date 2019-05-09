@@ -51,14 +51,14 @@ func (t *testConsensus) SetupTest() {
 		TimeoutWaitSeal: time.Second * 3,
 	}
 
-	votingBox := NewDefaultVotingBox(policy)
+	votingBox := NewDefaultVotingBox(t.home, policy)
 
 	t.nt = network.NewNodeTestNetwork()
 
 	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.home)
 	t.sealBroadcaster.SetSender(t.nt.Send)
 
-	t.sealPool = NewDefaultSealPool()
+	t.sealPool = NewDefaultSealPool(t.home)
 
 	t.proposerSelector = NewTProposerSelector()
 	t.proposerSelector.SetProposer(t.home)
@@ -75,7 +75,7 @@ func (t *testConsensus) SetupTest() {
 	)
 	t.blocker.Start()
 
-	consensus, err := NewConsensus(t.blocker)
+	consensus, err := NewConsensus(t.home, t.cstate, t.blocker)
 	t.NoError(err)
 	t.consensus = consensus
 

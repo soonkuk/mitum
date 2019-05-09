@@ -21,7 +21,7 @@ type testVotingBox struct {
 func (t *testVotingBox) SetupTest() {
 	t.home = common.NewRandomHome()
 	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
-	t.votingBox = NewDefaultVotingBox(t.policy)
+	t.votingBox = NewDefaultVotingBox(t.home, t.policy)
 	t.seals = map[common.Hash]common.Seal{}
 	t.proposeSeals = map[common.Hash]Proposal{}
 	t.ballotSeals = map[common.Hash]Ballot{}
@@ -85,7 +85,7 @@ func (t *testVotingBox) newBallotVote(
 }
 
 func (t *testVotingBox) TestNew() {
-	votingBox := NewDefaultVotingBox(t.policy)
+	votingBox := NewDefaultVotingBox(t.home, t.policy)
 	t.Nil(votingBox.current)
 }
 

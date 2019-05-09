@@ -18,17 +18,21 @@ func PrintJSON(v interface{}, indent bool, escapeHTML bool) string {
 		b = s
 	}
 
-	buffer := &bytes.Buffer{}
-	e := json.NewEncoder(buffer)
-	e.SetEscapeHTML(escapeHTML)
-	if indent {
-		e.SetIndent("", "  ")
-	}
-
-	err := e.Encode(json.RawMessage(b))
+	b, err := encodeJSON(v, indent, escapeHTML)
 	if err != nil {
 		return ""
 	}
+	return string(b)
+}
 
-	return buffer.String()
+func encodeJSON(v interface{}, indent, escapeHTML bool) ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	e := json.NewEncoder(buffer)
+	if indent {
+		e.SetIndent("", "  ")
+	}
+	e.SetEscapeHTML(escapeHTML)
+
+	err := e.Encode(v)
+	return buffer.Bytes(), err
 }

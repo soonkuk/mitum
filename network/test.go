@@ -12,6 +12,7 @@ import (
 
 type NodeTestNetwork struct {
 	sync.RWMutex
+	local chan<- common.Seal
 	chans map[string]chan<- common.Seal
 }
 
@@ -65,8 +66,14 @@ func (n *NodeTestNetwork) Send(node common.Node, seal common.Seal) error {
 
 	for _, c := range n.chans {
 		if reflect.ValueOf(seal).Kind() == reflect.Ptr {
-			seal = reflect.ValueOf(seal).Elem().Interface().(common.Seal)
+			seal = reflect.Indirect(reflect.ValueOf(seal)).Interface().(common.Seal)
 		}
+		if err := seal.Wellformed(); err != nil {
+			log.Crit("not wellformed seal found", "error", err)
+			panic(err)
+			return err
+		}
+
 		c <- seal
 	}
 

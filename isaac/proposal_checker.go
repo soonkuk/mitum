@@ -73,9 +73,37 @@ func CheckerProposalTimeIsValid(c *common.ChainChecker) error {
 	return nil
 }
 
-// CheckerProposalBlock checks `Proposal.Block` is correct
+// CheckerProposalBlock checks `Proposal.Block` is correct,
+// - Proposal.Block.Height is same
+// - Proposal.Block.Current is same
 func CheckerProposalBlock(c *common.ChainChecker) error {
 	// TODO test
+	var state *ConsensusState
+	if err := c.ContextValue("state", &state); err != nil {
+		return err
+	}
+
+	var proposal Proposal
+	if err := c.ContextValue("proposal", &proposal); err != nil {
+		return err
+	}
+
+	if !proposal.Block.Height.Equal(state.Height().Inc()) {
+		return DifferentHeightConsensusError.AppendMessage(
+			"proposal=%v next=%v",
+			proposal.Block.Height,
+			state.Height().Inc(),
+		)
+	}
+
+	if !proposal.Block.Current.Equal(state.Block()) {
+		return DifferentBlockHashConsensusError.AppendMessage(
+			"proposal=%v current=%v",
+			proposal.Block.Current,
+			state.Block(),
+		)
+	}
+
 	return nil
 }
 

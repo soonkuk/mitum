@@ -41,3 +41,12 @@ func (n NodeState) String() string {
 		return "<wrong node state>"
 	}
 }
+
+func (n NodeState) CanVote() bool {
+	switch n {
+	case NodeStateJoin, NodeStateConsensus:
+		return true
+	}
+
+	return false
+}

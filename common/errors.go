@@ -20,6 +20,7 @@ const (
 	StartStopperAlreadyStartedErrorCode
 	InvalidSealTypeErrorCode
 	InvalidSignatureErrorCode
+	InvalidSeedErrorCode
 )
 
 var (
@@ -41,4 +42,5 @@ var (
 	StartStopperAlreadyStartedError  Error = NewError("common", StartStopperAlreadyStartedErrorCode, "StartStopper already started")
 	InvalidSealTypeError             Error = NewError("isaac", InvalidSealTypeErrorCode, "invalid SealType")
 	InvalidSignatureError            Error = NewError("isaac", InvalidSignatureErrorCode, "invalid Signature found")
+	InvalidSeedError                 Error = NewError("isaac", InvalidSeedErrorCode, "invalid seed")
 )

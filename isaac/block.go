@@ -13,6 +13,7 @@ var (
 type Block struct {
 	version common.Version
 
+	height   common.Big
 	hash     common.Hash
 	prevHash common.Hash
 
@@ -30,6 +31,10 @@ type Block struct {
 
 func (b Block) Version() common.Version {
 	return b.version
+}
+
+func (b Block) Height() common.Big {
+	return b.height
 }
 
 func (b Block) Hash() common.Hash {
@@ -55,6 +60,7 @@ func (b Block) Transactions() []common.Hash {
 func (b Block) String() string {
 	by, _ := json.Marshal(map[string]interface{}{
 		"version":      b.version,
+		"height":       b.height,
 		"hash":         b.hash,
 		"prev_hash":    b.prevHash,
 		"state":        b.state,

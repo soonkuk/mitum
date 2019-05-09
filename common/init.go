@@ -5,6 +5,7 @@ import (
 )
 
 var InTest bool
+var DEBUG bool
 
 var log logging.Logger = logging.New("module", "common")
 

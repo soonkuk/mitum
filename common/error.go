@@ -11,13 +11,6 @@ type Error struct {
 	message string
 }
 
-func (e Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{
-		"code":    e.code,
-		"message": e.message,
-	})
-}
-
 func (e *Error) UnmarshalJSON(b []byte) error {
 	var m map[string]string
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -44,8 +37,12 @@ func (e *Error) UnmarshalJSON(b []byte) error {
 }
 
 func (e Error) Error() string {
-	b, _ := json.Marshal(e)
-	return string(b)
+	b, _ := encodeJSON(map[string]string{
+		"code":    e.code,
+		"message": e.message,
+	}, false, false)
+
+	return TerminalLogString(string(b))
 }
 
 func (e Error) Code() string {
@@ -56,6 +53,7 @@ func (e Error) Message() string {
 	return e.message
 }
 
+// TODO remvoe SetMessage, AppendMessage will be used
 func (e Error) SetMessage(format string, args ...interface{}) Error {
 	return Error{code: e.code, message: fmt.Sprintf(format, args...)}
 }

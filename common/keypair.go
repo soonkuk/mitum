@@ -85,6 +85,20 @@ func NewSeed(raw []byte) Seed {
 	return Seed{Full: seed}
 }
 
+func SeedFromString(s string) (Seed, error) {
+	var seed Seed
+	kp, err := keypair.Parse(s)
+	if err != nil {
+		return Seed{}, InvalidSeedError.SetMessage(err.Error())
+	} else if full, ok := kp.(*keypair.Full); !ok {
+		return Seed{}, InvalidSeedError
+	} else {
+		seed = Seed{Full: full}
+	}
+
+	return seed, nil
+}
+
 func (s Seed) Address() Address {
 	return Address(s.Full.Address())
 }

@@ -1,12 +1,15 @@
 package isaac
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
+
+// TODO voting internal scheduler: dynamically change the voting internal
 
 type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
 
@@ -15,6 +18,8 @@ type ConsensusBlocker struct {
 	stopBlockingChan chan bool
 	blockingChan     chan ConsensusBlockerBlockingChanFunc
 	timer            *common.CallbackTimer
+	lastVotingResult VoteResultInfo
+	log              log15.Logger
 
 	policy           ConsensusPolicy
 	state            *ConsensusState
@@ -36,6 +41,7 @@ func NewConsensusBlocker(
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
 		blockingChan:     make(chan ConsensusBlockerBlockingChanFunc),
+		log:              log.New(log15.Ctx{"node": state.Home().Name()}),
 		policy:           policy,
 		state:            state,
 		votingBox:        votingBox,
@@ -57,7 +63,17 @@ func (c *ConsensusBlocker) Start() error {
 
 	go c.blocking()
 
-	log.Debug("ConsensusBlocker started")
+	c.log.Debug("ConsensusBlocker started")
+
+	return nil
+}
+
+func (c *ConsensusBlocker) Join() error {
+	if c.state.NodeState() != NodeStateJoin {
+		c.state.SetNodeState(NodeStateJoin)
+	}
+
+	go c.joinConsensus(c.state.Height().Inc())
 
 	return nil
 }
@@ -78,7 +94,12 @@ func (c *ConsensusBlocker) Stop() error {
 		c.timer.Stop()
 	}
 
-	log.Debug("ConsensusBlocker stopped")
+	c.log.Debug("ConsensusBlocker stopped")
+
+	// votingBox also be cleared automatically
+	if err := c.votingBox.Clear(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -97,9 +118,6 @@ end:
 			seal, errChan := f()
 
 			err := c.vote(seal)
-			if err != nil {
-				log.Error("failed to vote", "error", err)
-			}
 			if errChan != nil {
 				errChan <- err
 			}
@@ -107,7 +125,12 @@ end:
 	}
 }
 
-func (c *ConsensusBlocker) startTimer(keepRunning bool, callback func() error) error {
+func (c *ConsensusBlocker) startTimer(
+	name string,
+	timeout time.Duration,
+	keepRunning bool,
+	callback func() error,
+) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -116,7 +139,14 @@ func (c *ConsensusBlocker) startTimer(keepRunning bool, callback func() error) e
 		c.timer = nil
 	}
 
-	c.timer = c.newTimer(callback, keepRunning)
+	// TODO initial timeout
+	c.timer = common.NewCallbackTimer(
+		fmt.Sprintf("timer: %s: %v", name, c.state.Home().Name()),
+		timeout,
+		callback,
+		keepRunning,
+	)
+
 	return c.timer.Start()
 }
 
@@ -146,6 +176,11 @@ func (c *ConsensusBlocker) Vote(seal common.Seal, errChan chan<- error) {
 
 // vote votes and decides the next action.
 func (c *ConsensusBlocker) vote(seal common.Seal) error {
+	log_ := c.log.New(log15.Ctx{
+		"seal":      seal.Hash(),
+		"seal_type": seal.Type(),
+	})
+
 	var votingResult VoteResultInfo
 	{ // voting
 		var err error
@@ -157,6 +192,20 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 				return err
 			}
 
+			checker := common.NewChainChecker(
+				"blocker_check_proposal",
+				common.ContextWithValues(
+					nil,
+					"proposal", proposal,
+					"state", c.state,
+				),
+				CheckerBlockerProposalBlock,
+			)
+			if err := checker.Check(); err != nil {
+				log_.Error("checker failed; proposal", "error", err)
+				return err
+			}
+
 			votingResult, err = c.votingBox.Open(proposal)
 		case BallotSealType:
 			var ballot Ballot
@@ -164,19 +213,56 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 				return err
 			}
 
+			ballotChecker := common.NewChainChecker(
+				"blocker_check_ballot",
+				common.ContextWithValues(
+					nil,
+					"ballot", ballot,
+					"state", c.state,
+				),
+				CheckerBlockerBallot,
+			)
+			if err := ballotChecker.Check(); err != nil {
+				log_.Error("checker failed; ballot", "error", err)
+				return err
+			}
+
 			votingResult, err = c.votingBox.Vote(ballot)
+
+			c.RLock()
+
+			resultChecker := common.NewChainChecker(
+				"blocker_check_ballot_votingresult",
+				common.ContextWithValues(
+					nil,
+					"votingResult", votingResult,
+					"lastVotingResult", c.lastVotingResult,
+					"state", c.state,
+				),
+				CheckerBlockerBallotVotingResult,
+			)
+			c.RUnlock()
+			if err := resultChecker.Check(); err != nil {
+				log_.Error("checker failed; ballot votingResult", "error", err)
+				return err
+			}
+
+			if votingResult.NotYet() {
+				return nil
+			}
+
+			c.Lock()
+			c.lastVotingResult = votingResult
+			c.Unlock()
 		default:
 			return common.InvalidSealTypeError
 		}
 
-		log.Debug("got voting result", "result", votingResult, "error", err)
 		if err != nil {
 			return err
 		}
 
-		if votingResult.NotYet() {
-			return nil
-		}
+		log_.Debug("got votingResult", "result", votingResult)
 	}
 
 	switch votingResult.Stage {
@@ -204,14 +290,30 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	return nil
 }
 
+// joinConsensus tries to join network; broadcasts INIT ballot with
+// - latest known height block
+// - round 0
+func (c *ConsensusBlocker) joinConsensus(height common.Big) error {
+	c.log.Debug("trying to join consensus", "height", height)
+
+	err := c.startTimer("join-consensus-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+		return c.broadcastINIT(height, Round(0))
+	})
+	if err != nil {
+		return err
+	}
+
+	return c.broadcastINIT(height, Round(0))
+}
+
 // doProposeAccepted will do,
 // - validate proposal
 // - decide YES/NOP
 // - broadcast sign ballot
 func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error {
-	log.Debug("proposal accepted", "result", votingResult)
+	c.log.Debug("proposal accepted", "result", votingResult)
 
-	err := c.startTimer(true, func() error {
+	err := c.startTimer("proposal-accepted-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(votingResult.Height, votingResult.Round+1)
 	})
 	if err != nil {
@@ -248,9 +350,14 @@ func (c *ConsensusBlocker) goToNextStage(
 	round Round,
 	stage VoteStage,
 ) error {
-	log.Debug("go to next sage", "proposal", phash, "height", height, "round", round, "next", stage)
+	c.log.Debug("go to next stage", "proposal", phash, "height", height, "round", round, "next", stage)
 
-	err := c.startTimer(true, func() error {
+	// TODO if proposer is different from current, check
+	// - current Block is same
+	// - current Height is same
+	// - current Height is same
+
+	err := c.startTimer("next-stage-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -279,7 +386,7 @@ func (c *ConsensusBlocker) goToNextStage(
 // - update ConsensusBlockerState
 // - ready to start new block
 func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
-	log.Debug("finish round", "proposal", phash)
+	c.log.Debug("finish round", "proposal", phash)
 
 	seal, err := c.sealPool.Get(phash)
 	if err != nil {
@@ -300,7 +407,7 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	{
 		prevState := *c.state
 
-		if err := c.state.SetHeight(proposal.Block.Height.Inc()); err != nil {
+		if err := c.state.SetHeight(proposal.Block.Height); err != nil {
 			return err
 		}
 		if err := c.state.SetBlock(proposal.Block.Next); err != nil {
@@ -310,7 +417,7 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 			return err
 		}
 
-		log.Debug(
+		c.log.Debug(
 			"round finished",
 			"proposal", seal.Hash(),
 			"old-block-height", prevState.Height().String(),
@@ -323,7 +430,7 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	}
 
 	// propose or wait new proposal
-	err = c.startTimer(true, func() error {
+	err = c.startTimer("finish-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(proposal.Block.Height.Inc(), Round(0))
 	})
 	if err != nil {
@@ -335,9 +442,9 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 
 // startNewRound starts new round
 func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
-	log.Debug("start new round", "height", height, "round", round)
+	c.log.Debug("start new round", "height", height, "round", round)
 
-	err := c.startTimer(true, func() error {
+	err := c.startTimer("new-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -349,23 +456,19 @@ func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
 
 // runNewRound starts new round and propose new proposal
 func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
-	log_ := log.New(log15.Ctx{"height": height, "round": round})
+	log_ := c.log.New(log15.Ctx{"height": height, "round": round})
 	log_.Debug("run new round")
 
-	err := c.startTimer(true, func() error {
-		return c.broadcastINIT(height, round+1)
-	})
+	err := c.startTimer(
+		"run-round-broadcast-init",
+		c.policy.TimeoutWaitSeal+c.policy.AvgBlockRoundInterval+time.Second, // NOTE wait after proposed
+		true,
+		func() error {
+			return c.broadcastINIT(height, round+1)
+		},
+	)
 	if err != nil {
 		return err
-	}
-
-	if !height.Equal(c.state.Height()) {
-		log_.Debug("different height found", "init-height", height, "state-height", c.state.Height())
-		return DifferentHeightConsensusError.AppendMessage(
-			"init height=%v, state height=%v",
-			height,
-			c.state.Height(),
-		)
 	}
 
 	delay := c.policy.AvgBlockRoundInterval
@@ -374,25 +477,13 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 	return c.propose(height, round, delay)
 }
 
-func (c *ConsensusBlocker) newTimer(callback func() error, keepRunning bool) *common.CallbackTimer {
-	return common.NewCallbackTimer(
-		"consensus_blocker_timer",
-		c.policy.TimeoutWaitSeal,
-		callback,
-		keepRunning,
-	)
-}
-
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
-	log_ := log.New(log15.Ctx{"height": height, "round": round})
-	log_.Debug("broadcast INIT ballot")
+	log_ := c.log.New(log15.Ctx{"height": height, "round": round})
 
 	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
 	if err != nil {
 		return err
 	}
-	log_.Debug("proposer selected", "block", c.state.Block(), "proposer", proposer.Address())
-
 	ballot := NewBallot(
 		common.Hash{},
 		proposer.Address(),
@@ -407,11 +498,19 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 		return err
 	}
 
+	log_.Debug(
+		"proposer selected",
+		"block", c.state.Block(),
+		"height", height,
+		"round", round,
+		"proposer", proposer.Address(),
+		"seal", ballot.Hash(),
+	)
 	return nil
 }
 
 func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Duration) error {
-	log_ := log.New(log15.Ctx{"height": height, "round": round})
+	log_ := c.log.New(log15.Ctx{"height": height, "round": round})
 
 	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
 	if err != nil {

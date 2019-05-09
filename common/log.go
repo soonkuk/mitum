@@ -78,7 +78,10 @@ func formatLogJSONValue(value interface{}) (result interface{}) {
 }
 
 func JsonFormatEx(pretty, lineSeparated bool) log15.Format {
-	jsonMarshal := json.Marshal
+	jsonMarshal := func(v interface{}) ([]byte, error) {
+		return encodeJSON(v, false, false)
+	}
+
 	if pretty {
 		jsonMarshal = func(v interface{}) ([]byte, error) {
 			return json.MarshalIndent(v, "", "    ")
@@ -117,5 +120,5 @@ func JsonFormatEx(pretty, lineSeparated bool) log15.Format {
 }
 
 func TerminalLogString(s string) string {
-	return strings.Replace(s, "\"", "'", -1)
+	return strings.TrimSpace(strings.Replace(s, "\"", "'", -1))
 }

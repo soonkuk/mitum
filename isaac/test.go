@@ -135,11 +135,14 @@ func (t *TProposerSelector) Select(block common.Hash, height common.Big, round R
 
 type TBlockStorage struct {
 	sync.RWMutex
-	blocks []Block
+	blocks           []Block
+	blocksbyProposal map[common.Hash]Block
 }
 
 func NewTBlockStorage() *TBlockStorage {
-	return &TBlockStorage{}
+	return &TBlockStorage{
+		blocksbyProposal: map[common.Hash]Block{},
+	}
 }
 
 func (t *TBlockStorage) Blocks() []Block {
@@ -155,6 +158,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 
 	block := Block{
 		version:      CurrentBlockVersion,
+		height:       proposal.Block.Height,
 		hash:         proposal.Block.Next,
 		prevHash:     proposal.Block.Current,
 		state:        proposal.State.Next,
@@ -167,15 +171,25 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 	}
 
 	t.blocks = append(t.blocks, block)
+	t.blocksbyProposal[proposal.Hash()] = block
 
 	log.Debug("new block created", "proposal", proposal.Hash(), "block", block)
 	return block, nil
 }
 
-func (i *TBlockStorage) LatestBlock() (Block, error) {
-	if len(i.blocks) < 1 {
+func (t *TBlockStorage) LatestBlock() (Block, error) {
+	if len(t.blocks) < 1 {
 		return Block{}, BlockNotFoundError.SetMessage("no blocks")
 	}
 
-	return i.blocks[len(i.blocks)-1], nil
+	return t.blocks[len(t.blocks)-1], nil
+}
+
+func (t *TBlockStorage) BlockByProposal(phash common.Hash) (Block, error) {
+	block, ok := t.blocksbyProposal[phash]
+	if !ok {
+		return Block{}, BlockNotFoundError
+	}
+
+	return block, nil
 }

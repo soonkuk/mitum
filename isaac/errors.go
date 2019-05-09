@@ -21,8 +21,10 @@ const (
 	VotingFailedErrorCode
 	FailedToElectProposerErrorCode
 	DifferentHeightConsensusErrorCode
+	DifferentBlockHashConsensusErrorCode
 	InvalidNodeStateErrorCode
 	BlockNotFoundErrorCode
+	IgnoreVotingResultErrorCode
 )
 
 var (
@@ -43,6 +45,8 @@ var (
 	VotingFailedError                    common.Error = common.NewError("isaac", VotingFailedErrorCode, "voting failed")
 	FailedToElectProposerError           common.Error = common.NewError("isaac", FailedToElectProposerErrorCode, "failed to elect proposer")
 	DifferentHeightConsensusError        common.Error = common.NewError("isaac", DifferentHeightConsensusErrorCode, "consensused, but different height found")
+	DifferentBlockHashConsensusError     common.Error = common.NewError("isaac", DifferentBlockHashConsensusErrorCode, "consensused, but different block hash found")
 	InvalidNodeStateError                common.Error = common.NewError("isaac", InvalidNodeStateErrorCode, "invalid NodeState")
 	BlockNotFoundError                   common.Error = common.NewError("isaac", BlockNotFoundErrorCode, "block not found")
+	IgnoreVotingResultError              common.Error = common.NewError("isaac", IgnoreVotingResultErrorCode, "ignore votingResult")
 )

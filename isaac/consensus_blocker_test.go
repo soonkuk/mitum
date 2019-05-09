@@ -52,7 +52,7 @@ func (t *testConsensusBlocker) SetupTest() {
 
 	t.votingBox = &TestMockVotingBox{}
 	t.sealBroadcaster, _ = NewTestSealBroadcaster(t.policy, t.home)
-	t.sealPool = NewDefaultSealPool()
+	t.sealPool = NewDefaultSealPool(t.home)
 	t.proposerSelector = NewTProposerSelector()
 	t.proposerSelector.SetProposer(t.home)
 }
@@ -215,7 +215,7 @@ func (t *testConsensusBlocker) TestACCEPT() {
 	round := Round(1)
 
 	{ // timer is started after proposal accepted
-		err := blocker.startTimer(false, func() error {
+		err := blocker.startTimer("", blocker.policy.TimeoutWaitSeal, false, func() error {
 			return blocker.broadcastINIT(t.height, round)
 		})
 		t.NoError(err)
@@ -434,7 +434,7 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 	t.sealBroadcaster.SetSenderChan(bChan)
 
 	{ // timer is started after proposal accepted
-		err := blocker.startTimer(false, func() error {
+		err := blocker.startTimer("", blocker.policy.TimeoutWaitSeal, false, func() error {
 			return blocker.broadcastINIT(t.height, round+1)
 		})
 		t.NoError(err)

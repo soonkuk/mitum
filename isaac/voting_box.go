@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -12,18 +13,23 @@ type VotingBox interface {
 	Open(Proposal) (VoteResultInfo, error)
 	Vote(Ballot) (VoteResultInfo, error)
 	Close() error
+	Clear() error
 }
 
 type DefaultVotingBox struct {
 	sync.RWMutex
+	home     *common.HomeNode
+	log      log15.Logger
 	policy   ConsensusPolicy
 	current  *VotingBoxProposal
 	previous *VotingBoxProposal
 	unknown  *VotingBoxUnknown
 }
 
-func NewDefaultVotingBox(policy ConsensusPolicy) *DefaultVotingBox {
+func NewDefaultVotingBox(home *common.HomeNode, policy ConsensusPolicy) *DefaultVotingBox {
 	return &DefaultVotingBox{
+		home:    home,
+		log:     log.New(log15.Ctx{"node": home.Name()}),
 		policy:  policy,
 		unknown: NewVotingBoxUnknown(),
 	}
@@ -75,6 +81,12 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		Stage:       VoteStageINIT, // NOTE will broadcast sign ballot
 		Proposed:    true,
 		LastVotedAt: common.Now(),
+		Voted: map[common.Address]VotingBoxStageNode{
+			proposal.Source(): VotingBoxStageNode{
+				vote: VoteYES,
+				seal: proposal.Hash(),
+			},
+		},
 	}
 
 	return result, nil
@@ -93,9 +105,30 @@ func (r *DefaultVotingBox) Close() error {
 		return err
 	}
 
+	var previous common.Hash
+	if r.previous != nil {
+		previous = r.previous.proposal
+	}
+
+	r.log.Debug(
+		"current votingbox closed",
+		"current", r.current.proposal,
+		"previous", previous,
+	)
+
 	r.previous = r.current
+	r.current = nil
+
+	return nil
+}
+
+// Clear clears votes; only leaves previous
+func (r *DefaultVotingBox) Clear() error {
+	r.Lock()
+	defer r.Unlock()
 
 	r.current = nil
+	r.unknown = NewVotingBoxUnknown()
 
 	return nil
 }
@@ -127,7 +160,16 @@ func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
 		ballot.Hash(),
 	)
 	if err != nil {
-		return VoteResultInfo{}, err
+		return result, err
+	}
+
+	if result.NotYet() {
+		result.Height = ballot.Height
+		result.Round = ballot.Round
+		result.Stage = ballot.Stage
+		result.Proposal = ballot.Proposal
+
+		return result, nil
 	}
 
 	return result, nil
@@ -140,11 +182,22 @@ func (r *DefaultVotingBox) vote(
 	round Round,
 	stage VoteStage,
 	vote Vote,
-	sHash common.Hash,
+	seal common.Hash,
 ) (VoteResultInfo, error) {
 	// vote for unknown
-	if (r.current == nil || !r.current.proposal.Equal(phash)) &&
+	log_ := r.log.New(log15.Ctx{
+		"phash":  phash,
+		"source": source,
+		"height": height,
+		"round":  round,
+		"stage":  stage,
+		"vote":   vote,
+		"seal":   seal,
+	})
+
+	if phash.Empty() || (r.current == nil || !r.current.proposal.Equal(phash)) &&
 		(r.previous == nil || !r.previous.proposal.Equal(phash)) {
+		log_.Debug("trying to vote to unknown")
 		return r.voteUnknown(
 			phash,
 			source,
@@ -152,16 +205,17 @@ func (r *DefaultVotingBox) vote(
 			round,
 			stage,
 			vote,
-			sHash,
+			seal,
 		)
 	}
 
+	log_.Debug("trying to vote to known")
 	return r.voteKnown(
 		phash,
 		source,
 		stage,
 		vote,
-		sHash,
+		seal,
 	)
 }
 
@@ -170,7 +224,7 @@ func (r *DefaultVotingBox) voteKnown(
 	source common.Address,
 	stage VoteStage,
 	vote Vote,
-	sHash common.Hash,
+	seal common.Hash,
 ) (VoteResultInfo, error) {
 	if !vote.IsValid() || !vote.CanVote() {
 		return VoteResultInfo{}, InvalidVoteError
@@ -180,21 +234,23 @@ func (r *DefaultVotingBox) voteKnown(
 		return VoteResultInfo{}, InvalidVoteStageError
 	}
 
-	if r.current.SealVoted(sHash) || (r.previous != nil && r.previous.SealVoted(sHash)) {
-		return VoteResultInfo{}, SealAlreadyVotedError
-	}
-
 	// vote for current or previous
 	var p *VotingBoxProposal
 	var isCurrent bool
-	if r.current.proposal.Equal(phash) {
+	if r.current != nil && r.current.proposal.Equal(phash) {
 		p = r.current
 		isCurrent = true
-	} else {
+	} else if r.previous != nil && r.previous.proposal.Equal(phash) {
 		p = r.previous
+	} else {
+		return VoteResultInfo{}, InvalidVoteError.SetMessage("unknown proposal in current and previous")
 	}
 
-	vs, err := p.Vote(source, stage, vote, sHash)
+	if p.SealVoted(seal) {
+		return VoteResultInfo{}, SealAlreadyVotedError
+	}
+
+	vs, err := p.Vote(source, stage, vote, seal)
 	if err != nil {
 		return VoteResultInfo{}, err
 	}
@@ -226,7 +282,7 @@ func (r *DefaultVotingBox) voteUnknown(
 	round Round,
 	stage VoteStage,
 	vote Vote,
-	sHash common.Hash,
+	seal common.Hash,
 ) (VoteResultInfo, error) {
 	if !vote.IsValid() || !vote.CanVote() {
 		return VoteResultInfo{}, InvalidVoteError
@@ -236,7 +292,7 @@ func (r *DefaultVotingBox) voteUnknown(
 		return VoteResultInfo{}, InvalidVoteStageError
 	}
 
-	if r.unknown.SealVoted(sHash) {
+	if r.unknown.SealVoted(seal) {
 		return VoteResultInfo{}, SealAlreadyVotedError
 	}
 
@@ -247,7 +303,7 @@ func (r *DefaultVotingBox) voteUnknown(
 		round,
 		stage,
 		vote,
-		sHash,
+		seal,
 	)
 	if err != nil {
 		return VoteResultInfo{}, err
@@ -289,24 +345,30 @@ func (r *DefaultVotingBox) Voted(source common.Address) (
 	return current, unknown
 }
 
-func (r *DefaultVotingBox) SealVoted(sHash common.Hash) bool {
+func (r *DefaultVotingBox) SealVoted(seal common.Hash) bool {
+	r.RLock()
+	defer r.RUnlock()
+
 	var found bool
 	if r.current != nil {
-		if found = r.current.SealVoted(sHash); found {
+		if found = r.current.SealVoted(seal); found {
 			return true
 		}
 	}
 
 	if r.previous != nil {
-		if found = r.previous.SealVoted(sHash); found {
+		if found = r.previous.SealVoted(seal); found {
 			return true
 		}
 	}
 
-	return r.unknown.SealVoted(sHash)
+	return r.unknown.SealVoted(seal)
 }
 
 func (r *DefaultVotingBox) ProposalVoted(phash common.Hash) bool {
+	r.RLock()
+	defer r.RUnlock()
+
 	if r.current != nil {
 		if r.current.proposal.Equal(phash) {
 			return true
@@ -417,20 +479,20 @@ func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBo
 	return voted
 }
 
-func (v *VotingBoxProposal) SealVoted(sHash common.Hash) bool {
+func (v *VotingBoxProposal) SealVoted(seal common.Hash) bool {
 	var found bool
-	if found = v.stageSIGN.SealVoted(sHash); found {
+	if found = v.stageSIGN.SealVoted(seal); found {
 		return true
 	}
 
-	if found = v.stageACCEPT.SealVoted(sHash); found {
+	if found = v.stageACCEPT.SealVoted(seal); found {
 		return true
 	}
 
 	return false
 }
 
-func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vote, sHash common.Hash) (
+func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vote, seal common.Hash) (
 	*VotingBoxStage,
 	error,
 ) {
@@ -444,7 +506,7 @@ func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vo
 		return nil, InvalidVoteStageError
 	}
 
-	return vs.Vote(source, vote, sHash)
+	return vs.Vote(source, vote, seal)
 }
 
 func (v *VotingBoxProposal) String() string {
@@ -493,10 +555,10 @@ func (v *VotingBoxStage) Voted(source common.Address) (VotingBoxStageNode, bool)
 	return sn, found
 }
 
-func (v *VotingBoxStage) SealVoted(sHash common.Hash) bool {
+func (v *VotingBoxStage) SealVoted(seal common.Hash) bool {
 	var found bool
 	for _, n := range v.voted {
-		if sHash.Equal(n.seal) {
+		if seal.Equal(n.seal) {
 			found = true
 			break
 		}
@@ -540,11 +602,11 @@ func (v *VotingBoxStage) Cancel(source common.Address) bool {
 	return true
 }
 
-func (v *VotingBoxStage) Vote(source common.Address, vote Vote, sHash common.Hash) (*VotingBoxStage, error) {
+func (v *VotingBoxStage) Vote(source common.Address, vote Vote, seal common.Hash) (*VotingBoxStage, error) {
 	v.Lock()
 	defer v.Unlock()
 
-	v.voted[source] = VotingBoxStageNode{vote: vote, seal: sHash}
+	v.voted[source] = VotingBoxStageNode{vote: vote, seal: seal}
 	return v, nil
 }
 
@@ -592,6 +654,13 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 	r.Height = v.height
 	r.Round = v.round
 	r.Stage = v.stage
+
+	votedMap := map[common.Address]VotingBoxStageNode{}
+	for k, v := range v.voted {
+		votedMap[k] = v
+	}
+
+	r.Voted = votedMap
 
 	return r
 }
@@ -663,9 +732,9 @@ func (v *VotingBoxUnknown) Vote(
 	round Round,
 	stage VoteStage,
 	vote Vote,
-	sHash common.Hash,
+	seal common.Hash,
 ) (*VotingBoxUnknown, error) {
-	u, err := NewVotingBoxUnknownVote(phash, source, height, round, stage, vote, sHash)
+	u, err := NewVotingBoxUnknownVote(phash, source, height, round, stage, vote, seal)
 	if err != nil {
 		return v, err
 	}
@@ -692,9 +761,9 @@ func (v *VotingBoxUnknown) Cancel(source common.Address) bool {
 	return true
 }
 
-func (v *VotingBoxUnknown) SealVoted(sHash common.Hash) bool {
+func (v *VotingBoxUnknown) SealVoted(seal common.Hash) bool {
 	for _, n := range v.voted {
-		if sHash.Equal(n.seal) {
+		if seal.Equal(n.seal) {
 			return true
 		}
 	}
@@ -847,6 +916,13 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	r.Round = found[0].round
 	r.Stage = found[0].stage
 
+	votedMap := map[common.Address]VotingBoxStageNode{}
+	for k, v := range v.voted {
+		votedMap[k] = v.VotingBoxStageNode
+	}
+
+	r.Voted = votedMap
+
 	return r
 }
 
@@ -889,6 +965,13 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 	r.Round = found[0].round
 	r.Stage = VoteStageINIT
 
+	votedMap := map[common.Address]VotingBoxStageNode{}
+	for k, v := range v.voted {
+		votedMap[k] = v.VotingBoxStageNode
+	}
+
+	r.Voted = votedMap
+
 	return r
 }
 
@@ -902,13 +985,12 @@ func (v *VotingBoxUnknown) String() string {
 }
 
 type VotingBoxUnknownVote struct {
+	VotingBoxStageNode
 	source   common.Address
 	proposal common.Hash
 	height   common.Big
 	round    Round
 	stage    VoteStage
-	vote     Vote
-	seal     common.Hash
 	votedAt  common.Time
 }
 
@@ -919,16 +1001,18 @@ func NewVotingBoxUnknownVote(
 	round Round,
 	stage VoteStage,
 	vote Vote,
-	sHash common.Hash,
+	seal common.Hash,
 ) (VotingBoxUnknownVote, error) {
 	return VotingBoxUnknownVote{
+		VotingBoxStageNode: VotingBoxStageNode{
+			vote: vote,
+			seal: seal,
+		},
 		proposal: phash,
 		source:   source,
 		height:   height,
 		round:    round,
 		stage:    stage,
-		vote:     vote,
-		seal:     sHash,
 		votedAt:  common.Now(),
 	}, nil
 }
