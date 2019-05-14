@@ -144,6 +144,18 @@ class Record {
 
     return r
   }
+
+  basic() {
+    return {
+      t: this.t,
+      module: this.module,
+      message: this.message,
+      level: this.level,
+      node: this.node,
+      caller: this.caller,
+      body: this.line,
+    }
+  }
 }
 
 class Log {

@@ -1,5 +1,5 @@
 import React from 'react'
-import ReactDOM from "react-dom";
+import ReactDOM from 'react-dom';
 import './App.css';
 import { withStyles } from '@material-ui/core/styles';
 import Typography from '@material-ui/core/Typography';
@@ -9,6 +9,7 @@ import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
+import Grid from '@material-ui/core/Grid';
 import TableRow from '@material-ui/core/TableRow';
 import Highlight from 'react-highlight'
 import { SnackbarProvider, withSnackbar } from 'notistack';
@@ -20,6 +21,7 @@ import ChildCareIcon from '@material-ui/icons/ChildCare';
 import BookmarksIcon from '@material-ui/icons/Bookmarks';
 import SpeedDialAction from '@material-ui/lab/SpeedDialAction';
 import { unstable_Box as Box } from '@material-ui/core/Box';
+import Chip from '@material-ui/core/Chip';
 
 import Log from './log'
 import raw from './raw'
@@ -115,7 +117,7 @@ class CenteredGrid extends React.Component {
 
     const children = node.querySelectorAll('.row-detail')
     Array.from(children).map(c => {
-      c.classList.add('row-detail-open')
+      c.classList.toggle('row-detail-open')
       return null
     })
   }
@@ -186,7 +188,7 @@ class CenteredGrid extends React.Component {
     <React.Fragment key={record.id + 'f'}>
       <TableRow key={record.id} ref={rowRef}>
         <TableCell key={record.id + '-t'}>
-          <IconButton className={classes.button} aria-label="Bookmark" onClick={e => {
+          <IconButton className={classes.button} aria-label='Bookmark' onClick={e => {
             const tr = ReactDOM.findDOMNode(rowRef.current)
             tr.classList.toggle('selected')
             tr.nextSibling.classList.toggle('selected')
@@ -195,7 +197,10 @@ class CenteredGrid extends React.Component {
           }}>
             <BookmarksIcon />
           </IconButton>
-          {record.t.elapsed(first.t)}
+          <Chip label={record.level} className={'lvl lvl-' + record.level} color='secondary' />
+          <span className='t'>
+            {record.t.elapsed(first.t)}
+          </span>
         </TableCell>
         {nodes.map((node, index) => (
           <TableCell
@@ -214,7 +219,14 @@ class CenteredGrid extends React.Component {
       </TableRow>
       <TableRow className={'row-detail'} key={record.id + 'detail'} ref={rowDetailRef}>
         <TableCell colSpan={nodes.length + 1}>
-          <Highlight className='json'>{JSON.stringify(record.extra, null, 2)}</Highlight>
+          <Grid container className={classes.root} spacing={16}>
+            <Grid item xs={4}>
+              <Highlight className='json'>{JSON.stringify(record.basic(), null, 2)}</Highlight>
+            </Grid>
+            <Grid item xs={8}>
+              <Highlight className='json'>{JSON.stringify(record.extra, null, 2)}</Highlight>
+            </Grid>
+          </Grid>
         </TableCell>
       </TableRow>
     </React.Fragment>
@@ -246,7 +258,7 @@ class CenteredGrid extends React.Component {
           <TableRow>
             <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
             {this.state.nodes.map(node => (
-              <TableCell align="left" key={node}><div>{node}</div></TableCell>
+              <TableCell align='left' key={node}><div>{node}</div></TableCell>
             ))}
           </TableRow>
         </TableHead>
@@ -291,7 +303,7 @@ class CenteredGrid extends React.Component {
 
       {this.renderRecords(this.state.records, this.state.nodes)}
       <SpeedDial
-        ariaLabel="SpeedDial tooltip example"
+        ariaLabel='SpeedDial tooltip example'
         className={classes.speedDial}
         icon={<SpeedDialIcon />}
         onBlur={this.handleSpeedDialClose}

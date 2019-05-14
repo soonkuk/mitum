@@ -161,7 +161,7 @@ table td pre {
 
 table.scrollable tbody td:nth-child(1) {
   white-space: nowrap;
-  width: 100px;
+  width: 150px;
 }
 
 table.scrollable tbody td:nth-child(1) button svg {
@@ -185,6 +185,7 @@ table.scrollable tbody tr.selected {
 table.scrollable tbody tr td:first-child {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace !important;
   font-size: 0.7rem !important;
+  padding-right: 0.3rem !important;
 }
 
 table.scrollable tbody tr td:first-child > button {
@@ -215,3 +216,34 @@ table.scrollable tbody tr.row-detail-open {
   display: table-row;
 }
 
+.lvl {
+  height: 18px !important;
+  margin: 0 0.3rem;
+}
+
+.lvl > span {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace !important;
+  font-size: 0.6rem !important;
+}
+
+.lvl-dbug {
+  background-color: #e2e2e2 !important;
+  color: gray !important;
+}
+
+.lvl-warn {
+  background-color: yellow !important;
+  color: black !important;
+}
+
+.lvl-info {
+  background-color: blue !important;
+}
+
+.lvl-eror {
+  background-color: #f50057 !important;
+}
+
+.lvl-crit {
+  background-color: #f300f5 !important;
+}
