@@ -112,6 +112,7 @@ func createNode(seedString string) (*Node, error) {
 	node.log = log.New(log15.Ctx{
 		"node": node.Name(),
 	})
+	node.blockStorage.SetLogContext("node", home.Name())
 
 	return node, nil
 }

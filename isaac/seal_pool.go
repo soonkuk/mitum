@@ -14,15 +14,15 @@ type SealPool interface {
 }
 
 type DefaultSealPool struct {
+	*common.Logger
 	home  *common.HomeNode
-	log   log15.Logger
 	seals *syncmap.Map // TODO should be stored in persistent storage
 }
 
 func NewDefaultSealPool(home *common.HomeNode) *DefaultSealPool {
 	return &DefaultSealPool{
-		seals: &syncmap.Map{},
-		log:   log.New(log15.Ctx{"node": home.Name()}),
+		Logger: common.NewLogger(log, "node", home.Name()),
+		seals:  &syncmap.Map{},
 	}
 }
 
@@ -43,14 +43,14 @@ func (s *DefaultSealPool) Get(hash common.Hash) (common.Seal, error) {
 func (s *DefaultSealPool) Add(seal common.Seal) error {
 	// NOTE seal should be checked well-formed already
 
-	log_ := s.log.New(log15.Ctx{"seal": seal.Hash(), "type": seal.Type()})
+	log_ := s.Log().New(log15.Ctx{"seal": seal.Hash(), "type": seal.Type()})
 	if _, found := s.seals.Load(seal.Hash()); found {
 		log_.Debug("already received; it will be ignored")
 		return KnownSealFoundError
 	}
 
 	s.seals.Store(seal.Hash(), seal)
-	log_.Debug("seal added")
+	log_.Debug("seal added", "seal-original", seal)
 
 	return nil
 }

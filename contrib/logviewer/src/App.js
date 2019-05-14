@@ -74,17 +74,26 @@ class CenteredGrid extends React.Component {
   }
 
   onSelectedFile = (acceptedFiles) => {
-    const reader = new FileReader();
+    var promises = []
+    for (let file of acceptedFiles) {
+      var p = new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = () => {
+          resolve(reader.result)
+        }
 
-    reader.onabort = () => console.log('file reading was aborted');
-    reader.onerror = () => console.log('file reading has failed');
-    reader.onload = () => {
-      const binaryStr = reader.result
+        reader.readAsBinaryString(file)
+      })
+      promises.push(p)
+    }
+
+    Promise.all(promises).then(values => {
+      var result = ''.concat(...values)
 
       try {
-        var log = Log.load(binaryStr)
+        var log = Log.load(result)
       } catch(e) {
-        this.props.enqueueSnackbar('failed to load log file,' + acceptedFiles, {variant: 'error'})
+        this.props.enqueueSnackbar('failed to load logs', {variant: 'error'})
         return
       }
 
@@ -92,12 +101,11 @@ class CenteredGrid extends React.Component {
       this.setState({nodes: log.nodes})
 
       this.props.enqueueSnackbar(
-        'log file,' + acceptedFiles + ' successfully imported: ' + log.records.length + ' records found',
+        'logs successfully imported: ' + log.records.length + ' records found',
         {variant: 'info'},
       )
-    }
 
-    acceptedFiles.forEach(file => reader.readAsBinaryString(file))
+    })
   }
 
 

@@ -18,8 +18,8 @@ type VotingBox interface {
 
 type DefaultVotingBox struct {
 	sync.RWMutex
+	*common.Logger
 	home     *common.HomeNode
-	log      log15.Logger
 	policy   ConsensusPolicy
 	current  *VotingBoxProposal
 	previous *VotingBoxProposal
@@ -29,7 +29,7 @@ type DefaultVotingBox struct {
 func NewDefaultVotingBox(home *common.HomeNode, policy ConsensusPolicy) *DefaultVotingBox {
 	return &DefaultVotingBox{
 		home:    home,
-		log:     log.New(log15.Ctx{"node": home.Name()}),
+		Logger:  common.NewLogger(log, "node", home.Name()),
 		policy:  policy,
 		unknown: NewVotingBoxUnknown(),
 	}
@@ -110,7 +110,7 @@ func (r *DefaultVotingBox) Close() error {
 		previous = r.previous.proposal
 	}
 
-	r.log.Debug(
+	r.Log().Debug(
 		"current votingbox closed",
 		"current", r.current.proposal,
 		"previous", previous,
@@ -185,7 +185,7 @@ func (r *DefaultVotingBox) vote(
 	seal common.Hash,
 ) (VoteResultInfo, error) {
 	// vote for unknown
-	log_ := r.log.New(log15.Ctx{
+	log_ := r.Log().New(log15.Ctx{
 		"phash":  phash,
 		"source": source,
 		"height": height,

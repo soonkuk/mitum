@@ -139,12 +139,14 @@ func (t *TProposerSelector) Select(block common.Hash, height common.Big, round R
 
 type TBlockStorage struct {
 	sync.RWMutex
+	*common.Logger
 	blocks           []Block
 	blocksbyProposal map[common.Hash]Block
 }
 
 func NewTBlockStorage() *TBlockStorage {
 	return &TBlockStorage{
+		Logger:           common.NewLogger(log),
 		blocksbyProposal: map[common.Hash]Block{},
 	}
 }
@@ -177,7 +179,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 	t.blocks = append(t.blocks, block)
 	t.blocksbyProposal[proposal.Hash()] = block
 
-	log.Debug("new block created", "proposal", proposal.Hash(), "block", block)
+	t.Log().Debug("new block created", "proposal", proposal.Hash(), "block", block)
 	return block, nil
 }
 

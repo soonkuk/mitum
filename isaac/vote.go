@@ -62,6 +62,8 @@ func (v VoteResultInfo) String() string {
 	return common.TerminalLogString(string(b))
 }
 
+func (v VoteResultInfo) JSONLog() {}
+
 type Majoritier interface {
 	CanCount(uint, uint) bool
 	Majority(uint, uint) VoteResultInfo

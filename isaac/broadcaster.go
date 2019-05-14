@@ -14,7 +14,7 @@ type SealBroadcaster interface {
 
 type DefaultSealBroadcaster struct {
 	sync.RWMutex
-	log    log15.Logger
+	*common.Logger
 	policy ConsensusPolicy
 	home   *common.HomeNode
 	sender network.SenderFunc
@@ -25,7 +25,7 @@ func NewDefaultSealBroadcaster(
 	home *common.HomeNode,
 ) (*DefaultSealBroadcaster, error) {
 	return &DefaultSealBroadcaster{
-		log:    log.New(log15.Ctx{"node": home.Name()}),
+		Logger: common.NewLogger(log, "node", home.Name()),
 		policy: policy,
 		home:   home,
 	}, nil
@@ -46,7 +46,7 @@ func (i *DefaultSealBroadcaster) Send(
 		return err
 	}
 
-	log_ := i.log.New(log15.Ctx{"seal": seal.Hash()})
+	log_ := i.Log().New(log15.Ctx{"seal": seal.Hash()})
 	log_.Debug("seal will be broadcasted")
 
 	var targets = []common.Node{i.home}

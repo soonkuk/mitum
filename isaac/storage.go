@@ -1,7 +1,6 @@
 package isaac
 
 import (
-	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -13,29 +12,27 @@ type BlockStorage interface {
 }
 
 type DefaultBlockStorage struct {
-	state *ConsensusState
-	log   log15.Logger
+	*common.Logger
 }
 
-func NewDefaultBlockStorage(state *ConsensusState) (*DefaultBlockStorage, error) {
+func NewDefaultBlockStorage() (*DefaultBlockStorage, error) {
 	return &DefaultBlockStorage{
-		state: state,
-		log:   log.New(log15.Ctx{"node": state.Home().Name()}),
+		Logger: common.NewLogger(log),
 	}, nil
 }
 
-func (i *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, error) {
+func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 	// TODO store block
 
-	i.log.Debug("new block created", "proposal", proposal)
+	d.Log().Debug("new block created", "proposal", proposal)
 
 	return Block{}, nil
 }
 
-func (i *DefaultBlockStorage) LatestBlock() (Block, error) {
+func (d *DefaultBlockStorage) LatestBlock() (Block, error) {
 	return Block{}, nil
 }
 
-func (i *DefaultBlockStorage) BlockByProposal(phash common.Hash) (Block, error) {
+func (d *DefaultBlockStorage) BlockByProposal(phash common.Hash) (Block, error) {
 	return Block{}, nil
 }

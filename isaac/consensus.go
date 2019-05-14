@@ -10,7 +10,7 @@ import (
 
 type Consensus struct {
 	sync.RWMutex
-	log      log15.Logger
+	*common.Logger
 	receiver chan common.Seal
 	stop     chan bool
 	voteChan chan common.Seal
@@ -26,7 +26,7 @@ func NewConsensus(
 	blocker *ConsensusBlocker,
 ) (*Consensus, error) {
 	c := &Consensus{
-		log:      log.New(log15.Ctx{"node": home.Name()}),
+		Logger:   common.NewLogger(log, "node", home.Name()),
 		receiver: make(chan common.Seal),
 		voteChan: make(chan common.Seal),
 		ctx:      context.Background(),
@@ -131,7 +131,7 @@ end:
 
 			go func() {
 				if err := c.receiveSeal(seal); err != nil {
-					c.log.Error("failed to receive seal", "error", err)
+					c.Log().Error("failed to receive seal", "error", err)
 				}
 			}()
 		}
@@ -139,7 +139,7 @@ end:
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
-	log_ := c.log.New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
+	log_ := c.Log().New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	checker := common.NewChainChecker(
 		"receiveSeal",
@@ -150,6 +150,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		CheckerSealPool,
 		CheckerSealTypes,
 	)
+	checker.SetLogContext("node", c.home.Name())
 	if err := checker.Check(); err != nil {
 		log_.Error("failed to checker for seal", "error", err)
 		return err
@@ -170,7 +171,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 				return
 			}
 
-			c.log.Error("failed to vote", "seal", seal.Hash(), "error", err)
+			c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
 
 			cerr, ok := err.(common.Error)
 			if !ok {

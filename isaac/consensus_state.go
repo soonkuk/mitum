@@ -23,16 +23,23 @@ func NewConsensusState(home *common.HomeNode) *ConsensusState {
 	}
 }
 
-func (c *ConsensusState) String() string {
+func (c *ConsensusState) MarshalJSON() ([]byte, error) {
 	c.RLock()
 	defer c.RUnlock()
 
-	b, _ := json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]interface{}{
 		"home":   c.home,
 		"height": c.height,
 		"block":  c.block,
 		"state":  c.state,
 	})
+}
+
+func (c *ConsensusState) String() string {
+	c.RLock()
+	defer c.RUnlock()
+
+	b, _ := json.Marshal(c)
 	return common.TerminalLogString(string(b))
 }
 

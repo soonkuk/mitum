@@ -21,12 +21,16 @@ class Time {
       p[4],
       p[5],
       p[6],
-      Number.parseInt(p[7].slice(0, 3), 10),
     )
+
+    var tail = p[7]
+    if (tail.length < 6) {
+      tail = tail + '0'.repeat(6 - tail.length)
+    }
 
     var time = new Time()
     time.t = t
-    time.n = (t.getTime() * 1000) + Number.parseInt(p[7].slice(0, 6), 10)
+    time.n = (t.getTime() * 1000000) + Number.parseInt(tail, 10)
 
     return time
   }
@@ -167,6 +171,7 @@ class Log {
   static load (contents) {
     var log = new Log()
 
+    var records = []
     var nodes = []
     var line = ''
     for (const c of contents) {
@@ -179,7 +184,7 @@ class Log {
           continue
         }
 
-        log.records.push(record)
+        records.push(record)
 
         // node
         if (record.node == null) {
@@ -196,14 +201,26 @@ class Log {
       line += c
     }
 
+    records.sort(function(a, b) {
+      return a.t.n - b.t.n
+    });
+
     nodes.sort()
     log.nodes = nodes
+    log.records = records
 
     return log
   }
 
   static parseRecord(line) {
-    var record = Record.fromJSONString(line)
+    var record = null
+    try {
+      record = Record.fromJSONString(line)
+    } catch (e) {
+      console.error(e)
+      return
+    }
+
     if (record.node == null) {
       return
     }

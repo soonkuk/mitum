@@ -3,27 +3,23 @@ package common
 import (
 	"sync"
 	"time"
-
-	"github.com/inconshreveable/log15"
 )
 
 type CallbackTimer struct {
 	sync.RWMutex
-	name        string
+	*Logger
 	timeout     time.Duration
 	stopChan    chan bool
 	callback    func() error
 	keepRunning bool
-	log         log15.Logger
 }
 
-func NewCallbackTimer(name string, timeout time.Duration, callback func() error, keepRunning bool) *CallbackTimer {
+func NewCallbackTimer(timeout time.Duration, callback func() error, keepRunning bool) *CallbackTimer {
 	return &CallbackTimer{
-		name:        name,
+		Logger:      &Logger{},
 		callback:    callback,
 		timeout:     timeout,
 		keepRunning: keepRunning,
-		log:         log.New(log15.Ctx{"name": name}),
 	}
 }
 
@@ -39,7 +35,7 @@ func (c *CallbackTimer) Start() error {
 
 	go c.waiting()
 
-	c.log.Debug("timer started")
+	c.Log().Debug("timer started", "timeout", c.timeout, "keep-running", c.keepRunning)
 
 	return nil
 }
@@ -56,7 +52,7 @@ func (c *CallbackTimer) Stop() error {
 	close(c.stopChan)
 	c.stopChan = nil
 
-	log.Debug("timer stopped")
+	c.Log().Debug("timer stopped")
 
 	return nil
 }
@@ -66,15 +62,15 @@ end:
 	for {
 		select {
 		case <-c.stopChan:
-			c.log.Debug("timer is stopped")
+			c.Log().Debug("timer is stopped")
 			break end
 		case <-time.After(c.timeout):
-			c.log.Debug("timer expired")
+			c.Log().Debug("timer expired")
 			if err := c.callback(); err != nil {
 				log.Error("failed to callback", "error", err)
 			}
 			if !c.keepRunning {
-				c.log.Debug("callback called and stopped")
+				c.Log().Debug("callback called and stopped")
 				defer c.Stop()
 			}
 		}

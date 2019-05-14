@@ -32,3 +32,5 @@ func (c ConsensusPolicy) String() string {
 	b, _ := json.Marshal(c)
 	return common.TerminalLogString(string(b))
 }
+
+func (c ConsensusPolicy) JSONLog() {}

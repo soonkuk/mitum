@@ -17,22 +17,22 @@ func (c ChainCheckerStop) Error() string {
 type ChainCheckerFunc func(*ChainChecker) error
 
 type ChainChecker struct {
+	*Logger
 	name        string
 	checkers    []ChainCheckerFunc
 	originalCtx context.Context
 	ctx         context.Context
-	log         log15.Logger
 	deferFunc   func(*ChainChecker, ChainCheckerFunc, error)
 	success     bool
 }
 
 func NewChainChecker(name string, ctx context.Context, checkers ...ChainCheckerFunc) *ChainChecker {
 	return &ChainChecker{
+		Logger:      NewLogger(log),
 		name:        name,
 		checkers:    checkers,
 		ctx:         ctx,
 		originalCtx: ctx,
-		log:         log.New(log15.Ctx{"module": "ChainChecker", "name": name}),
 	}
 }
 
@@ -46,7 +46,6 @@ func (c *ChainChecker) New(ctx context.Context) *ChainChecker {
 		checkers:    c.checkers,
 		ctx:         ctx,
 		originalCtx: ctx,
-		log:         c.log,
 	}
 }
 
@@ -106,11 +105,11 @@ end:
 			newChecker = err.(*ChainChecker)
 			break end
 		case ChainCheckerStop:
-			c.log.Debug("checker stopped")
+			c.Log().Debug("checker stopped")
 			c.success = true
 			return nil
 		default:
-			c.log.Error("checking", "error", err, "func", FuncName(f, false))
+			c.Log().Error("checking", "error", err, "func", FuncName(f, false))
 			return err
 		}
 	}
@@ -120,6 +119,7 @@ end:
 		return nil
 	}
 
+	newChecker.SetLogContext(c.LogContext()...)
 	err = newChecker.Check()
 	c.ctx = newChecker.Context()
 	c.success = newChecker.success
