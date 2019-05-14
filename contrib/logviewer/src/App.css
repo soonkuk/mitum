@@ -1,0 +1,163 @@
+@import url('https://highlightjs.org/static/demo/styles/github.css');
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0px;
+}
+
+#root {
+  height: 100%;
+}
+
+
+.hljs {
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  animation: App-logo-spin infinite 20s linear;
+  height: 40vmin;
+  pointer-events: none;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.MuiExpansionPanelSummary-content-260,
+.MuiExpansionPanelSummary-content-260.MuiExpansionPanelSummary-expanded-257 {
+  margin: 0 !important;
+}
+
+.MuiExpansionPanelSummary-root-256 {
+  min-height: 0 !important;
+}
+
+/*
+table > tbody > tr:hover {
+  background-color: #eaffe4;
+}
+
+
+table > tbody > tr > td > * {
+  background-color: transparent !important;
+}
+
+table > thead {
+  background-color: black;
+}
+
+table > thead  * {
+  color: white !important;
+}
+*/
+
+#root > .IntegrationNotistack-root-1 {
+  height: 100%;
+}
+
+table.fixed {
+  z-index: 1000;
+  background-color: white;
+  width: 100%;
+  position: fixed;
+}
+
+table * {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace !important;
+  font-size: 12px !important;
+}
+
+table.scrollable {
+  margin-top: 24px;
+  position: absolute;
+}
+
+table.fixed thead th:nth-child(1) > div,
+table.fixed thead th:nth-child(2) > div,
+table.scrollable tbody td:nth-child(2) > div {
+  padding-left: 2em;
+}
+
+table.scrollable tbody td:nth-child(1) {
+  vertical-align: top;
+}
+
+table.scrollable tbody tr * {
+  background-color: transparent;
+}
+
+table.scrollable tbody tr:hover {
+  background-color: #eeffe9;
+}
+
+.MuiExpansionPanelSummary-content-114 {
+  margin: 0 !important;
+}
+
+.MuiExpansionPanelDetails-root-162,
+.MuiIconButton-root-152,
+.MuiExpansionPanelSummary-root-110 {
+  padding: 0 !important;
+}
+
+.MuiExpansionPanelSummary-root-110 {
+  min-height: auto !important;
+}
+
+.MuiExpansionPanel-rounded-80 {
+  border-radius: 0 !important;
+}
+
+.MuiPaper-elevation1-86 {
+  box-shadow: none !important;
+}
+
+.MuiTableRow-root-8 {
+  height: auto !important;
+}
+
+.MuiTableCell-root-13,
+.MuiTableCell-body-15 {
+    padding: 3px 0 3px 0 !important;
+}
+
+.MuiCollapse-container-158 {
+  transition: none !important;
+}
+
+table td pre {
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
