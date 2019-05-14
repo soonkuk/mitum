@@ -110,6 +110,10 @@ func (t *TestMockVotingBox) Close() error {
 	return nil
 }
 
+func (t *TestMockVotingBox) Clear() error {
+	return nil
+}
+
 type TProposerSelector struct {
 	sync.RWMutex
 	proposer common.Node

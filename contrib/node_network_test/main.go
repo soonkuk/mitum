@@ -16,7 +16,8 @@ func init() {
 	common.InTest = false
 	common.DEBUG = true
 
-	handler, _ := common.LogHandler(common.LogFormatter("terminal"), "")
+	//handler, _ := common.LogHandler(common.LogFormatter("terminal"), "")
+	handler, _ := common.LogHandler(common.LogFormatter("json"), "")
 	handler = log15.LvlFilterHandler(log15.LvlDebug, handler)
 	handler = log15.CallerFileHandler(handler)
 

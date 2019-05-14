@@ -1,7 +1,7 @@
 import React from 'react'
+import ReactDOM from "react-dom";
 import './App.css';
 import { withStyles } from '@material-ui/core/styles';
-import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import AttachFileIcon from '@material-ui/icons/AttachFile';
 import Dropzone from 'react-dropzone'
@@ -10,20 +10,19 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
 import Highlight from 'react-highlight'
-import ExpansionPanel from '@material-ui/core/ExpansionPanel';
-import ExpansionPanelDetails from '@material-ui/core/ExpansionPanelDetails';
-import ExpansionPanelSummary from '@material-ui/core/ExpansionPanelSummary';
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { SnackbarProvider, withSnackbar } from 'notistack';
 import SpeedDial from '@material-ui/lab/SpeedDial';
 import SpeedDialIcon from '@material-ui/lab/SpeedDialIcon';
+import IconButton from '@material-ui/core/IconButton';
+import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
+import ChildCareIcon from '@material-ui/icons/ChildCare';
+import BookmarksIcon from '@material-ui/icons/Bookmarks';
 import SpeedDialAction from '@material-ui/lab/SpeedDialAction';
 import { unstable_Box as Box } from '@material-ui/core/Box';
 
-import VTable from './table'
 import Log from './log'
+import raw from './raw'
 
 
 const styles = theme => ({
@@ -48,43 +47,6 @@ const styles = theme => ({
     right: theme.spacing.unit * 3,
   },
 });
-
-
-class RecordItem extends React.Component {
-  state = {
-    opened: false,
-  }
-
-  onChangeExpand(e, expanded) {
-    this.setState({opened: expanded})
-  }
-
-  render() {
-    const { classes } = this.props;
-    const { record } = this.props;
-
-    return (
-      <TableCell className={classes.listTableTd}>
-          <ExpansionPanel className={classes.recorditem} onChange={(e, expaned) => this.onChangeExpand(e, expaned)}>
-            <ExpansionPanelSummary
-                expandIcon={<ExpandMoreIcon className={classes.recorditemIcon} />}
-                className={classes.recorditemTitle}>
-              <div className={classes.column}>
-                <Typography className={classes.heading}>{record.message}</Typography>
-              </div>
-            </ExpansionPanelSummary>
-            <ExpansionPanelDetails className={classes.details + ' ' + classes.recorditemDetails}>
-              {this.state.opened ? (
-                <Highlight className='json'>{JSON.stringify(record.extra, null, 2)}</Highlight>
-              ) : (
-                <span />
-              )}
-            </ExpansionPanelDetails>
-          </ExpansionPanel>
-      </TableCell>
-    )
-  }
-}
 
 class CenteredGrid extends React.Component {
   state = {
@@ -145,6 +107,30 @@ class CenteredGrid extends React.Component {
     this.setState({ speedDial: false, });
   };
 
+  toggleExpandAll = () => {
+    const node = ReactDOM.findDOMNode(this)
+    if (! node instanceof HTMLElement) {
+      return
+    }
+
+    const children = node.querySelectorAll('.row-detail')
+    Array.from(children).map(c => {
+      c.classList.add('row-detail-open')
+      return null
+    })
+  }
+
+  importTestData = () => {
+      var log = Log.load(raw)
+      this.setState({records: log.records})
+      this.setState({nodes: log.nodes})
+
+      this.props.enqueueSnackbar(
+        'test log data successfully imported: ' + log.records.length + ' records found',
+        {variant: 'info'},
+      )
+  }
+
   componentDidUpdate() {
     setTimeout(e => {
       var tds = null
@@ -158,10 +144,130 @@ class CenteredGrid extends React.Component {
       var fixed_ths = document.getElementsByTagName('table')[0].getElementsByTagName('thead')[0].getElementsByTagName('tr')[0].getElementsByTagName('th')
 
       Array.from(tds).map((e, i) => {
+        if (fixed_ths[i] === undefined) {
+          return null
+        }
+
         fixed_ths[i].style.width = e.offsetWidth + 'px'
         e.style.width = fixed_ths[i].style.width
+        return null
       })
+
     }, 1000)
+  }
+
+  openDetail(ref, open) {
+    const tr = ReactDOM.findDOMNode(ref.current)
+    if (open === undefined) {
+      tr.classList.toggle('row-detail-open')
+      return
+    }
+
+    if (open === true) {
+      tr.classList.add('row-detail-open')
+    } else {
+      tr.classList.remove('row-detail-open')
+    }
+    return
+  }
+
+  renderRecord(first, record, nodes) {
+    const { classes } = this.props;
+
+    var i = nodes.indexOf(record.node)
+    if (i < 0) {
+      return null
+    }
+    
+    var rowRef = React.createRef()
+    var rowDetailRef = React.createRef()
+    
+    return (
+    <React.Fragment key={record.id + 'f'}>
+      <TableRow key={record.id} ref={rowRef}>
+        <TableCell key={record.id + '-t'}>
+          <IconButton className={classes.button} aria-label="Bookmark" onClick={e => {
+            const tr = ReactDOM.findDOMNode(rowRef.current)
+            tr.classList.toggle('selected')
+            tr.nextSibling.classList.toggle('selected')
+    
+            this.openDetail(rowDetailRef, true)
+          }}>
+            <BookmarksIcon />
+          </IconButton>
+          {record.t.elapsed(first.t)}
+        </TableCell>
+        {nodes.map((node, index) => (
+          <TableCell
+            className={classes.listTableTd}
+            key={record.id + node + '-m'}
+            onClick={e => this.openDetail(rowDetailRef)}
+          >
+          {i === index ? (
+              <Typography key={record.id + node + 'ty'}>{record.message}</Typography>
+            ) : (
+              <Typography key={record.id + node + 'ty'}></Typography>
+            )
+          }
+          </TableCell>
+        ))}
+      </TableRow>
+      <TableRow className={'row-detail'} key={record.id + 'detail'} ref={rowDetailRef}>
+        <TableCell colSpan={nodes.length + 1}>
+          <Highlight className='json'>{JSON.stringify(record.extra, null, 2)}</Highlight>
+        </TableCell>
+      </TableRow>
+    </React.Fragment>
+    )
+  }
+
+  renderRecords(records, nodes) {
+    const { classes } = this.props;
+
+    if (this.state.records.length < 1) {
+      return <React.Fragment>
+        <Table className={' fixed'}>
+          <TableHead>
+            <TableRow>
+              <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
+                <TableCell key={'tc-0'}></TableCell>
+                <TableCell key={'tc-1'}></TableCell>
+                <TableCell key={'tc-2'}></TableCell>
+                <TableCell key={'tc-3'}></TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </React.Fragment>
+    }
+
+    return <React.Fragment>
+      <Table className={' fixed'}>
+        <TableHead>
+          <TableRow>
+            <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
+            {this.state.nodes.map(node => (
+              <TableCell align="left" key={node}><div>{node}</div></TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+      </Table>
+
+      <Box height='100%'>
+        <Table className={' scrollable'}>
+          <TableBody>
+            <TableRow>
+                <TableCell key={'h'}>.</TableCell>
+              {this.state.nodes.map((node, index) => (
+                <TableCell key={node + 'h'}></TableCell>
+              ))}
+            </TableRow>
+            {this.state.records.map(record => {
+              return this.renderRecord(records[0], record, nodes)
+            })}
+          </TableBody>
+        </Table>
+      </Box>
+    </React.Fragment>
   }
 
   render() {
@@ -169,7 +275,6 @@ class CenteredGrid extends React.Component {
 
     return <div className={classes.root}>
       <div className={classes.root}>
-
         <div style={{display: 'none'}}>
           <Dropzone ref='dropzone' onDrop={acceptedFiles => this.onSelectedFile(acceptedFiles)}>
             {({getRootProps, getInputProps}) => (
@@ -182,70 +287,43 @@ class CenteredGrid extends React.Component {
             )}
           </Dropzone>
         </div>
-
       </div>
 
-        <Table className={' fixed'}>
-          <TableHead>
-            <TableRow>
-              <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
-              {this.state.nodes.map(node => (
-                <TableCell align="left" key={node}><div>{node}</div></TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-        </Table>
-
-      <Box height='100%'>
-        <Table className={' scrollable'}>
-          <TableBody>
-            {this.state.records.map(record => {
-              var i = this.state.nodes.indexOf(record.node)
-              if (i < 0) {
-                return null
-              }
-
-              return (
-                <TableRow key={record.id}>
-                  <TableCell key={record.id + '-t'}>
-                    {record.t.elapsed(this.state.records[0].t)}
-                  </TableCell>
-                  {this.state.nodes.map((node, index) => (
-                    i === index ? (
-                      <RecordItem classes={classes} record={record} key={record.id + '-' + record.node} />
-                    ) : (
-                      <TableCell key={record.id + '-' + node}></TableCell>
-                    )
-                  ))}
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </Box>
-
-        <SpeedDial
-          ariaLabel="SpeedDial tooltip example"
-          className={classes.speedDial}
-          icon={<SpeedDialIcon />}
-          onBlur={this.handleSpeedDialClose}
-          onClick={this.handleSpeedDialClick}
-          onClose={this.handleSpeedDialClose}
-          onFocus={this.handleSpeedDialOpen}
-          onMouseEnter={this.handleSpeedDialOpen}
-          onMouseLeave={this.handleSpeedDialClose}
-          open={this.state.speedDial}
-        >
-            <SpeedDialAction
-              key={'import-log-file'}
-              icon={<AttachFileIcon />}
-              tooltipTitle={'import new log'}
-              tooltipOpen
-              onClick={e=>{this.refs['dropzone'].open()}}
-            />
-        </SpeedDial>
-
-
+      {this.renderRecords(this.state.records, this.state.nodes)}
+      <SpeedDial
+        ariaLabel="SpeedDial tooltip example"
+        className={classes.speedDial}
+        icon={<SpeedDialIcon />}
+        onBlur={this.handleSpeedDialClose}
+        onClick={this.handleSpeedDialClick}
+        onClose={this.handleSpeedDialClose}
+        onFocus={this.handleSpeedDialOpen}
+        onMouseEnter={this.handleSpeedDialOpen}
+        onMouseLeave={this.handleSpeedDialClose}
+        open={this.state.speedDial}
+      >
+        <SpeedDialAction
+          key={'import-log-file'}
+          icon={<AttachFileIcon />}
+          tooltipTitle={'import new log'}
+          tooltipOpen
+          onClick={e=>{this.refs['dropzone'].open()}}
+        />
+        <SpeedDialAction
+          key={'expand-collapse-all'}
+          icon={<SettingsOverscanIcon />}
+          tooltipTitle={'expand/collapse all'}
+          tooltipOpen
+          onClick={e=>{this.toggleExpandAll()}}
+        />
+        <SpeedDialAction
+          key={'test data'}
+          icon={<ChildCareIcon />}
+          tooltipTitle={'test data'}
+          tooltipOpen
+          onClick={e=>{this.importTestData()}}
+        />
+      </SpeedDial>
     </div>
   }
 }

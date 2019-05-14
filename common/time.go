@@ -105,6 +105,14 @@ func (t Time) Equal(a Time) bool {
 	return t.Time.Equal(a.Time)
 }
 
+func (t Time) Sub(a Time) time.Duration {
+	return t.Time.Sub(a.Time)
+}
+
+func (t Time) Add(a time.Duration) Time {
+	return Time{Time: t.Time.Add(a)}
+}
+
 func Now() Time {
 	return Time{Time: time.Now()}
 }

@@ -17,7 +17,7 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 	}
 
 	if proposal.Block.Height.Cmp(state.Height().Inc()) != 0 {
-		Log().Debug(
+		c.Log().Debug(
 			"different height proposal received",
 			"proposa", proposal.Block.Height,
 			"current", state.Height(),
@@ -26,7 +26,7 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 	}
 
 	if !proposal.Block.Current.Equal(state.Block()) {
-		Log().Debug(
+		c.Log().Debug(
 			"proposal block is not matched",
 			"proposal", proposal.Block.Current,
 			"current", state.Block(),
@@ -48,7 +48,7 @@ func CheckerBlockerBallot(c *common.ChainChecker) error {
 	}
 
 	if ballot.Height.Cmp(state.Height()) < 1 {
-		Log().Debug(
+		c.Log().Debug(
 			"lower height ballot received",
 			"ballot", ballot.Height,
 			"current", state.Height(),

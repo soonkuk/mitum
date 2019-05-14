@@ -34,5 +34,5 @@ func encodeJSON(v interface{}, indent, escapeHTML bool) ([]byte, error) {
 	e.SetEscapeHTML(escapeHTML)
 
 	err := e.Encode(v)
-	return buffer.Bytes(), err
+	return bytes.TrimRight(buffer.Bytes(), "\n"), err
 }
