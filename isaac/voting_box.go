@@ -148,17 +148,6 @@ func (r *DefaultVotingBox) afterMajority(result VoteResultInfo) error {
 }
 
 func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
-	if r.policy.ExpireDurationVote != 0 {
-		d := r.policy.ExpireDurationVote
-		if d > 0 {
-			d = d * -1
-		}
-
-		if ballot.SignedAt().Before(common.Now().Add(d)) {
-			return VoteResultInfo{}, BallotIsTooOldError.AppendMessage("duration=%v", d)
-		}
-	}
-
 	result, err := r.vote(
 		ballot.Proposal,
 		ballot.Source(),
