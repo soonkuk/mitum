@@ -25,7 +25,7 @@ func NewDefaultSealBroadcaster(
 	state *ConsensusState,
 ) (*DefaultSealBroadcaster, error) {
 	return &DefaultSealBroadcaster{
-		Logger: common.NewLogger(log, "node", state.Home().Name()),
+		Logger: common.NewLogger(log, "module", "broadcaster", "node", state.Home().Name()),
 		policy: policy,
 		state:  state,
 	}, nil

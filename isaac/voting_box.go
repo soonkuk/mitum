@@ -30,7 +30,7 @@ type DefaultVotingBox struct {
 func NewDefaultVotingBox(home *common.HomeNode, policy ConsensusPolicy) *DefaultVotingBox {
 	return &DefaultVotingBox{
 		home:    home,
-		Logger:  common.NewLogger(log, "node", home.Name()),
+		Logger:  common.NewLogger(log, "module", "voting-box", "node", home.Name()),
 		policy:  policy,
 		unknown: NewVotingBoxUnknown(policy),
 	}
@@ -103,15 +103,10 @@ func (r *DefaultVotingBox) Close() error {
 		return err
 	}
 
-	var previous common.Hash
-	if r.previous != nil {
-		previous = r.previous.proposal
-	}
-
 	r.Log().Debug(
 		"current votingbox closed",
-		"current", r.current.proposal,
-		"previous", previous,
+		"current", r.current,
+		"previous", r.previous,
 	)
 
 	r.previous = r.current
@@ -508,8 +503,8 @@ func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vo
 	return vs.Vote(source, vote, seal)
 }
 
-func (v *VotingBoxProposal) String() string {
-	b, _ := json.Marshal(map[string]interface{}{
+func (v *VotingBoxProposal) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
 		"proposal":    v.proposal,
 		"height":      v.height,
 		"round":       v.round,
@@ -517,6 +512,10 @@ func (v *VotingBoxProposal) String() string {
 		"stageSIGN":   v.stageSIGN,
 		"stageACCEPT": v.stageACCEPT,
 	})
+}
+
+func (v *VotingBoxProposal) String() string {
+	b, _ := json.Marshal(v)
 
 	return common.TerminalLogString(string(b))
 }

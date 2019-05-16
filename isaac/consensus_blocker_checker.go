@@ -16,7 +16,7 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 		return err
 	}
 
-	if proposal.Block.Height.Cmp(state.Height().Inc()) != 0 {
+	if proposal.Block.Height.Cmp(state.Height()) != 0 {
 		c.Log().Debug(
 			"different height proposal received",
 			"in_proposal", proposal.Block.Height,
@@ -56,7 +56,7 @@ func CheckerBlockerBallot(c *common.ChainChecker) error {
 		return err
 	}
 
-	if ballot.Height.Cmp(state.Height()) < 1 {
+	if ballot.Height.Cmp(state.Height()) < 0 {
 		c.Log().Debug(
 			"lower height ballot received",
 			"in_ballot", ballot.Height,
@@ -72,6 +72,13 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 	if err := c.ContextValue("votingResult", &result); err != nil {
 		return err
 	}
+	if result.NotYet() {
+		cstop, err := common.NewChainCheckerStop("voting result, not yet", "result", result)
+		if err != nil {
+			return err
+		}
+		return cstop
+	}
 
 	var last VoteResultInfo
 	if err := c.ContextValue("lastVotingResult", &last); err != nil {
@@ -85,16 +92,16 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 
 	log_ := c.Log().New(log15.Ctx{"result": result, "current": state, "last": last})
 
-	if result.Height.Cmp(state.Height()) < 1 {
+	if result.Height.Cmp(state.Height()) < 0 {
 		log_.Debug(
-			"lower height, lower than current state",
+			"height, lower than current state",
 		)
 		return nil
 	}
 
 	if result.Height.Cmp(last.Height) < 0 {
 		log_.Debug(
-			"lower height, lower than last result",
+			"height, lower than last result",
 		)
 		return nil
 	}

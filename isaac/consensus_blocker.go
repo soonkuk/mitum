@@ -16,10 +16,11 @@ type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
 type ConsensusBlocker struct {
 	sync.RWMutex
 	*common.Logger
-	stopBlockingChan chan bool
-	blockingChan     chan ConsensusBlockerBlockingChanFunc
-	timer            *common.CallbackTimer
-	lastVotingResult VoteResultInfo
+	stopBlockingChan     chan bool
+	blockingChan         chan ConsensusBlockerBlockingChanFunc
+	timer                *common.CallbackTimer
+	lastVotingResult     VoteResultInfo
+	lastFinishedProposal *Proposal
 
 	policy           ConsensusPolicy
 	state            *ConsensusState
@@ -40,7 +41,7 @@ func NewConsensusBlocker(
 	blockStorage BlockStorage,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
-		Logger:           common.NewLogger(log, "node", state.Home().Name()),
+		Logger:           common.NewLogger(log, "node", state.Home().Name(), "module", "blocker"),
 		blockingChan:     make(chan ConsensusBlockerBlockingChanFunc),
 		policy:           policy,
 		state:            state,
@@ -155,7 +156,7 @@ func (c *ConsensusBlocker) startTimer(
 	)
 	c.timer.SetLogger(log)
 	c.timer.SetLogContext(
-		"name", name,
+		"module", name,
 		"node", c.state.Home().Name(),
 	)
 
@@ -218,9 +219,13 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		if err != nil {
 			return err
 		}
-
-		log_.Debug("got votingResult", "result", votingResult)
 	}
+
+	if votingResult.NotYet() {
+		return nil
+	}
+
+	log_.Debug("got votingResult", "result", votingResult)
 
 	if c.state.NodeState() != NodeStateConsensus {
 		c.state.SetNodeState(NodeStateConsensus)
@@ -266,7 +271,12 @@ func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, erro
 		),
 		CheckerBlockerProposalBlock,
 	)
-	checker.SetLogContext("node", c.state.Home().Name(), "seal", proposal.Hash(), "seal_type", proposal.Type())
+	checker.SetLogContext(
+		"module", "vote-proposal-checker",
+		"node", c.state.Home().Name(),
+		"seal", proposal.Hash(),
+		"seal_type", proposal.Type(),
+	)
 	if err := checker.Check(); err != nil {
 		log_.Error("checker failed; proposal", "error", err)
 		return VoteResultInfo{}, err
@@ -292,7 +302,10 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		),
 		CheckerBlockerBallot,
 	)
-	ballotChecker.SetLogContext(logContext...)
+	ballotChecker.SetLogContext(append(
+		[]interface{}{"module", "vote-ballot-checker"},
+		logContext...,
+	)...)
 	if err := ballotChecker.Check(); err != nil {
 		log_.Error("checker failed; ballot", "error", err)
 		return VoteResultInfo{}, err
@@ -315,7 +328,10 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		),
 		CheckerBlockerBallotVotingResult,
 	)
-	resultChecker.SetLogContext(ballotChecker.LogContext()...)
+	resultChecker.SetLogContext(append(
+		[]interface{}{"module", "vote-ballot-result-checker"},
+		ballotChecker.LogContext()...,
+	)...)
 	c.RUnlock()
 	if err := resultChecker.Check(); err != nil {
 		log_.Error("checker failed; ballot votingResult", "error", err)
@@ -429,7 +445,7 @@ func (c *ConsensusBlocker) goToNextStage(
 // - update ConsensusBlockerState
 // - ready to start new block
 func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
-	c.Log().Debug("finish round", "proposal", proposal)
+	c.Log().Debug("finishing round", "proposal", proposal)
 
 	seal, err := c.sealPool.Get(proposal)
 	if err != nil {
@@ -461,8 +477,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 		}
 
 		c.Log().Debug(
-			"round finished",
-			"proposal", seal.Hash(),
+			"finished round",
 			"old-block-height", prevState.Height().String(),
 			"old-block-hash", prevState.Block(),
 			"old-state-hash", prevState.State(),
@@ -470,6 +485,8 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 			"new-block-hash", c.state.Block(),
 			"new-state-hash", c.state.State(),
 		)
+
+		c.lastFinishedProposal = &p
 	}
 
 	// propose or wait new proposal
@@ -504,7 +521,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 
 	err := c.startTimer(
 		"run-round-broadcast-init",
-		c.policy.TimeoutWaitSeal+c.policy.AvgBlockRoundInterval+time.Second, // NOTE wait after proposed
+		c.policy.TimeoutWaitSeal,
 		true,
 		func() error {
 			return c.broadcastINIT(height, round+1)
@@ -514,7 +531,17 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 		return err
 	}
 
-	return c.propose(height, round, c.policy.AvgBlockRoundInterval)
+	// NOTE will propose after,
+	// duration = ConsensusPolicy.AvgBlockRoundInterval - (<Latest block's Proposal.SignedAt> - <Now()>)
+	// if duration is under 0, after 1 second
+	var delay = time.Second
+	if c.lastFinishedProposal != nil {
+		delay = c.policy.AvgBlockRoundInterval - common.Now().Sub(c.lastFinishedProposal.SignedAt())
+		if delay < 0 {
+			delay = time.Second
+		}
+	}
+	return c.propose(height, round, delay)
 }
 
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
@@ -549,7 +576,8 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 }
 
 func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Duration) error {
-	log_ := c.Log().New(log15.Ctx{"height": height, "round": round})
+	log_ := c.Log().New(log15.Ctx{"height": height, "round": round, "delay": delay})
+	log_.Debug("new proposal will be proposed")
 
 	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
 	if err != nil {

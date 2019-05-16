@@ -21,7 +21,7 @@ type DefaultSealPool struct {
 
 func NewDefaultSealPool(home *common.HomeNode) *DefaultSealPool {
 	return &DefaultSealPool{
-		Logger: common.NewLogger(log, "node", home.Name()),
+		Logger: common.NewLogger(log, "module", "seal-pool", "node", home.Name()),
 		seals:  &syncmap.Map{},
 	}
 }
@@ -50,7 +50,6 @@ func (s *DefaultSealPool) Add(seal common.Seal) error {
 	}
 
 	s.seals.Store(seal.Hash(), seal)
-	log_.Debug("seal added", "seal-original", seal)
 
 	return nil
 }

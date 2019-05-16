@@ -16,22 +16,22 @@ func CheckerSealPool(c *common.ChainChecker) error {
 	}
 
 	if err := sealPool.Add(seal); err != nil {
-		if !KnownSealFoundError.Equal(err) {
-			return err
-		}
-
-		cstop, err := common.NewChainCheckerStop(
-			err.(common.Error).Message(),
-			"error", err,
-		)
-		if err != nil {
-			return err
-		} else {
-			return cstop
+		if KnownSealFoundError.Equal(err) {
+			cstop, err := common.NewChainCheckerStop(
+				err.(common.Error).Message(),
+				"error", err,
+			)
+			if err != nil {
+				return err
+			} else {
+				return cstop
+			}
 		}
 
 		return err
 	}
+
+	c.Log().Debug("seal added", "seal", seal.Hash(), "seal-original", seal)
 
 	return nil
 }
@@ -52,7 +52,6 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerProposalIsValid,
 			CheckerProposalProposerIsFromKnowns,
 			CheckerProposalProposerIsValid,
-			CheckerProposalTimeIsValid,
 			CheckerProposalBlock,
 			CheckerProposalState,
 		)
@@ -62,8 +61,6 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		return common.NewChainChecker(
 			"ballot checker",
 			c.Context(),
-			CheckerBallotIsValid,
-			CheckerBallotTimeIsValid,
 			CheckerBallotProposal,
 		)
 	case TransactionSealType:
@@ -78,5 +75,11 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		return common.UnknownSealTypeError.SetMessage("tyep=%v", seal.Type())
 	}
 
+	return nil
+}
+
+// CheckerSealSignedAtTimeIsValid checks `Seal.SignedAt` is not far from now
+func CheckerSealSignedAtTimeIsValid(c *common.ChainChecker) error {
+	// TODO test
 	return nil
 }

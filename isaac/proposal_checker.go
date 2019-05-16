@@ -66,13 +66,6 @@ func CheckerProposalProposerIsValid(c *common.ChainChecker) error {
 	return nil
 }
 
-// CheckerSealProposeTimeIsValid checks `Proposal.ProposedAt` is not
-// far from now
-func CheckerProposalTimeIsValid(c *common.ChainChecker) error {
-	// TODO test
-	return nil
-}
-
 // CheckerProposalBlock checks `Proposal.Block` is correct,
 // - Proposal.Block.Height is same
 // - Proposal.Block.Current is same

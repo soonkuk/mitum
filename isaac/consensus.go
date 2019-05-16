@@ -26,7 +26,7 @@ func NewConsensus(
 	blocker *ConsensusBlocker,
 ) (*Consensus, error) {
 	c := &Consensus{
-		Logger:   common.NewLogger(log, "node", home.Name()),
+		Logger:   common.NewLogger(log, "module", "consensus", "node", home.Name()),
 		receiver: make(chan common.Seal),
 		voteChan: make(chan common.Seal),
 		ctx:      context.Background(),
@@ -118,7 +118,6 @@ func (c *Consensus) Receiver() chan common.Seal {
 
 // TODO Please correct this boring method name, `schedule` :(
 func (c *Consensus) schedule() {
-	// NOTE these seal should be verified that is wellformed.
 end:
 	for {
 		select {
@@ -139,6 +138,7 @@ end:
 }
 
 func (c *Consensus) receiveSeal(seal common.Seal) error {
+	// NOTE these seal should be verified that is wellformed before.
 	log_ := c.Log().New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	checker := common.NewChainChecker(
@@ -150,7 +150,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		CheckerSealPool,
 		CheckerSealTypes,
 	)
-	checker.SetLogContext("node", c.home.Name())
+	checker.SetLogContext("module", "receive-seal", "node", c.home.Name())
 	if err := checker.Check(); err != nil {
 		log_.Error("failed to checker for seal", "error", err)
 		return err
