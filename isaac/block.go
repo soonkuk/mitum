@@ -57,8 +57,8 @@ func (b Block) Transactions() []common.Hash {
 	return b.transactions
 }
 
-func (b Block) String() string {
-	by, _ := json.Marshal(map[string]interface{}{
+func (b Block) MarshalJSON() ([]byte, error) {
+	return common.EncodeJSON(map[string]interface{}{
 		"version":      b.version,
 		"height":       b.height,
 		"hash":         b.hash,
@@ -71,7 +71,10 @@ func (b Block) String() string {
 		"proposal":     b.proposal,
 		"validators":   b.validators,
 		"transactions": b.transactions,
-	})
+	}, false, false)
+}
 
+func (b Block) String() string {
+	by, _ := json.Marshal(b)
 	return common.TerminalLogString(string(by))
 }

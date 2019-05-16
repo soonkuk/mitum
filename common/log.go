@@ -84,7 +84,7 @@ func formatLogJSONValue(value interface{}) (result interface{}) {
 
 func JsonFormatEx(pretty, lineSeparated bool) log15.Format {
 	jsonMarshal := func(v interface{}) ([]byte, error) {
-		return encodeJSON(v, false, false)
+		return EncodeJSON(v, false, false)
 	}
 
 	if pretty {

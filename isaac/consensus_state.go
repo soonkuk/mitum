@@ -9,17 +9,19 @@ import (
 
 type ConsensusState struct {
 	sync.RWMutex
-	home      *common.HomeNode
-	height    common.Big  // last Block.Height
-	block     common.Hash // Block.Hash()
-	state     []byte      // last State.Root.Hash()
-	nodeState NodeState
+	home       *common.HomeNode
+	height     common.Big  // last Block.Height
+	block      common.Hash // Block.Hash()
+	state      []byte      // last State.Root.Hash()
+	nodeState  NodeState
+	validators map[common.Address]common.Validator
 }
 
 func NewConsensusState(home *common.HomeNode) *ConsensusState {
 	return &ConsensusState{
-		home:      home,
-		nodeState: NodeStateBooting,
+		home:       home,
+		nodeState:  NodeStateBooting,
+		validators: map[common.Address]common.Validator{},
 	}
 }
 
@@ -28,10 +30,11 @@ func (c *ConsensusState) MarshalJSON() ([]byte, error) {
 	defer c.RUnlock()
 
 	return json.Marshal(map[string]interface{}{
-		"home":   c.home,
-		"height": c.height,
-		"block":  c.block,
-		"state":  c.state,
+		"home":       c.home,
+		"height":     c.height,
+		"block":      c.block,
+		"state":      c.state,
+		"validators": c.Validators(),
 	})
 }
 
@@ -114,6 +117,49 @@ func (c *ConsensusState) SetNodeState(state NodeState) error {
 	}
 
 	c.nodeState = state
+
+	return nil
+}
+
+func (c *ConsensusState) Validators() []common.Validator {
+	c.RLock()
+	defer c.RUnlock()
+
+	var validators []common.Validator
+	for _, validator := range c.validators {
+		validators = append(validators, validator)
+	}
+
+	return validators
+}
+
+func (c *ConsensusState) AddValidators(validators ...common.Validator) error {
+	c.Lock()
+	defer c.Unlock()
+
+	for _, validator := range validators {
+		if _, found := c.validators[validator.Address()]; found {
+			continue
+		} else if c.home.Equal(validator) { // NOTE validators does not contain home itself
+			continue
+		}
+
+		c.validators[validator.Address()] = validator
+	}
+
+	return nil
+}
+
+func (c *ConsensusState) RemoveValidators(validators ...common.Validator) error {
+	c.Lock()
+	defer c.Unlock()
+
+	for _, validator := range validators {
+		if _, found := c.validators[validator.Address()]; !found {
+			continue
+		}
+		delete(c.validators, validator.Address())
+	}
 
 	return nil
 }

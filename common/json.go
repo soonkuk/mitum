@@ -18,14 +18,14 @@ func PrintJSON(v interface{}, indent bool, escapeHTML bool) string {
 		b = s
 	}
 
-	b, err := encodeJSON(v, indent, escapeHTML)
+	b, err := EncodeJSON(v, indent, escapeHTML)
 	if err != nil {
 		return ""
 	}
 	return string(b)
 }
 
-func encodeJSON(v interface{}, indent, escapeHTML bool) ([]byte, error) {
+func EncodeJSON(v interface{}, indent, escapeHTML bool) ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	e := json.NewEncoder(buffer)
 	if indent {

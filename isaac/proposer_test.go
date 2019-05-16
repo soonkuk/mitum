@@ -188,7 +188,7 @@ func (t *testProposer) TestElect() {
 
 				var nodes []common.Node
 				for _, a := range addresses {
-					nodes = append(nodes, common.NewValidator(a, common.NetAddr{}, nil))
+					nodes = append(nodes, common.NewValidator(a, common.NetAddr{}))
 				}
 
 				block, err := common.ParseHash(c.block)

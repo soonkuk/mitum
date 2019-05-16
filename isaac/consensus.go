@@ -157,7 +157,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 	}
 
 	if !c.state.NodeState().CanVote() {
-		log_.Error("node can not vote", "state", c.state.NodeState())
+		log_.Error("node cannot vote", "state", c.state.NodeState())
 		return nil
 	}
 

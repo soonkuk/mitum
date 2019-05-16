@@ -31,7 +31,7 @@ type testConsensus struct {
 
 func (t *testConsensus) SetupSuite() {
 	t.home = common.NewRandomHome()
-	t.height = common.NewBig(0)
+	t.height = common.NewBig(1)
 	t.block = common.NewRandomHash("bk")
 	t.state = []byte("sl")
 	t.total = 1
@@ -55,7 +55,7 @@ func (t *testConsensus) SetupTest() {
 
 	t.nt = network.NewNodeTestNetwork()
 
-	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.home)
+	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.cstate)
 	t.sealBroadcaster.SetSender(t.nt.Send)
 
 	t.sealPool = NewDefaultSealPool(t.home)
@@ -89,6 +89,7 @@ func (t *testConsensus) SetupTest() {
 		"sealPool", t.sealPool,
 	)
 
+	t.cstate.SetNodeState(NodeStateJoin)
 	t.consensus.Start()
 }
 
@@ -105,6 +106,9 @@ func (t *testConsensus) TestNew() {
 	{
 		var err error
 		proposal = NewTestProposal(t.cstate.Home().Address(), nil)
+		proposal.Block.Height = t.height
+		proposal.Block.Current = t.block
+		proposal.State.Current = t.state
 		t.NoError(err)
 		err = proposal.Sign(common.TestNetworkID, t.cstate.Home().Seed())
 		t.NoError(err)
@@ -123,6 +127,8 @@ func (t *testConsensus) TestNew() {
 	t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
 	t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 	t.Equal(proposal.State.Next, t.cstate.State())
+
+	t.Equal(NodeStateConsensus, t.cstate.NodeState())
 }
 
 func TestConsensus(t *testing.T) {

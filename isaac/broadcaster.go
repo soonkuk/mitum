@@ -16,18 +16,18 @@ type DefaultSealBroadcaster struct {
 	sync.RWMutex
 	*common.Logger
 	policy ConsensusPolicy
-	home   *common.HomeNode
+	state  *ConsensusState
 	sender network.SenderFunc
 }
 
 func NewDefaultSealBroadcaster(
 	policy ConsensusPolicy,
-	home *common.HomeNode,
+	state *ConsensusState,
 ) (*DefaultSealBroadcaster, error) {
 	return &DefaultSealBroadcaster{
-		Logger: common.NewLogger(log, "node", home.Name()),
+		Logger: common.NewLogger(log, "node", state.Home().Name()),
 		policy: policy,
-		home:   home,
+		state:  state,
 	}, nil
 }
 
@@ -42,15 +42,15 @@ func (i *DefaultSealBroadcaster) Send(
 		seal = s
 	}
 
-	if err := message.Sign(i.policy.NetworkID, i.home.Seed()); err != nil {
+	if err := message.Sign(i.policy.NetworkID, i.state.Home().Seed()); err != nil {
 		return err
 	}
 
 	log_ := i.Log().New(log15.Ctx{"seal": seal.Hash()})
-	log_.Debug("seal will be broadcasted")
+	log_.Debug("seal will be broadcasted", "excludes", excludes, "validators", i.state.Validators())
 
-	var targets = []common.Node{i.home}
-	for _, node := range i.home.Validators() {
+	var targets = []common.Node{i.state.Home()}
+	for _, node := range i.state.Validators() {
 		var exclude bool
 		for _, a := range excludes {
 			if a == node.Address() {
@@ -66,8 +66,10 @@ func (i *DefaultSealBroadcaster) Send(
 
 	for _, node := range targets {
 		if err := i.sender(node, seal); err != nil {
-			return err
+			log_.Error("failed to broadcast seal", "target-node", node.Name(), "seal-original", seal, "error", err)
+			continue
 		}
+		log_.Debug("seal broadcasted", "target-node", node.Name(), "seal-original", seal)
 	}
 
 	return nil

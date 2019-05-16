@@ -3,7 +3,6 @@ package common
 import (
 	"encoding"
 	"encoding/json"
-	"sort"
 	"strings"
 	"sync"
 
@@ -12,26 +11,20 @@ import (
 
 type Node interface {
 	encoding.BinaryMarshaler
+	Name() string
 	Address() Address
 	Publish() NetAddr
-	Validators() map[Address]Validator
 	Equal(Node) bool
 	String() string
 }
 
 type BaseNode struct {
-	address    Address
-	publish    NetAddr
-	validators map[Address]Validator
+	address Address
+	publish NetAddr
 }
 
-func NewBaseNode(address Address, publish NetAddr, validators []Validator) BaseNode {
-	vs := map[Address]Validator{}
-	for _, v := range validators {
-		vs[v.Address()] = v
-	}
-
-	return BaseNode{address: address, publish: publish, validators: vs}
+func NewBaseNode(address Address, publish NetAddr) BaseNode {
+	return BaseNode{address: address, publish: publish}
 }
 
 func (n BaseNode) Name() string {
@@ -46,33 +39,12 @@ func (n BaseNode) Publish() NetAddr {
 	return n.publish
 }
 
-func (n BaseNode) Validators() map[Address]Validator {
-	return n.validators
-}
-
 func (n BaseNode) Equal(node Node) bool {
 	return n.Address() == node.Address()
 }
 
 func (n BaseNode) MarshalBinary() ([]byte, error) {
 	// NOTE sort valdators by address
-	var validators [][]byte
-	if len(n.validators) > 0 {
-		var addresses []string
-		for a := range n.validators {
-			addresses = append(addresses, string(a))
-		}
-		sort.Strings(addresses)
-
-		for _, address := range addresses {
-			b, err := n.validators[Address(address)].MarshalBinary()
-			if err != nil {
-				return nil, err
-			}
-			validators = append(validators, b)
-		}
-	}
-
 	publish, err := n.publish.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -81,7 +53,6 @@ func (n BaseNode) MarshalBinary() ([]byte, error) {
 	return Encode([]interface{}{
 		n.address,
 		publish,
-		validators,
 	})
 }
 
@@ -107,25 +78,8 @@ func (n *BaseNode) UnmarshalBinary(b []byte) error {
 		}
 	}
 
-	validators := map[Address]Validator{}
-	{
-		var vs [][]byte
-		if err := Decode(m[2], &vs); err != nil {
-			return err
-		}
-
-		for _, b := range vs {
-			var validator Validator
-			if err := validator.UnmarshalBinary(b); err != nil {
-				return err
-			}
-			validators[validator.Address()] = validator
-		}
-	}
-
 	n.address = address
 	n.publish = publish
-	n.validators = validators
 
 	return nil
 }
@@ -176,7 +130,7 @@ type HomeNode struct {
 
 func NewHome(seed Seed, publish NetAddr) *HomeNode {
 	return &HomeNode{
-		BaseNode: NewBaseNode(seed.Address(), publish, nil),
+		BaseNode: NewBaseNode(seed.Address(), publish),
 		seed:     seed,
 	}
 }
@@ -188,30 +142,6 @@ func (n *HomeNode) Seed() Seed {
 	return n.seed
 }
 
-func (n *HomeNode) AddValidators(validators ...Validator) {
-	n.Lock()
-	defer n.Unlock()
-
-	for _, v := range validators {
-		if _, found := n.validators[v.Address()]; found {
-			continue
-		}
-		n.validators[v.Address()] = v
-	}
-}
-
-func (n *HomeNode) RemoveValidators(validators ...Validator) {
-	n.Lock()
-	defer n.Unlock()
-
-	for _, v := range validators {
-		if _, found := n.validators[v.Address()]; !found {
-			continue
-		}
-		delete(n.validators, v.Address())
-	}
-}
-
 func (n *HomeNode) UnmarshalBinary(b []byte) error {
 	var node BaseNode
 	if err := Decode(b, &node); err != nil {
@@ -220,7 +150,6 @@ func (n *HomeNode) UnmarshalBinary(b []byte) error {
 
 	n.address = node.Address()
 	n.publish = node.Publish()
-	n.validators = node.Validators()
 
 	return nil
 }
@@ -229,7 +158,7 @@ type Validator struct {
 	BaseNode
 }
 
-func NewValidator(address Address, publish NetAddr, validators []Validator) Validator {
-	b := NewBaseNode(address, publish, validators)
+func NewValidator(address Address, publish NetAddr) Validator {
+	b := NewBaseNode(address, publish)
 	return Validator{BaseNode: b}
 }

@@ -29,14 +29,14 @@ func NewTestProposal(proposer common.Address, transactions []common.Hash) Propos
 }
 
 func NewTestSealBallot(
-	phash common.Hash,
+	proposal common.Hash,
 	proposer common.Address,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 	vote Vote,
 ) Ballot {
-	return NewBallot(phash, proposer, height, round, stage, vote)
+	return NewBallot(proposal, proposer, height, round, stage, vote)
 }
 
 // TODO remove if unused
@@ -164,7 +164,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 
 	block := Block{
 		version:      CurrentBlockVersion,
-		height:       proposal.Block.Height,
+		height:       proposal.Block.Height.Inc(),
 		hash:         proposal.Block.Next,
 		prevHash:     proposal.Block.Current,
 		state:        proposal.State.Next,
@@ -191,8 +191,8 @@ func (t *TBlockStorage) LatestBlock() (Block, error) {
 	return t.blocks[len(t.blocks)-1], nil
 }
 
-func (t *TBlockStorage) BlockByProposal(phash common.Hash) (Block, error) {
-	block, ok := t.blocksbyProposal[phash]
+func (t *TBlockStorage) BlockByProposal(proposal common.Hash) (Block, error) {
+	block, ok := t.blocksbyProposal[proposal]
 	if !ok {
 		return Block{}, BlockNotFoundError
 	}

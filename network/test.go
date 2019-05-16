@@ -12,13 +12,14 @@ import (
 
 type NodeTestNetwork struct {
 	sync.RWMutex
-	local chan<- common.Seal
-	chans map[string]chan<- common.Seal
+	chans          map[string]chan<- common.Seal
+	validatorsChan map[common.Address]chan<- common.Seal
 }
 
 func NewNodeTestNetwork() *NodeTestNetwork {
 	return &NodeTestNetwork{
-		chans: map[string]chan<- common.Seal{},
+		chans:          map[string]chan<- common.Seal{},
+		validatorsChan: map[common.Address]chan<- common.Seal{},
 	}
 }
 
@@ -56,26 +57,41 @@ func (n *NodeTestNetwork) RemoveReceiver(c chan common.Seal) error {
 	return nil
 }
 
+func (n *NodeTestNetwork) AddValidatorChan(validator common.Validator, c chan<- common.Seal) *NodeTestNetwork {
+	n.Lock()
+	defer n.Unlock()
+
+	n.validatorsChan[validator.Address()] = c
+
+	return n
+}
+
 func (n *NodeTestNetwork) Send(node common.Node, seal common.Seal) error {
 	n.RLock()
 	defer n.RUnlock()
 
-	if len(n.chans) < 1 {
-		return NoReceiversError
+	if reflect.ValueOf(seal).Kind() == reflect.Ptr {
+		seal = reflect.Indirect(reflect.ValueOf(seal)).Interface().(common.Seal)
 	}
 
-	for _, c := range n.chans {
-		if reflect.ValueOf(seal).Kind() == reflect.Ptr {
-			seal = reflect.Indirect(reflect.ValueOf(seal)).Interface().(common.Seal)
-		}
-		if err := seal.Wellformed(); err != nil {
-			log.Crit("not wellformed seal found", "error", err)
-			panic(err)
-			return err
-		}
-
-		c <- seal
+	if err := seal.Wellformed(); err != nil {
+		log.Crit("not wellformed seal found", "error", err)
+		panic(err)
+		return err
 	}
+
+	if len(n.chans) > 0 {
+		for _, c := range n.chans {
+			c <- seal
+		}
+	}
+
+	sender, found := n.validatorsChan[node.Address()]
+	if !found {
+		return fmt.Errorf("not registered node for broadcasting: %v", node.Address())
+	}
+
+	sender <- seal
 
 	return nil
 }

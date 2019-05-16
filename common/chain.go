@@ -2,23 +2,45 @@ package common
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/inconshreveable/log15"
 )
 
-type ChainCheckerStop struct {
+type ChainCheckerStop map[string]interface{}
+
+func NewChainCheckerStop(msg string, args ...interface{}) (ChainCheckerStop, error) {
+	return ChainCheckerStop{}.SetMessage(msg, args...)
 }
 
+func (c ChainCheckerStop) SetMessage(msg string, args ...interface{}) (ChainCheckerStop, error) {
+	n := ChainCheckerStop{"msg": msg}
+
+	for i := 0; i < len(args); i += 2 {
+		s, ok := args[i].(string)
+		if !ok {
+			return ChainCheckerStop{}, fmt.Errorf("invalid key found in ChainCheckerStop: %T", args[i])
+		}
+
+		n[s] = args[i+1]
+	}
+
+	return n, nil
+}
+
+func (c ChainCheckerStop) JSONLog() {}
+
 func (c ChainCheckerStop) Error() string {
-	return "chain-checker-stop"
+	b, _ := json.Marshal(c)
+	return TerminalLogString(string(b))
 }
 
 type ChainCheckerFunc func(*ChainChecker) error
 
 type ChainChecker struct {
 	*Logger
-	name        string
 	checkers    []ChainCheckerFunc
 	originalCtx context.Context
 	ctx         context.Context
@@ -28,8 +50,7 @@ type ChainChecker struct {
 
 func NewChainChecker(name string, ctx context.Context, checkers ...ChainCheckerFunc) *ChainChecker {
 	return &ChainChecker{
-		Logger:      NewLogger(log),
-		name:        name,
+		Logger:      NewLogger(log, "name", name),
 		checkers:    checkers,
 		ctx:         ctx,
 		originalCtx: ctx,
@@ -42,7 +63,7 @@ func (c *ChainChecker) New(ctx context.Context) *ChainChecker {
 	}
 
 	return &ChainChecker{
-		name:        c.name,
+		Logger:      c.Logger,
 		checkers:    c.checkers,
 		ctx:         ctx,
 		originalCtx: ctx,
@@ -105,11 +126,11 @@ end:
 			newChecker = err.(*ChainChecker)
 			break end
 		case ChainCheckerStop:
-			c.Log().Debug("checker stopped")
+			c.Log().Debug("checker stopped", "stop", err)
 			c.success = true
 			return nil
 		default:
-			c.Log().Error("checking", "error", err, "func", FuncName(f, false))
+			c.Log().Error("failed to check", "error", err, "func", FuncName(f, false))
 			return err
 		}
 	}

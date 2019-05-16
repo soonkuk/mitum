@@ -64,7 +64,7 @@ func (c *ConsensusBlocker) Start() error {
 	go c.blocking()
 
 	c.Log().Debug(
-		"ConsensusBlocker started",
+		"blocker started",
 		"policy", c.policy,
 		"state", c.state,
 		"seal-broadcastor", fmt.Sprintf("%T", c.sealBroadcaster),
@@ -81,7 +81,7 @@ func (c *ConsensusBlocker) Join() error {
 		c.state.SetNodeState(NodeStateJoin)
 	}
 
-	go c.joinConsensus(c.state.Height().Inc())
+	go c.joinConsensus(c.state.Height())
 
 	return nil
 }
@@ -196,7 +196,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	var votingResult VoteResultInfo
 	{ // voting
 		var err error
-		logContext := []interface{}{"node", c.state.Home().Name()}
+		logContext := []interface{}{"node", c.state.Home().Name(), "seal", seal.Hash(), "seal_type", seal.Type()}
 
 		switch seal.Type() {
 		case ProposalSealType:
@@ -281,6 +281,10 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		log_.Debug("got votingResult", "result", votingResult)
 	}
 
+	if c.state.NodeState() != NodeStateConsensus {
+		c.state.SetNodeState(NodeStateConsensus)
+	}
+
 	switch votingResult.Stage {
 	case VoteStageINIT:
 		if votingResult.Proposed {
@@ -361,12 +365,12 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 
 // goToNextStage goes to next stage
 func (c *ConsensusBlocker) goToNextStage(
-	phash common.Hash,
+	proposal common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 ) error {
-	c.Log().Debug("go to next stage", "proposal", phash, "height", height, "round", round, "next", stage)
+	c.Log().Debug("go to next stage", "proposal", proposal, "height", height, "round", round, "next", stage)
 
 	// TODO if proposer is different from current, check
 	// - current Block is same
@@ -382,7 +386,7 @@ func (c *ConsensusBlocker) goToNextStage(
 
 	// broadcast next stage ballot
 	ballot := NewBallot(
-		phash,
+		proposal,
 		"",
 		height,
 		round,
@@ -401,21 +405,21 @@ func (c *ConsensusBlocker) goToNextStage(
 // - store block and state
 // - update ConsensusBlockerState
 // - ready to start new block
-func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
-	c.Log().Debug("finish round", "proposal", phash)
+func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
+	c.Log().Debug("finish round", "proposal", proposal)
 
-	seal, err := c.sealPool.Get(phash)
+	seal, err := c.sealPool.Get(proposal)
 	if err != nil {
 		return err
 	}
 
-	var proposal Proposal
-	if err := common.CheckSeal(seal, &proposal); err != nil {
+	var p Proposal
+	if err := common.CheckSeal(seal, &p); err != nil {
 		return common.UnknownSealTypeError.SetMessage(err.Error())
 	}
 
 	// TODO store block and state
-	if _, err := c.blockStorage.NewBlock(proposal); err != nil {
+	if _, err := c.blockStorage.NewBlock(p); err != nil {
 		return err
 	}
 
@@ -423,13 +427,13 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 	{
 		prevState := *c.state
 
-		if err := c.state.SetHeight(proposal.Block.Height); err != nil {
+		if err := c.state.SetHeight(p.Block.Height.Inc()); err != nil {
 			return err
 		}
-		if err := c.state.SetBlock(proposal.Block.Next); err != nil {
+		if err := c.state.SetBlock(p.Block.Next); err != nil {
 			return err
 		}
-		if err := c.state.SetState(proposal.State.Next); err != nil {
+		if err := c.state.SetState(p.State.Next); err != nil {
 			return err
 		}
 
@@ -447,7 +451,7 @@ func (c *ConsensusBlocker) finishRound(phash common.Hash) error {
 
 	// propose or wait new proposal
 	err = c.startTimer("finish-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
-		return c.broadcastINIT(proposal.Block.Height.Inc(), Round(0))
+		return c.broadcastINIT(p.Block.Height.Inc(), Round(0))
 	})
 	if err != nil {
 		return err
@@ -487,10 +491,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 		return err
 	}
 
-	delay := c.policy.AvgBlockRoundInterval
-	log_.Debug("propose new proposal", "delay", delay)
-
-	return c.propose(height, round, delay)
+	return c.propose(height, round, c.policy.AvgBlockRoundInterval)
 }
 
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
@@ -515,13 +516,12 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	}
 
 	log_.Debug(
-		"proposer selected",
+		"INIT ballot broadcasted",
 		"block", c.state.Block(),
-		"height", height,
-		"round", round,
 		"proposer", proposer.Address(),
 		"seal", ballot.Hash(),
 	)
+
 	return nil
 }
 
@@ -535,10 +535,11 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Du
 	log_.Debug("proposer selected", "block", c.state.Block(), "proposer", proposer.Address())
 
 	if !proposer.Equal(c.state.Home()) {
-		log_.Debug("proposer is not home; will wait Proposal")
+		log_.Debug("proposer is not home; will wait new proposal")
 		return nil
 	}
 
+	log_.Debug("proposer is home; new proposal will be proposed")
 	// TODO validate transactions.
 	proposal := NewProposal(
 		round,

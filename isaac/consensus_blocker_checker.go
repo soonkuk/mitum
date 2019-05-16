@@ -19,16 +19,25 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 	if proposal.Block.Height.Cmp(state.Height().Inc()) != 0 {
 		c.Log().Debug(
 			"different height proposal received",
-			"proposa", proposal.Block.Height,
+			"in_proposal", proposal.Block.Height,
 			"current", state.Height(),
 		)
-		return common.ChainCheckerStop{}
+		cstop, err := common.NewChainCheckerStop(
+			"different height proposal received",
+			"in_proposal", proposal.Block.Height,
+			"current", state.Height(),
+		)
+		if err != nil {
+			return err
+		} else {
+			return cstop
+		}
 	}
 
 	if !proposal.Block.Current.Equal(state.Block()) {
 		c.Log().Debug(
 			"proposal block is not matched",
-			"proposal", proposal.Block.Current,
+			"in_proposal", proposal.Block.Current,
 			"current", state.Block(),
 		)
 	}
@@ -50,7 +59,7 @@ func CheckerBlockerBallot(c *common.ChainChecker) error {
 	if ballot.Height.Cmp(state.Height()) < 1 {
 		c.Log().Debug(
 			"lower height ballot received",
-			"ballot", ballot.Height,
+			"in_ballot", ballot.Height,
 			"current", state.Height(),
 		)
 	}
@@ -77,15 +86,17 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 	log_ := c.Log().New(log15.Ctx{"result": result, "current": state, "last": last})
 
 	if result.Height.Cmp(state.Height()) < 1 {
-		log_.Debug("lower height ballot received")
-	}
-
-	if last.NotYet() {
+		log_.Debug(
+			"lower height, lower than current state",
+		)
 		return nil
 	}
 
 	if result.Height.Cmp(last.Height) < 0 {
-		log_.Debug("height is lower than last result")
+		log_.Debug(
+			"lower height, lower than last result",
+		)
+		return nil
 	}
 
 	if result.Stage == VoteStageINIT {
@@ -94,10 +105,11 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 
 	if result.Height.Equal(last.Height) && result.Round == last.Round && result.Stage <= last.Stage {
 		log_.Debug("already finished; earlier stage found")
+		return nil
 	}
 
-	if result.Height.Cmp(state.Height().Inc()) > 0 {
-		log_.Debug("different height found")
+	if result.Height.Cmp(state.Height()) > 0 {
+		log_.Debug("higher height found")
 		return DifferentHeightConsensusError.AppendMessage(
 			"height=%v, current height=%v",
 			result.Height,

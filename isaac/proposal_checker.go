@@ -88,11 +88,11 @@ func CheckerProposalBlock(c *common.ChainChecker) error {
 		return err
 	}
 
-	if !proposal.Block.Height.Equal(state.Height().Inc()) {
+	if !proposal.Block.Height.Equal(state.Height()) {
 		return DifferentHeightConsensusError.AppendMessage(
-			"proposal=%v next=%v",
+			"proposal=%v current=%v",
 			proposal.Block.Height,
-			state.Height().Inc(),
+			state.Height(),
 		)
 	}
 

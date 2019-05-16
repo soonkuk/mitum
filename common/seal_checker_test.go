@@ -50,6 +50,8 @@ func (t testSealCheckers) TestCheckerUnmarshalSeal() {
 }
 
 func (t testSealCheckers) TestCheckerUnmarshalSealFailed() {
+	defer DebugPanic()
+
 	ctx := context.WithValue(context.Background(), "networkID", TestNetworkID)
 
 	sc := NewSealCodec()

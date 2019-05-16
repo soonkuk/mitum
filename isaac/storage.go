@@ -33,6 +33,6 @@ func (d *DefaultBlockStorage) LatestBlock() (Block, error) {
 	return Block{}, nil
 }
 
-func (d *DefaultBlockStorage) BlockByProposal(phash common.Hash) (Block, error) {
+func (d *DefaultBlockStorage) BlockByProposal(proposal common.Hash) (Block, error) {
 	return Block{}, nil
 }

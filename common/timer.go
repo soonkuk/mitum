@@ -52,8 +52,6 @@ func (c *CallbackTimer) Stop() error {
 	close(c.stopChan)
 	c.stopChan = nil
 
-	c.Log().Debug("timer stopped")
-
 	return nil
 }
 
@@ -62,7 +60,7 @@ end:
 	for {
 		select {
 		case <-c.stopChan:
-			c.Log().Debug("timer is stopped")
+			c.Log().Debug("timer stopped")
 			break end
 		case <-time.After(c.timeout):
 			c.Log().Debug("timer expired")

@@ -38,14 +38,14 @@ func (t *testVotingBox) newNodes(n uint) []*common.HomeNode {
 
 func (t *testVotingBox) newBallot(
 	node *common.HomeNode,
-	phash common.Hash,
+	proposal common.Hash,
 	height common.Big,
 	stage VoteStage,
 	round Round,
 	vote Vote,
 ) (Ballot, error) {
 	ballot := NewTestSealBallot(
-		phash,
+		proposal,
 		node.Address(),
 		height,
 		round,
@@ -65,13 +65,13 @@ func (t *testVotingBox) newBallot(
 
 func (t *testVotingBox) newBallotVote(
 	node *common.HomeNode,
-	phash common.Hash,
+	proposal common.Hash,
 	height common.Big,
 	stage VoteStage,
 	round Round,
 	vote Vote,
 ) (Ballot, VoteResultInfo, error) {
-	ballot, err := t.newBallot(node, phash, height, stage, round, vote)
+	ballot, err := t.newBallot(node, proposal, height, stage, round, vote)
 	if err != nil {
 		return Ballot{}, VoteResultInfo{}, err
 	}
@@ -146,8 +146,13 @@ func (t *testVotingBox) TestClose() {
 }
 
 func (t *testVotingBox) TestVoteCurrent() {
+	defer common.DebugPanic()
+
 	proposal := NewTestProposal(t.home.Address(), nil)
-	_, err := t.votingBox.Open(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+
+	_, err = t.votingBox.Open(proposal)
 	t.NoError(err)
 
 	round := Round(0)
@@ -207,7 +212,10 @@ func (t *testVotingBox) TestVoteUnknown() {
 	defer common.DebugPanic()
 
 	proposal := NewTestProposal(t.home.Address(), nil)
-	_, err := t.votingBox.Open(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+
+	_, err = t.votingBox.Open(proposal)
 	t.NoError(err)
 
 	round := Round(0)
@@ -259,7 +267,10 @@ func (t *testVotingBox) TestVoteUnknown() {
 
 func (t *testVotingBox) TestVoteUnknownCancel() {
 	proposal := NewTestProposal(t.home.Address(), nil)
-	_, err := t.votingBox.Open(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+
+	_, err = t.votingBox.Open(proposal)
 	t.NoError(err)
 
 	round := Round(0)
@@ -523,8 +534,13 @@ func (t *testVotingBox) TestCloseUnknown() {
 }
 
 func (t *testVotingBox) TestAlreadyVotedCurrent() {
+	defer common.DebugPanic()
+
 	proposal := NewTestProposal(t.home.Address(), nil)
-	_, err := t.votingBox.Open(proposal)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+
+	_, err = t.votingBox.Open(proposal)
 	t.NoError(err)
 
 	round := Round(0)
@@ -536,13 +552,14 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
-		var ballot Ballot
-		ballot, _, err = t.newBallotVote(v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote)
+		ballot, _, err := t.newBallotVote(
+			v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote,
+		)
 		t.NoError(err)
 
 		// check
 		voted := votingBox.current.Voted(v0.Address())
-		t.NotNil(voted[VoteStageSIGN])
+		t.NotEmpty(voted[VoteStageSIGN])
 
 		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
 		t.True(found)

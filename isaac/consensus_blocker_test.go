@@ -146,10 +146,10 @@ func (t *testConsensusBlocker) TestSIGN() {
 
 	round := Round(1)
 
-	phash := common.NewRandomHash("sl")
+	proposal := common.NewRandomHash("sl")
 
 	ballot := NewBallot(
-		phash,
+		proposal,
 		t.home.Address(),
 		t.height,
 		round,
@@ -164,7 +164,7 @@ func (t *testConsensusBlocker) TestSIGN() {
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
-		Proposal: phash,
+		Proposal: proposal,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -273,6 +273,7 @@ func (t *testConsensusBlocker) TestACCEPT() {
 	t.NoError(<-errChan)
 
 	{ //check state
+		fmt.Println(proposal.Block.Height.Inc(), t.cstate.Height())
 		t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
 		t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 		t.Equal(proposal.State.Next, t.cstate.State())
@@ -292,10 +293,10 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 	defer blocker.Stop()
 
 	round := Round(1)
-	phash := common.NewRandomHash("sl")
+	proposal := common.NewRandomHash("sl")
 
 	ballot := NewBallot(
-		phash,
+		proposal,
 		t.home.Address(),
 		t.height,
 		round,
@@ -310,7 +311,7 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
-		Proposal: phash,
+		Proposal: proposal,
 		Result:   VoteResultNOP,
 		Height:   t.height,
 		Round:    round,

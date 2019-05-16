@@ -10,13 +10,12 @@ import (
 	"github.com/spikeekips/mitum/network"
 )
 
-var log log15.Logger = log15.New("module", "♾")
+var log log15.Logger = log15.New("module", "node-network-test")
 
 func init() {
 	common.InTest = false
 	common.DEBUG = true
 
-	//handler, _ := common.LogHandler(common.LogFormatter("terminal"), "")
 	handler, _ := common.LogHandler(common.LogFormatter("json"), "")
 	handler = log15.LvlFilterHandler(log15.LvlDebug, handler)
 	handler = log15.CallerFileHandler(handler)
@@ -62,7 +61,7 @@ func createNode(seedString string) (*Node, error) {
 	state.SetBlock(block)
 	state.SetState(blockState)
 
-	sealBroadcaster, err := isaac.NewDefaultSealBroadcaster(policy, home)
+	sealBroadcaster, err := isaac.NewDefaultSealBroadcaster(policy, state)
 	if err != nil {
 		return nil, err
 	}
@@ -89,18 +88,20 @@ func createNode(seedString string) (*Node, error) {
 		node.proposerSelector,
 		node.blockStorage,
 	)
-	node.blocker = blocker
-
-	consensus, err := isaac.NewConsensus(home, state, node.blocker)
+	consensus, err := isaac.NewConsensus(home, state, blocker)
 	if err != nil {
 		return nil, err
 	}
 
+	node.blocker = blocker
 	node.consensus = consensus
 
+	/* NOTE instead of registering channel, validator channel will be used
 	if err := node.nt.AddReceiver(consensus.Receiver()); err != nil {
 		return nil, err
 	}
+	*/
+	node.nt.AddValidatorChan(home.AsValidator(), consensus.Receiver())
 
 	node.consensus.SetContext(
 		nil, // nolint
@@ -170,12 +171,12 @@ func main() {
 	log.Debug("starting", "policy", policy)
 
 	var nodes []*Node
-	for i, seed := range seeds {
+	for _, seed := range seeds {
 		node, err := createNode(seed)
 		if err != nil {
 			panic(err)
 		}
-		node.log.Debug("node created", "count", i)
+		node.log.Debug("node created")
 		nodes = append(nodes, node)
 	}
 
@@ -184,17 +185,21 @@ func main() {
 		node.proposerSelector.SetProposer(nodes[0].home)
 	}
 
-	// connecting node's network
+	// connecting each others
+	var validators []common.Validator
 	for _, node := range nodes {
+		validators = append(validators, node.home.AsValidator())
+	}
+
+	for _, node := range nodes {
+		node.state.AddValidators(validators...)
+
 		for _, other := range nodes {
 			if node.home.Equal(other.home) {
 				continue
 			}
 
-			if err := node.nt.AddReceiver(other.consensus.Receiver()); err != nil {
-				node.log.Error("failed to connect nodes", "other", other.Name())
-				return
-			}
+			node.nt.AddValidatorChan(other.home.AsValidator(), other.consensus.Receiver())
 		}
 	}
 
