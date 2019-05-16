@@ -196,8 +196,6 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	var votingResult VoteResultInfo
 	{ // voting
 		var err error
-		logContext := []interface{}{"node", c.state.Home().Name(), "seal", seal.Hash(), "seal_type", seal.Type()}
-
 		switch seal.Type() {
 		case ProposalSealType:
 			var proposal Proposal
@@ -205,71 +203,14 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 				return err
 			}
 
-			checker := common.NewChainChecker(
-				"blocker_check_proposal",
-				common.ContextWithValues(
-					nil,
-					"proposal", proposal,
-					"state", c.state,
-				),
-				CheckerBlockerProposalBlock,
-			)
-			checker.SetLogContext(logContext...)
-			if err := checker.Check(); err != nil {
-				log_.Error("checker failed; proposal", "error", err)
-				return err
-			}
-
-			votingResult, err = c.votingBox.Open(proposal)
+			votingResult, err = c.voteProposal(proposal)
 		case BallotSealType:
 			var ballot Ballot
 			if err := common.CheckSeal(seal, &ballot); err != nil {
 				return err
 			}
 
-			ballotChecker := common.NewChainChecker(
-				"blocker_check_ballot",
-				common.ContextWithValues(
-					nil,
-					"ballot", ballot,
-					"state", c.state,
-				),
-				CheckerBlockerBallot,
-			)
-			ballotChecker.SetLogContext(logContext...)
-			if err := ballotChecker.Check(); err != nil {
-				log_.Error("checker failed; ballot", "error", err)
-				return err
-			}
-
-			votingResult, err = c.votingBox.Vote(ballot)
-
-			c.RLock()
-
-			resultChecker := common.NewChainChecker(
-				"blocker_check_ballot_votingresult",
-				common.ContextWithValues(
-					nil,
-					"votingResult", votingResult,
-					"lastVotingResult", c.lastVotingResult,
-					"state", c.state,
-				),
-				CheckerBlockerBallotVotingResult,
-			)
-			resultChecker.SetLogContext(ballotChecker.LogContext()...)
-			c.RUnlock()
-			if err := resultChecker.Check(); err != nil {
-				log_.Error("checker failed; ballot votingResult", "error", err)
-				return err
-			}
-
-			if votingResult.NotYet() {
-				return nil
-			}
-
-			c.Lock()
-			c.lastVotingResult = votingResult
-			c.Unlock()
+			votingResult, err = c.voteBallot(ballot)
 		default:
 			return common.InvalidSealTypeError
 		}
@@ -308,6 +249,88 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	}
 
 	return nil
+}
+
+func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, error) {
+	log_ := c.Log().New(log15.Ctx{
+		"seal":      proposal.Hash(),
+		"seal_type": proposal.Type(),
+	})
+
+	checker := common.NewChainChecker(
+		"blocker_check_proposal",
+		common.ContextWithValues(
+			nil,
+			"proposal", proposal,
+			"state", c.state,
+		),
+		CheckerBlockerProposalBlock,
+	)
+	checker.SetLogContext("node", c.state.Home().Name(), "seal", proposal.Hash(), "seal_type", proposal.Type())
+	if err := checker.Check(); err != nil {
+		log_.Error("checker failed; proposal", "error", err)
+		return VoteResultInfo{}, err
+	}
+
+	return c.votingBox.Open(proposal)
+}
+
+func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
+	log_ := c.Log().New(log15.Ctx{
+		"seal":      ballot.Hash(),
+		"seal_type": ballot.Type(),
+	})
+
+	logContext := []interface{}{"node", c.state.Home().Name(), "seal", ballot.Hash(), "seal_type", ballot.Type()}
+
+	ballotChecker := common.NewChainChecker(
+		"blocker_check_ballot",
+		common.ContextWithValues(
+			nil,
+			"ballot", ballot,
+			"state", c.state,
+		),
+		CheckerBlockerBallot,
+	)
+	ballotChecker.SetLogContext(logContext...)
+	if err := ballotChecker.Check(); err != nil {
+		log_.Error("checker failed; ballot", "error", err)
+		return VoteResultInfo{}, err
+	}
+
+	votingResult, err := c.votingBox.Vote(ballot)
+	if err != nil {
+		return VoteResultInfo{}, err
+	}
+
+	c.RLock()
+
+	resultChecker := common.NewChainChecker(
+		"blocker_check_ballot_votingresult",
+		common.ContextWithValues(
+			nil,
+			"votingResult", votingResult,
+			"lastVotingResult", c.lastVotingResult,
+			"state", c.state,
+		),
+		CheckerBlockerBallotVotingResult,
+	)
+	resultChecker.SetLogContext(ballotChecker.LogContext()...)
+	c.RUnlock()
+	if err := resultChecker.Check(); err != nil {
+		log_.Error("checker failed; ballot votingResult", "error", err)
+		return votingResult, err
+	}
+
+	if votingResult.NotYet() {
+		return votingResult, nil
+	}
+
+	c.Lock()
+	c.lastVotingResult = votingResult
+	c.Unlock()
+
+	return votingResult, nil
 }
 
 // joinConsensus tries to join network; broadcasts INIT ballot with

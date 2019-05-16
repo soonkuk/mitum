@@ -25,6 +25,7 @@ const (
 	InvalidNodeStateErrorCode
 	BlockNotFoundErrorCode
 	IgnoreVotingResultErrorCode
+	BallotIsTooOldErrorCode
 )
 
 var (
@@ -49,4 +50,5 @@ var (
 	InvalidNodeStateError                common.Error = common.NewError("isaac", InvalidNodeStateErrorCode, "invalid NodeState")
 	BlockNotFoundError                   common.Error = common.NewError("isaac", BlockNotFoundErrorCode, "block not found")
 	IgnoreVotingResultError              common.Error = common.NewError("isaac", IgnoreVotingResultErrorCode, "ignore votingResult")
+	BallotIsTooOldError                  common.Error = common.NewError("isaac", BallotIsTooOldErrorCode, "ballot is too old")
 )

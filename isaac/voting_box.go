@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
@@ -31,7 +32,7 @@ func NewDefaultVotingBox(home *common.HomeNode, policy ConsensusPolicy) *Default
 		home:    home,
 		Logger:  common.NewLogger(log, "node", home.Name()),
 		policy:  policy,
-		unknown: NewVotingBoxUnknown(),
+		unknown: NewVotingBoxUnknown(policy),
 	}
 }
 
@@ -62,7 +63,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.current = NewVotingBoxProposal(proposal.Hash(), proposal.Block.Height, proposal.Round)
+	r.current = NewVotingBoxProposal(r.policy, proposal.Hash(), proposal.Block.Height, proposal.Round)
 
 	// import from others
 	for _, u := range r.unknown.Proposal(proposal.Hash()) {
@@ -82,10 +83,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		Proposed:    true,
 		LastVotedAt: common.Now(),
 		Voted: map[common.Address]VotingBoxStageNode{
-			proposal.Source(): VotingBoxStageNode{
-				vote: VoteYES,
-				seal: proposal.Hash(),
-			},
+			proposal.Source(): NewVotingBoxStageNode(VoteYES, proposal.Hash()),
 		},
 	}
 
@@ -128,7 +126,7 @@ func (r *DefaultVotingBox) Clear() error {
 	defer r.Unlock()
 
 	r.current = nil
-	r.unknown = NewVotingBoxUnknown()
+	r.unknown = NewVotingBoxUnknown(r.policy)
 
 	return nil
 }
@@ -150,6 +148,17 @@ func (r *DefaultVotingBox) afterMajority(result VoteResultInfo) error {
 }
 
 func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
+	if r.policy.ExpireDurationVote != 0 {
+		d := r.policy.ExpireDurationVote
+		if d > 0 {
+			d = d * -1
+		}
+
+		if ballot.SignedAt().Before(common.Now().Add(d)) {
+			return VoteResultInfo{}, BallotIsTooOldError.AppendMessage("duration=%v", d)
+		}
+	}
+
 	result, err := r.vote(
 		ballot.Proposal,
 		ballot.Source(),
@@ -349,15 +358,14 @@ func (r *DefaultVotingBox) SealVoted(seal common.Hash) bool {
 	r.RLock()
 	defer r.RUnlock()
 
-	var found bool
 	if r.current != nil {
-		if found = r.current.SealVoted(seal); found {
+		if voted := r.current.SealVoted(seal); voted {
 			return true
 		}
 	}
 
 	if r.previous != nil {
-		if found = r.previous.SealVoted(seal); found {
+		if voted := r.previous.SealVoted(seal); voted {
 			return true
 		}
 	}
@@ -385,6 +393,7 @@ func (r *DefaultVotingBox) ProposalVoted(proposal common.Hash) bool {
 }
 
 type VotingBoxProposal struct {
+	policy      ConsensusPolicy
 	proposal    common.Hash
 	height      common.Big
 	round       Round
@@ -394,17 +403,19 @@ type VotingBoxProposal struct {
 }
 
 func NewVotingBoxProposal(
+	policy ConsensusPolicy,
 	proposal common.Hash,
 	height common.Big,
 	round Round,
 ) *VotingBoxProposal {
 	return &VotingBoxProposal{
+		policy:      policy,
 		proposal:    proposal,
 		height:      height,
 		round:       round,
 		stage:       VoteStageINIT,
-		stageSIGN:   NewVotingBoxStage(proposal, height, round, VoteStageSIGN),
-		stageACCEPT: NewVotingBoxStage(proposal, height, round, VoteStageACCEPT),
+		stageSIGN:   NewVotingBoxStage(policy, proposal, height, round, VoteStageSIGN),
+		stageACCEPT: NewVotingBoxStage(policy, proposal, height, round, VoteStageACCEPT),
 	}
 }
 
@@ -480,12 +491,11 @@ func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBo
 }
 
 func (v *VotingBoxProposal) SealVoted(seal common.Hash) bool {
-	var found bool
-	if found = v.stageSIGN.SealVoted(seal); found {
+	if voted := v.stageSIGN.SealVoted(seal); voted {
 		return true
 	}
 
-	if found = v.stageACCEPT.SealVoted(seal); found {
+	if voted := v.stageACCEPT.SealVoted(seal); voted {
 		return true
 	}
 
@@ -524,6 +534,7 @@ func (v *VotingBoxProposal) String() string {
 
 type VotingBoxStage struct {
 	sync.RWMutex
+	policy   ConsensusPolicy
 	proposal common.Hash
 	height   common.Big
 	round    Round
@@ -533,12 +544,14 @@ type VotingBoxStage struct {
 }
 
 func NewVotingBoxStage(
+	policy ConsensusPolicy,
 	proposal common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
 ) *VotingBoxStage {
 	return &VotingBoxStage{
+		policy:   policy,
 		proposal: proposal,
 		height:   height,
 		round:    round,
@@ -556,15 +569,16 @@ func (v *VotingBoxStage) Voted(source common.Address) (VotingBoxStageNode, bool)
 }
 
 func (v *VotingBoxStage) SealVoted(seal common.Hash) bool {
-	var found bool
+	v.RLock()
+	defer v.RUnlock()
+
 	for _, n := range v.voted {
 		if seal.Equal(n.seal) {
-			found = true
-			break
+			return !n.Expired(v.policy.ExpireDurationVote)
 		}
 	}
 
-	return found
+	return false
 }
 
 func (v *VotingBoxStage) Closed() bool {
@@ -606,7 +620,7 @@ func (v *VotingBoxStage) Vote(source common.Address, vote Vote, seal common.Hash
 	v.Lock()
 	defer v.Unlock()
 
-	v.voted[source] = VotingBoxStageNode{vote: vote, seal: seal}
+	v.voted[source] = NewVotingBoxStageNode(vote, seal)
 	return v, nil
 }
 
@@ -617,6 +631,10 @@ func (v *VotingBoxStage) Count() int {
 func (v *VotingBoxStage) VoteCount() (int, int) {
 	var yes, nop int
 	for _, t := range v.voted {
+		if t.Expired(v.policy.ExpireDurationVote) {
+			continue
+		}
+
 		switch t.vote {
 		case VoteYES:
 			yes += 1
@@ -682,8 +700,29 @@ func (v *VotingBoxStage) String() string {
 }
 
 type VotingBoxStageNode struct {
-	vote Vote
-	seal common.Hash
+	vote    Vote
+	seal    common.Hash
+	votedAt common.Time
+}
+
+func NewVotingBoxStageNode(vote Vote, hash common.Hash) VotingBoxStageNode {
+	return VotingBoxStageNode{
+		vote:    vote,
+		seal:    hash,
+		votedAt: common.Now(),
+	}
+}
+
+func (v VotingBoxStageNode) Expired(d time.Duration) bool {
+	if d == 0 {
+		return false
+	}
+
+	if d > 0 {
+		d = d * -1
+	}
+
+	return v.votedAt.Before(common.Now().Add(d))
 }
 
 func (v VotingBoxStageNode) MarshalJSON() ([]byte, error) {
@@ -700,12 +739,14 @@ func (v VotingBoxStageNode) String() string {
 
 type VotingBoxUnknown struct {
 	sync.RWMutex
-	voted map[ /* source */ common.Address]VotingBoxUnknownVote
+	policy ConsensusPolicy
+	voted  map[ /* source */ common.Address]VotingBoxUnknownVote
 }
 
-func NewVotingBoxUnknown() *VotingBoxUnknown {
+func NewVotingBoxUnknown(policy ConsensusPolicy) *VotingBoxUnknown {
 	return &VotingBoxUnknown{
-		voted: map[common.Address]VotingBoxUnknownVote{},
+		policy: policy,
+		voted:  map[common.Address]VotingBoxUnknownVote{},
 	}
 }
 
@@ -764,7 +805,7 @@ func (v *VotingBoxUnknown) Cancel(source common.Address) bool {
 func (v *VotingBoxUnknown) SealVoted(seal common.Hash) bool {
 	for _, n := range v.voted {
 		if seal.Equal(n.seal) {
-			return true
+			return !n.Expired(v.policy.ExpireDurationVote)
 		}
 	}
 
@@ -841,6 +882,10 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	v.RLock()
 	byProposal := map[common.Hash][]VotingBoxUnknownVote{}
 	for _, u := range v.voted {
+		if u.Expired(v.policy.ExpireDurationVote) {
+			continue
+		}
+
 		byProposal[u.proposal] = append(byProposal[u.proposal], u)
 	}
 	v.RUnlock()
@@ -935,6 +980,10 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 			continue
 		}
 
+		if u.Expired(v.policy.ExpireDurationVote) {
+			continue
+		}
+
 		byRound[u.round] = append(byRound[u.round], u)
 	}
 	v.RUnlock()
@@ -950,6 +999,7 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 		if len(l) < th {
 			continue
 		}
+
 		found = l
 		break
 	}
@@ -991,7 +1041,6 @@ type VotingBoxUnknownVote struct {
 	height   common.Big
 	round    Round
 	stage    VoteStage
-	votedAt  common.Time
 }
 
 func NewVotingBoxUnknownVote(
@@ -1004,16 +1053,12 @@ func NewVotingBoxUnknownVote(
 	seal common.Hash,
 ) (VotingBoxUnknownVote, error) {
 	return VotingBoxUnknownVote{
-		VotingBoxStageNode: VotingBoxStageNode{
-			vote: vote,
-			seal: seal,
-		},
-		proposal: proposal,
-		source:   source,
-		height:   height,
-		round:    round,
-		stage:    stage,
-		votedAt:  common.Now(),
+		VotingBoxStageNode: NewVotingBoxStageNode(vote, seal),
+		proposal:           proposal,
+		source:             source,
+		height:             height,
+		round:              round,
+		stage:              stage,
 	}, nil
 }
 

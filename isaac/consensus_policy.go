@@ -16,6 +16,7 @@ type ConsensusPolicy struct {
 	MaxOperationsInTransaction uint             `json:"max_operations_in_transaction"`
 	AvgBlockRoundInterval      time.Duration    `json:"avg_block_round_interval"` // average interval for each round
 	TimeoutWaitSeal            time.Duration    `json:"timeout_wait_seal"`        // wait time for incoming seal
+	ExpireDurationVote         time.Duration    `json:"expire_duration_vote"`     // VotingBoxStageNode.votedAt expires after duration
 }
 
 func DefaultConsensusPolicy() ConsensusPolicy {
@@ -25,6 +26,7 @@ func DefaultConsensusPolicy() ConsensusPolicy {
 		MaxOperationsInTransaction: 100,
 		AvgBlockRoundInterval:      time.Second * 3,
 		TimeoutWaitSeal:            time.Second * 3,
+		ExpireDurationVote:         time.Second * 10,
 	}
 }
 

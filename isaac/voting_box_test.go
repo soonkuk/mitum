@@ -3,6 +3,7 @@ package isaac
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/stretchr/testify/suite"
@@ -11,7 +12,7 @@ import (
 type testVotingBox struct {
 	suite.Suite
 	home         *common.HomeNode
-	votingBox    VotingBox
+	votingBox    *DefaultVotingBox
 	seals        map[common.Hash]common.Seal
 	proposeSeals map[common.Hash]Proposal
 	ballotSeals  map[common.Hash]Ballot
@@ -96,7 +97,7 @@ func (t *testVotingBox) TestOpen() {
 	_, err := t.votingBox.Open(proposal)
 	t.NoError(err)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 	vp := votingBox.Current()
 	t.Equal(proposal.Hash(), vp.proposal)
 	t.Equal(0, votingBox.unknown.Len())
@@ -117,7 +118,7 @@ func (t *testVotingBox) TestClose() {
 	err := t.votingBox.Close()
 	t.Error(err, ProposalIsNotOpenedError)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 	t.Nil(votingBox.current)
 	t.Nil(votingBox.previous)
 
@@ -157,7 +158,7 @@ func (t *testVotingBox) TestVoteCurrent() {
 
 	round := Round(0)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	{ // v0 vote the current proposal
 		v0 := common.NewRandomHome()
@@ -220,7 +221,7 @@ func (t *testVotingBox) TestVoteUnknown() {
 
 	round := Round(0)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	{ // v0 vote the current proposal
 		v0 := common.NewRandomHome()
@@ -275,7 +276,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 
 	round := Round(0)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	{ // v0 vote the current proposal
 		v0 := common.NewRandomHome()
@@ -347,7 +348,7 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 	var threshold uint = 3
 	nodes := t.newNodes(total)
 
-	vo := NewVotingBoxUnknown()
+	vo := NewVotingBoxUnknown(t.policy)
 	t.Equal(0, vo.Len())
 
 	phash := common.NewRandomHash("sl")
@@ -419,7 +420,7 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 	var threshold uint = 3
 	nodes := t.newNodes(total)
 
-	vo := NewVotingBoxUnknown()
+	vo := NewVotingBoxUnknown(t.policy)
 	t.Equal(0, vo.Len())
 
 	height := common.NewBig(200)
@@ -492,6 +493,7 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 
 func (t *testVotingBox) TestCloseVotingBoxStage() {
 	st := NewVotingBoxStage(
+		t.policy,
 		common.NewRandomHash("sl"),
 		common.NewBig(33),
 		Round(0),
@@ -509,7 +511,7 @@ func (t *testVotingBox) TestCloseVotingBoxStage() {
 }
 
 func (t *testVotingBox) TestCloseUnknown() {
-	un := NewVotingBoxUnknown()
+	un := NewVotingBoxUnknown(t.policy)
 
 	var created []common.Time
 	for i := 0; i < 5; i++ {
@@ -545,7 +547,7 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 
 	round := Round(0)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	var votedSeal common.Seal
 	{ // v0 vote the current proposal
@@ -574,6 +576,49 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 	}
 }
 
+func (t *testVotingBox) TestAlreadyVotedCurrentButExpired() {
+	defer common.DebugPanic()
+
+	newPolicy := t.votingBox.policy
+	newPolicy.ExpireDurationVote = time.Millisecond * 100
+	t.votingBox.policy = newPolicy
+
+	proposal := NewTestProposal(t.home.Address(), nil)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
+
+	_, err = t.votingBox.Open(proposal)
+	t.NoError(err)
+
+	round := Round(0)
+
+	votingBox := t.votingBox
+
+	var ballot Ballot
+	v0 := common.NewRandomHome()
+	{ // v0 vote the current proposal
+		var err error
+		ballot, _, err = t.newBallotVote(
+			v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, VoteYES,
+		)
+		t.NoError(err)
+
+		// check
+		voted := votingBox.current.Voted(v0.Address())
+		t.NotEmpty(voted[VoteStageSIGN])
+
+		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		t.True(found)
+		t.Equal(VoteYES, sn.vote)
+	}
+
+	{
+		time.Sleep(newPolicy.ExpireDurationVote)
+		voted := votingBox.SealVoted(ballot.Hash())
+		t.False(voted)
+	}
+}
+
 func (t *testVotingBox) TestAlreadyVotedUnknown() {
 	proposal := NewTestProposal(t.home.Address(), nil)
 	_, err := t.votingBox.Open(proposal)
@@ -581,7 +626,7 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 
 	round := Round(0)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	var votedSeal common.Seal
 	{ // v0 vote the unknown proposal
@@ -641,7 +686,7 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 		)
 		t.NoError(err)
 	}
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 	t.NotNil(votingBox.Current())
 	t.Nil(votingBox.Previous())
 
@@ -688,7 +733,7 @@ func (t *testVotingBox) TestNewRoundSignVote() {
 
 	t.votingBox.Open(proposal)
 
-	votingBox := t.votingBox.(*DefaultVotingBox)
+	votingBox := t.votingBox
 
 	t.False(votingBox.current.SealVoted(proposal.Hash()))
 	t.False(votingBox.current.Stage(VoteStageSIGN).SealVoted(proposal.Hash()))
@@ -703,6 +748,11 @@ func TestVotingBox(t *testing.T) {
 
 type testVotingBoxStage struct {
 	suite.Suite
+	policy ConsensusPolicy
+}
+
+func (t *testVotingBox) SetupSuite() {
+	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
 }
 
 func (t *testVotingBoxStage) newSeed() common.Seed {
@@ -720,6 +770,7 @@ func (t *testVotingBoxStage) makeNodes(c uint) []common.Seed {
 
 func (t *testVotingBoxStage) newVotingBoxStage() *VotingBoxStage {
 	return NewVotingBoxStage(
+		t.policy,
 		common.NewRandomHash("sl"),
 		common.NewBig(33),
 		Round(0),
