@@ -4,6 +4,7 @@ class Time {
   constructor() {
     this.t = null
     this.n = null
+    this.orig = null
   }
 
   static parse(s) {
@@ -35,6 +36,7 @@ class Time {
     var time = new Time()
     time.t = t
     time.n = (t.getTime() * 1000000) + Number.parseInt(tail, 10)
+    time.orig = s
 
     return time
   }

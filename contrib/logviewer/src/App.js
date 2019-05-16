@@ -32,6 +32,7 @@ import FormControl from '@material-ui/core/FormControl';
 import FormLabel from '@material-ui/core/FormLabel';
 import FilterListIcon from '@material-ui/icons/FilterList';
 import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
+import stringify from 'csv-stringify';
 
 import Log from './log'
 import raw from './raw'
@@ -89,6 +90,7 @@ class CenteredGrid extends React.Component {
   }
 
   onSelectedFile = (acceptedFiles) => {
+    this.headerResized = false
     var promises = []
     for (let file of acceptedFiles) {
       var p = new Promise(function(resolve, reject) {
@@ -120,7 +122,6 @@ class CenteredGrid extends React.Component {
       this.renderRecordsMore()
     })
   }
-
 
   handleSpeedDialOpen = () => {
     this.setState({ speedDial: true, });
@@ -158,29 +159,85 @@ class CenteredGrid extends React.Component {
       this.renderRecordsMore()
   }
 
-  componentDidUpdate() {
-    setTimeout(e => {
-      var tds = null
-      try {
-        tds = document.getElementsByTagName('table')[1].getElementsByTagName('tbody')[0].getElementsByTagName('tr')[0].getElementsByTagName('td')
-      } catch {
-        return
+  exportToCSV() {
+    if (this.log == null) {
+      console.error('read log first')
+      return
+    }
+
+    var data = []
+    const stringifier = stringify({
+      delimiter: ','
+    })
+    stringifier.on('readable', function(){
+      let row;
+      while(row = stringifier.read()){
+        data.push(row)
       }
+    })
+    stringifier.on('error', function(err){
+      console.error(err.message)
+    })
+    stringifier.on('finish', function(){
+      var csvData = new Blob([data.join('')], {type: 'text/csv'})
+      var csvurl = URL.createObjectURL(csvData)
+      console.log(csvurl)
 
+      var link = document.createElement('a');
+      link.href = csvurl;
+      link.download='mitum-log-' + (new Date()).toISOString().replace(/[:\.]/g, '-') + '.csv';
+      link.click();
+    })
 
-      var fixed_ths = document.getElementsByTagName('table')[0].getElementsByTagName('thead')[0].getElementsByTagName('tr')[0].getElementsByTagName('th')
+    var header = ['t']
+    header.push(...this.log.nodes)
 
-      Array.from(tds).map((e, i) => {
-        if (fixed_ths[i] === undefined) {
-          return null
+    stringifier.write(header)
+
+    this.log.records.map(record => {
+      var row = [record.t.orig]
+
+      this.log.nodes.map(node => {
+        if (node === record.node) {
+          row.push(JSON.stringify(record, null, "  "))
+        } else {
+          row.push('')
         }
-
-        fixed_ths[i].style.width = e.offsetWidth + 'px'
-        e.style.width = fixed_ths[i].style.width
-        return null
       })
 
-    }, 1000)
+      stringifier.write(row)
+    })
+
+    stringifier.end()
+  }
+
+  headerResized = false
+  componentDidUpdate() {
+    if (!this.headerResized) {
+      setTimeout(e => {
+        var tds = null
+        try {
+          tds = document.getElementsByTagName('table')[1].getElementsByTagName('tbody')[0].getElementsByTagName('tr')[0].getElementsByTagName('td')
+        } catch {
+          return
+        }
+
+        var fixed_ths = document.getElementsByTagName('table')[0].getElementsByTagName('thead')[0].getElementsByTagName('tr')[0].getElementsByTagName('th')
+
+        Array.from(tds).map((e, i) => {
+          if (fixed_ths[i] === undefined) {
+            return null
+          }
+
+          fixed_ths[i].style.width = e.offsetWidth + 'px'
+          e.style.width = fixed_ths[i].style.width
+          return null
+        })
+
+      }, 1000)
+
+      this.headerResized = true
+    }
   }
 
   componentDidMount() {
@@ -268,7 +325,12 @@ class CenteredGrid extends React.Component {
             onClick={e => this.openDetail(rowRef)}
           >
           {i === index ? (
-              <Typography key={record.id + node + 'ty'}>{record.message}</Typography>
+            <div key={record.id + record.module} className='record'>
+              <Chip label={record.module} className={'module'} color='secondary' />
+              <Typography key={record.id + node + 'ty'}>
+                {record.message}
+              </Typography>
+            </div>
             ) : (
               <Typography key={record.id + node + 'ty'}></Typography>
             )
@@ -395,6 +457,14 @@ class CenteredGrid extends React.Component {
           tooltipTitle={'filter records'}
           tooltipOpen
           onClick={e=>{this.setState({openDialog: true})}}
+        />) : ([]) }
+      {this.state.msgs.length > 0 ? (
+        <SpeedDialAction
+          key={'export to csv'}
+          icon={<ChildCareIcon />}
+          tooltipTitle={'export to csv'}
+          tooltipOpen
+          onClick={e=>{this.exportToCSV()}}
         />) : ([]) }
         <SpeedDialAction
           key={'test data'}
