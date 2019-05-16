@@ -7,11 +7,15 @@ class Time {
   }
 
   static parse(s) {
-    var iso = /(\d{4})-([01]\d)-([0-3]\d)T([0-2]\d):([0-5]\d):([0-5]\d)\.(\d+)([+-][0-2]\d:[0-5]\d|Z)/
+    var iso0 = /(\d{4})-([01]\d)-([0-3]\d)T([0-2]\d):([0-5]\d):([0-5]\d)\.(\d+)([+-][0-2]\d:[0-5]\d|Z)/
+    var iso1 = /(\d{4})-([01]\d)-([0-3]\d)T([0-2]\d):([0-5]\d):([0-5]\d)([+-][0-2]\d:[0-5]\d|Z)/
 
-    var p = s.match(iso);
+    var p = s.match(iso0);
     if (p == null) {
-      throw new Error('invalid time', s)
+      p = s.match(iso1)
+      if (p == null) {
+        throw new Error('invalid time: ' + s)
+      }
     }
 
     var t = new Date(
@@ -23,7 +27,7 @@ class Time {
       p[6],
     )
 
-    var tail = p[7]
+    var tail = p[7].length > 0 ? p[7] : 0
     if (tail.length < 6) {
       tail = tail + '0'.repeat(6 - tail.length)
     }
@@ -70,7 +74,13 @@ class Record {
   }
 
   static fromJSONString(line) {
-    var o = JSON.parse(line)
+    var o = null
+    try {
+      o = JSON.parse(line)
+    } catch(e) {
+      console.warn(e)
+      return null
+    }
 
     // module
     var module = null
@@ -166,6 +176,8 @@ class Log {
   constructor() {
     this.nodes = []
     this.records = []
+    this.msgs = []
+    this.levels = []
   }
 
   static load (contents) {
@@ -173,6 +185,8 @@ class Log {
 
     var records = []
     var nodes = []
+    var msgs = []
+    var levels = []
     var line = ''
     for (const c of contents) {
       if (c === '\n') {
@@ -184,15 +198,20 @@ class Log {
           continue
         }
 
-        records.push(record)
-
         // node
         if (record.node == null) {
           continue
-        } else if (nodes.includes(record.node)) {
-          continue
-        } else {
+        } else if (!nodes.includes(record.node)) {
           nodes.push(record.node)
+        }
+
+        records.push(record)
+        if (!msgs.includes(record.message)) {
+          msgs.push(record.message)
+        }
+
+        if (!levels.includes(record.level)) {
+          levels.push(record.level)
         }
 
         continue
@@ -205,9 +224,13 @@ class Log {
       return a.t.n - b.t.n
     });
 
+    msgs.sort();
+
     nodes.sort()
     log.nodes = nodes
     log.records = records
+    log.msgs = msgs
+    log.levels = levels
 
     return log
   }
@@ -221,7 +244,7 @@ class Log {
       return
     }
 
-    if (record.node == null) {
+    if (record == null || record.node == null) {
       return
     }
 

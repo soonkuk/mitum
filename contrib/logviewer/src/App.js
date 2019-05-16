@@ -11,17 +11,27 @@ import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import Grid from '@material-ui/core/Grid';
 import TableRow from '@material-ui/core/TableRow';
-import Highlight from 'react-highlight'
 import { SnackbarProvider, withSnackbar } from 'notistack';
 import SpeedDial from '@material-ui/lab/SpeedDial';
 import SpeedDialIcon from '@material-ui/lab/SpeedDialIcon';
 import IconButton from '@material-ui/core/IconButton';
-import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
 import ChildCareIcon from '@material-ui/icons/ChildCare';
 import BookmarksIcon from '@material-ui/icons/Bookmarks';
 import SpeedDialAction from '@material-ui/lab/SpeedDialAction';
 import { unstable_Box as Box } from '@material-ui/core/Box';
 import Chip from '@material-ui/core/Chip';
+import Highlight from 'react-highlight'
+import Dialog from '@material-ui/core/Dialog';
+import DialogActions from '@material-ui/core/DialogActions';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogTitle from '@material-ui/core/DialogTitle';
+import Button from '@material-ui/core/Button';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import Checkbox from '@material-ui/core/Checkbox';
+import FormControl from '@material-ui/core/FormControl';
+import FormLabel from '@material-ui/core/FormLabel';
+import FilterListIcon from '@material-ui/icons/FilterList';
+import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
 
 import Log from './log'
 import raw from './raw'
@@ -57,9 +67,14 @@ class CenteredGrid extends React.Component {
     bottom: true,
     records: [],
     nodes: [],
+    levels: [],
+    msgs: [],
     record: null,
     speedDial: false,
+    openDialog: false,
   }
+
+  log = null
 
   toggleDrawer = (open) => () => {
     this.setState({
@@ -91,20 +106,18 @@ class CenteredGrid extends React.Component {
       var result = ''.concat(...values)
 
       try {
-        var log = Log.load(result)
+        this.log = Log.load(result)
       } catch(e) {
         this.props.enqueueSnackbar('failed to load logs', {variant: 'error'})
         return
       }
 
-      this.setState({records: log.records})
-      this.setState({nodes: log.nodes})
-
       this.props.enqueueSnackbar(
-        'logs successfully imported: ' + log.records.length + ' records found',
+        'logs successfully imported: ' + this.log.records.length + ' records found',
         {variant: 'info'},
       )
 
+      this.renderRecordsMore()
     })
   }
 
@@ -130,15 +143,19 @@ class CenteredGrid extends React.Component {
     })
   }
 
+  handleCloseDialog = () => {
+    this.setState({ openDialog: false, });
+  };
+
   importTestData = () => {
-      var log = Log.load(raw)
-      this.setState({records: log.records})
-      this.setState({nodes: log.nodes})
+      this.log = Log.load(raw)
 
       this.props.enqueueSnackbar(
-        'test log data successfully imported: ' + log.records.length + ' records found',
+        'test log data successfully imported: ' + this.log.records.length + ' records found',
         {variant: 'info'},
       )
+
+      this.renderRecordsMore()
   }
 
   componentDidUpdate() {
@@ -164,6 +181,37 @@ class CenteredGrid extends React.Component {
       })
 
     }, 1000)
+  }
+
+  componentDidMount() {
+    window.addEventListener('scroll', this.onScroll, false);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this.onScroll, false);
+  }
+
+  onLoading = false
+  limit = 50
+  recordsOffset = 0
+
+  onScroll = () => {
+    var root = document.getElementById('inner-root')
+    /*
+    console.log(
+      window.innerHeight, window.scrollY + document.body.offsetHeight, root.offsetHeight,
+      root.offsetTop,
+    )
+    */
+
+    if ((window.scrollY + document.body.offsetHeight) >= (root.offsetHeight - 1)) {
+      if (this.onLoading) {
+        return
+      }
+
+      this.onLoading = true
+      this.renderRecordsMore();
+    }
   }
 
   openDetail(ref, open) {
@@ -232,6 +280,17 @@ class CenteredGrid extends React.Component {
     </React.Fragment>
   }
 
+  renderRecordsMore() {
+    var records = this.log.records.slice(0, this.recordsOffset+this.limit)
+    if (records.length < 1) {
+      return
+    }
+
+    this.setState({records: records, nodes: this.log.nodes, msgs: this.log.msgs, levels: this.log.levels})
+    this.recordsOffset += this.limit
+    this.onLoading = false
+  }
+
   renderRecords(records, nodes) {
     const { classes } = this.props;
 
@@ -264,7 +323,7 @@ class CenteredGrid extends React.Component {
       </Table>
 
       <Box height='100%'>
-        <Table className={' scrollable'}>
+        <Table id='inner-root' className={' scrollable'}>
           <TableBody>
             <TableRow>
                 <TableCell key={'h'}>.</TableCell>
@@ -272,6 +331,7 @@ class CenteredGrid extends React.Component {
                 <TableCell key={node + 'h'}></TableCell>
               ))}
             </TableRow>
+
             {this.state.records.map(record => {
               return this.renderRecord(records[0], record, nodes)
             })}
@@ -320,13 +380,22 @@ class CenteredGrid extends React.Component {
           tooltipOpen
           onClick={e=>{this.refs['dropzone'].open()}}
         />
+      {this.state.msgs.length > 0 ? (
         <SpeedDialAction
           key={'expand-collapse-all'}
           icon={<SettingsOverscanIcon />}
           tooltipTitle={'expand/collapse all'}
           tooltipOpen
           onClick={e=>{this.toggleExpandAll()}}
-        />
+        />) : ([]) }
+      {this.state.msgs.length > 0 ? (
+        <SpeedDialAction
+          key={'filter'}
+          icon={<FilterListIcon />}
+          tooltipTitle={'filter records'}
+          tooltipOpen
+          onClick={e=>{this.setState({openDialog: true})}}
+        />) : ([]) }
         <SpeedDialAction
           key={'test data'}
           icon={<ChildCareIcon />}
@@ -335,6 +404,48 @@ class CenteredGrid extends React.Component {
           onClick={e=>{this.importTestData()}}
         />
       </SpeedDial>
+
+
+        <Dialog
+          fullWidth={true}
+          maxWidth='sm'
+          open={this.state.openDialog}
+          onClose={this.handleCloseDialog}
+          scroll={'paper'}
+          aria-labelledby='scroll-dialog-title'
+        >
+          <DialogTitle id='scroll-dialog-title'>Filter by</DialogTitle>
+          <DialogContent>
+            <FormControl component='fieldset' className={classes.formControl}>
+              <FormLabel component='legend'>Level</FormLabel>
+                {this.state.levels.map(level => (
+                  <FormControlLabel
+                    key={level}
+                    label={level}
+                    control={ <Checkbox color='default' value={level} /> }
+                  />
+                ))}
+            </FormControl>
+            <FormControl component='fieldset' className={classes.formControl}>
+              <FormLabel component='legend'>Messages</FormLabel>
+                {this.state.msgs.map(msg => (
+                  <FormControlLabel
+                    key={msg}
+                    label={msg}
+                    control={ <Checkbox color='default' value={msg} /> }
+                  />
+                ))}
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={this.handleCloseDialog} color='primary'>
+              Close
+            </Button>
+            <Button onClick={this.handleCloseDialog} color='primary'>
+              Apply Filters
+            </Button>
+          </DialogActions>
+        </Dialog>
     </div>
   }
 }

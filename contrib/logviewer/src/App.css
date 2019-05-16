@@ -113,6 +113,7 @@ table.scrollable tbody tr:hover {
 
 .MuiExpansionPanelDetails-root-162,
 .MuiIconButton-root-79,
+table.scrollable td > button,
 .MuiExpansionPanelSummary-root-116 {
   padding: 0 !important;
 }
