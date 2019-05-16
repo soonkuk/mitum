@@ -249,7 +249,7 @@ class CenteredGrid extends React.Component {
   }
 
   onLoading = false
-  limit = 50
+  limit = 100
   recordsOffset = 0
 
   onScroll = () => {
