@@ -505,6 +505,7 @@ end:
 		select {
 		case <-time.After(time.Second):
 			t.Empty("timeout to wait receivedSeal")
+			blocker.Stop()
 			return
 		case receivedSeal = <-bChan:
 			if receivedSeal.Type() != ProposalSealType {

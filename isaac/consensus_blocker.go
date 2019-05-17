@@ -549,17 +549,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 		return err
 	}
 
-	// NOTE will propose after,
-	// duration = ConsensusPolicy.AvgBlockRoundInterval - (<Latest block's Proposal.SignedAt> - <Now()>)
-	// if duration is under 0, after 1 second
-	var delay = time.Second
-	if c.lastFinishedProposal != nil {
-		delay = c.policy.AvgBlockRoundInterval - common.Now().Sub(c.lastFinishedProposal.SignedAt())
-		if delay < 0 {
-			delay = time.Second
-		}
-	}
-	return c.propose(height, round, delay)
+	return c.propose(height, round)
 }
 
 func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
@@ -593,8 +583,8 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	return nil
 }
 
-func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Duration) error {
-	log_ := c.Log().New(log15.Ctx{"height": height, "round": round, "delay": delay})
+func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
+	log_ := c.Log().New(log15.Ctx{"height": height, "round": round})
 	log_.Debug("new proposal will be proposed")
 
 	proposer, err := c.proposerSelector.Select(c.state.Block(), height, round)
@@ -615,26 +605,44 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round, delay time.Du
 		ProposalBlock{
 			Height:  height,
 			Current: c.state.Block(),
-			Next:    common.NewRandomHash("bk"),
+			Next:    common.NewRandomHash("bk"), // TODO should be determined by validation
 		},
 		ProposalState{
 			Current: c.state.State(),
-			Next:    []byte("next state"),
+			Next:    []byte("next state"), // TODO should be determined by validation
 		},
 		nil, // TODO transactions
 	)
 
-	go func(proposal Proposal, delay time.Duration) {
-		if delay > 0 {
-			<-time.After(delay)
+	// NOTE will propose after,
+	// duration = ConsensusPolicy.AvgBlockRoundInterval - (<Latest block's Proposal.SignedAt> - <Now()>)
+	// if duration is under 0, after 300 millisecond
+	var delay = time.Millisecond * 300
+	if c.lastFinishedProposal != nil {
+		delay = c.policy.AvgBlockRoundInterval - common.Now().Sub(c.lastFinishedProposal.SignedAt())
+		if delay < 0 {
+			delay = time.Second
 		}
+	}
 
-		err := c.sealBroadcaster.Send(&proposal)
-		if err != nil {
-			log_.Error("failed to broadcast", "proposal", proposal.Hash())
-		}
-		log_.Debug("proposal broadcasted", "proposal", proposal.Hash(), "delay", delay)
-	}(proposal, delay)
+	err = c.startTimer("propose-new-proposal", delay, false, func() error {
+		return c.broadcastProposal(proposal)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *ConsensusBlocker) broadcastProposal(proposal Proposal) error {
+	err := c.sealBroadcaster.Send(&proposal)
+	if err != nil {
+		c.Log().Error("failed to broadcast", "proposal", proposal.Hash())
+		return err
+	}
+
+	c.Log().Debug("proposal broadcasted", "proposal", proposal.Hash())
 
 	return nil
 }

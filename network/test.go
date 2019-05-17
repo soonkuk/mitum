@@ -12,8 +12,9 @@ import (
 
 type NodeTestNetwork struct {
 	sync.RWMutex
-	chans          map[string]chan<- common.Seal
-	validatorsChan map[common.Address]chan<- common.Seal
+	chans              map[string]chan<- common.Seal
+	validatorsChan     map[common.Address]chan<- common.Seal
+	skipCheckValidator bool
 }
 
 func NewNodeTestNetwork() *NodeTestNetwork {
@@ -87,11 +88,11 @@ func (n *NodeTestNetwork) Send(node common.Node, seal common.Seal) error {
 	}
 
 	sender, found := n.validatorsChan[node.Address()]
-	if !found {
+	if found {
+		sender <- seal
+	} else if !n.skipCheckValidator {
 		return fmt.Errorf("not registered node for broadcasting: %v", node.Address())
 	}
-
-	sender <- seal
 
 	return nil
 }

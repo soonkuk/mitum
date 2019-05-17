@@ -54,6 +54,7 @@ func (t *testNodeNetwork) newSeal() common.TestNewSeal {
 
 func (t *testNodeNetwork) TestMultipleReceiver() {
 	network := NewNodeTestNetwork()
+	network.skipCheckValidator = true
 
 	node := common.NewRandomHome()
 
@@ -107,8 +108,11 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 		seal := seals[c]
 
 		if err := network.Send(node, seal); err != nil {
+			log.Error(err.Error())
+			t.NoError(err)
 			return
 		}
+
 		if c == count-1 {
 			return
 		}
@@ -131,6 +135,7 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 
 func (t *testNodeNetwork) TestRemoveReceiver() {
 	network := NewNodeTestNetwork()
+	network.skipCheckValidator = true
 
 	node := common.NewRandomHome()
 
