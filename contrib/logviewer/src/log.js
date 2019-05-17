@@ -180,6 +180,7 @@ class Log {
     this.records = []
     this.msgs = []
     this.levels = []
+    this.modules = []
   }
 
   static load (contents) {
@@ -189,6 +190,7 @@ class Log {
     var nodes = []
     var msgs = []
     var levels = []
+    var modules = []
     var line = ''
     for (const c of contents) {
       if (c === '\n') {
@@ -216,6 +218,10 @@ class Log {
           levels.push(record.level)
         }
 
+        if (!modules.includes(record.module)) {
+          modules.push(record.module)
+        }
+
         continue
       }
 
@@ -233,6 +239,7 @@ class Log {
     log.records = records
     log.msgs = msgs
     log.levels = levels
+    log.modules = modules
 
     return log
   }

@@ -33,6 +33,7 @@ import FormLabel from '@material-ui/core/FormLabel';
 import FilterListIcon from '@material-ui/icons/FilterList';
 import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
 import stringify from 'csv-stringify';
+import colormap from 'colormap';
 
 import Log from './log'
 import raw from './raw'
@@ -61,6 +62,31 @@ const styles = theme => ({
   },
 });
 
+
+var hexToRgb = (hex) => {
+  var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+    return r + r + g + g + b + b;
+  });
+
+  var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? [
+    parseInt(result[1], 16),
+    parseInt(result[2], 16),
+    parseInt(result[3], 16),
+  ] : null;
+}
+
+var fontColorByBG = (hex) => {
+  var rgb = hexToRgb(hex)
+  var o = Math.round(
+    ((parseInt(rgb[0]) * 299) +
+    (parseInt(rgb[1]) * 587) +
+    (parseInt(rgb[2]) * 114)) / 1000)
+
+  return (o > 140) ? 'black' : 'white'
+}
+
 class CenteredGrid extends React.Component {
   state = {
     menu: false,
@@ -69,10 +95,12 @@ class CenteredGrid extends React.Component {
     records: [],
     nodes: [],
     levels: [],
+    modules: [],
     msgs: [],
     record: null,
     speedDial: false,
     openDialog: false,
+    moduleColors: [],
   }
 
   log = null
@@ -118,6 +146,21 @@ class CenteredGrid extends React.Component {
         'logs successfully imported: ' + this.log.records.length + ' records found',
         {variant: 'info'},
       )
+
+      var colors = colormap({
+        colormap: 'hsv',
+        nshades: this.log.modules.length,
+        format: 'hex',
+        alpha: 1,
+      })
+
+      this.setState({
+        nodes: this.log.nodes,
+        msgs: this.log.msgs,
+        levels: this.log.levels,
+        modules: this.log.modules,
+        moduleColors: colors,
+      })
 
       this.renderRecordsMore()
     })
@@ -185,7 +228,7 @@ class CenteredGrid extends React.Component {
 
       var link = document.createElement('a');
       link.href = csvurl;
-      link.download='mitum-log-' + (new Date()).toISOString().replace(/[:\.]/g, '-') + '.csv';
+      link.download='mitum-log-' + (new Date()).toISOString().replace(/[:.]/g, '-') + '.csv';
       link.click();
     })
 
@@ -326,7 +369,10 @@ class CenteredGrid extends React.Component {
           >
           {i === index ? (
             <div key={record.id + record.module} className='record'>
-              <Chip label={record.module} className={'module'} color='secondary' />
+              <Chip label={record.module} className={'module'} color='secondary' style={{
+                backgroundColor: this.state.moduleColors[this.state.modules.indexOf(record.module)],
+                color: fontColorByBG(this.state.moduleColors[this.state.modules.indexOf(record.module)]),
+              }} />
               <Typography key={record.id + node + 'ty'}>
                 {record.message}
               </Typography>
@@ -348,7 +394,8 @@ class CenteredGrid extends React.Component {
       return
     }
 
-    this.setState({records: records, nodes: this.log.nodes, msgs: this.log.msgs, levels: this.log.levels})
+    this.setState({ records: records })
+
     this.recordsOffset += this.limit
     this.onLoading = false
   }
