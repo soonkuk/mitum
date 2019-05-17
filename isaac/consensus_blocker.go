@@ -194,9 +194,9 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		"seal_type": seal.Type(),
 	})
 
+	var err error
 	var votingResult VoteResultInfo
 	{ // voting
-		var err error
 		switch seal.Type() {
 		case ProposalSealType:
 			var proposal Proposal
@@ -215,10 +215,28 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		default:
 			return common.InvalidSealTypeError
 		}
+	}
 
-		if err != nil {
+	if err != nil {
+		cerr, ok := err.(common.Error)
+		if !ok {
 			return err
 		}
+
+		switch cerr.Code() {
+		case DifferentHeightConsensusError.Code():
+			// TODO go to sync
+			log_.Debug("go to sync", "error", err)
+			c.state.SetNodeState(NodeStateSync)
+			c.Stop()
+		case DifferentBlockHashConsensusError.Code():
+			// TODO go to sync
+			log_.Debug("go to sync", "error", err)
+			c.state.SetNodeState(NodeStateSync)
+			c.Stop()
+		}
+
+		return err
 	}
 
 	if votingResult.NotYet() {

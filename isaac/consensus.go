@@ -167,30 +167,8 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 
 		select {
 		case err := <-errChan:
-			if err == nil {
-				return
-			}
-
-			c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
-
-			cerr, ok := err.(common.Error)
-			if !ok {
-				return
-			}
-
-			switch cerr.Code() {
-			case DifferentHeightConsensusError.Code():
-				// TODO detect sync
-				log_.Debug("go to sync", "error", err)
-				c.state.SetNodeState(NodeStateSync)
-				c.blocker.Stop()
-				panic(err)
-			case DifferentBlockHashConsensusError.Code():
-				// TODO detect sync
-				log_.Debug("go to sync", "error", err)
-				c.state.SetNodeState(NodeStateSync)
-				c.blocker.Stop()
-				panic(err)
+			if err != nil {
+				c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
 			}
 		}
 	}(seal)
