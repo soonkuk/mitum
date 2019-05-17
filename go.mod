@@ -5,6 +5,7 @@ go 1.12
 require (
 	boscoin.io/sebak v0.0.0-20190213022301-8aa4d74daff1
 	github.com/Masterminds/semver v1.4.2
+	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcutil v0.0.0-20190316010144-3ac1210f4b38
 	github.com/ethereum/go-ethereum v1.8.26
 	github.com/inconshreveable/log15 v0.0.0-20180818164646-67afb5ed74ec

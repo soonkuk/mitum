@@ -29,6 +29,12 @@ func init() {
 	for _, l := range loggers {
 		l.SetHandler(handler)
 	}
+
+	{
+		syncer, _ := common.NewTimeSyncer("zero.bora.net", time.Second*10)
+		syncer.Start()
+		common.SetTimeSyncer(syncer)
+	}
 }
 
 var (

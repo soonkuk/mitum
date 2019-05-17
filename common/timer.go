@@ -16,7 +16,7 @@ type CallbackTimer struct {
 
 func NewCallbackTimer(timeout time.Duration, callback func() error, keepRunning bool) *CallbackTimer {
 	return &CallbackTimer{
-		Logger:      common.NewLogger(log),
+		Logger:      NewLogger(log),
 		callback:    callback,
 		timeout:     timeout,
 		keepRunning: keepRunning,

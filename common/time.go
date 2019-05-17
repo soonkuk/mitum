@@ -2,7 +2,10 @@ package common
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
+
+	"github.com/beevik/ntp"
 )
 
 const (
@@ -10,7 +13,8 @@ const (
 )
 
 var (
-	ZeroTime Time = Time{Time: time.Time{}}
+	ZeroTime   Time = Time{Time: time.Time{}}
+	timeSyncer *TimeSyncer
 )
 
 func FormatISO8601(t Time) string {
@@ -114,5 +118,105 @@ func (t Time) Add(a time.Duration) Time {
 }
 
 func Now() Time {
-	return Time{Time: time.Now()}
+	if timeSyncer == nil {
+		return Time{Time: time.Now()}
+	}
+
+	return Time{Time: time.Now().Add(timeSyncer.Offset())}
+}
+
+type TimeSyncer struct {
+	sync.RWMutex
+	*Logger
+	server   string
+	offset   time.Duration
+	stopChan chan bool
+	interval time.Duration
+}
+
+func NewTimeSyncer(server string, checkInterval time.Duration) (*TimeSyncer, error) {
+	_, err := ntp.Query(server)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TimeSyncer{
+		Logger: NewLogger(
+			log,
+			"module", "time-syncer",
+			"server", server,
+			"interval", checkInterval,
+		),
+		server:   server,
+		interval: checkInterval,
+		stopChan: make(chan bool),
+	}, nil
+}
+
+func SetTimeSyncer(syncer *TimeSyncer) {
+	timeSyncer = syncer
+	log.Debug("common.timeSyncer is set")
+}
+
+func (s *TimeSyncer) Start() error {
+	s.Log().Debug("started")
+
+	go s.schedule()
+
+	return nil
+}
+
+func (s *TimeSyncer) Stop() error {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.stopChan != nil {
+		s.stopChan <- true
+		close(s.stopChan)
+		s.stopChan = nil
+	}
+
+	s.Log().Debug("stopped")
+	return nil
+}
+
+func (s *TimeSyncer) schedule() {
+	ticker := time.NewTicker(s.interval)
+
+end:
+	for {
+		select {
+		case <-s.stopChan:
+			ticker.Stop()
+			break end
+		case <-ticker.C:
+			s.check()
+		}
+	}
+}
+
+func (s *TimeSyncer) Offset() time.Duration {
+	return s.offset
+}
+
+func (s *TimeSyncer) check() {
+	response, err := ntp.Query(s.server)
+	if err != nil {
+		s.Log().Error("failed to query", "error", err)
+		return
+	}
+
+	if err := response.Validate(); err != nil {
+		s.Log().Error("failed to validate response", "response", response, "error", err)
+		return
+	}
+
+	s.Lock()
+	defer s.Unlock()
+
+	s.offset = response.ClockOffset
+
+	s.Log().Debug("time checked", "response", response, "offset", s.offset)
+
+	return
 }
