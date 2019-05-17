@@ -47,13 +47,13 @@ class Time {
       return '000.000000s'
     }
 
-    var s = Math.floor(d / 1000000)
+    var s = parseInt(d / 1000000000)
     var head = s.toString()
     if (head.length < 3) {
       head = '0'.repeat(3 - head.length) + head
     }
 
-    var tail = (d- (s * 1000000)).toString()
+    var tail = (d- (s * 1000000000)).toString()
     if (tail.length < 6) {
       tail = '0'.repeat(6 - tail.length) + tail
     }

@@ -16,7 +16,7 @@ type CallbackTimer struct {
 
 func NewCallbackTimer(timeout time.Duration, callback func() error, keepRunning bool) *CallbackTimer {
 	return &CallbackTimer{
-		Logger:      &Logger{},
+		Logger:      common.NewLogger(log),
 		callback:    callback,
 		timeout:     timeout,
 		keepRunning: keepRunning,
@@ -65,7 +65,7 @@ end:
 		case <-time.After(c.timeout):
 			c.Log().Debug("timer expired")
 			if err := c.callback(); err != nil {
-				log.Error("failed to callback", "error", err)
+				c.Log().Error("failed to callback", "error", err)
 			}
 			if !c.keepRunning {
 				c.Log().Debug("callback called and stopped")

@@ -273,3 +273,7 @@ table.scrollable tbody tr.row-detail-open {
 .lvl-crit {
   background-color: #f300f5 !important;
 }
+
+table.scrollable tbody tr td:first-child > span {
+  font-size: 0.7rem !important;
+}

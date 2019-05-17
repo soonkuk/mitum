@@ -149,7 +149,7 @@ class CenteredGrid extends React.Component {
 
       var colors = colormap({
         colormap: 'hsv',
-        nshades: this.log.modules.length,
+        nshades: this.log.modules.length > 10 ? this.log.modules.length : 11,
         format: 'hex',
         alpha: 1,
       })
@@ -199,6 +199,23 @@ class CenteredGrid extends React.Component {
         {variant: 'info'},
       )
 
+      var colors = colormap({
+        colormap: 'hsv',
+        nshades: this.log.modules.length > 10 ? this.log.modules.length : 11,
+        format: 'hex',
+        alpha: 1,
+      })
+
+      this.setState({
+        nodes: this.log.nodes,
+        msgs: this.log.msgs,
+        levels: this.log.levels,
+        modules: this.log.modules,
+        moduleColors: colors,
+      })
+
+
+
       this.renderRecordsMore()
   }
 
@@ -224,7 +241,6 @@ class CenteredGrid extends React.Component {
     stringifier.on('finish', function(){
       var csvData = new Blob([data.join('')], {type: 'text/csv'})
       var csvurl = URL.createObjectURL(csvData)
-      console.log(csvurl)
 
       var link = document.createElement('a');
       link.href = csvurl;
