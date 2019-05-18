@@ -58,10 +58,6 @@ func ContextWithValues(ctx context.Context, args ...interface{}) context.Context
 		panic(fmt.Errorf("invalid number of args: %v", len(args)))
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	for i := 0; i < len(args); i += 2 {
 		ctx = context.WithValue(ctx, args[i], args[i+1])
 	}

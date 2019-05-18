@@ -32,7 +32,7 @@ func init() {
 
 	{
 		syncer, _ := common.NewTimeSyncer("zero.bora.net", time.Second*10)
-		syncer.Start()
+		_ = syncer.Start()
 		common.SetTimeSyncer(syncer)
 	}
 }
@@ -63,9 +63,9 @@ func createNode(seedString string) (*Node, error) {
 	}
 	home := common.NewHome(seed, common.NetAddr{})
 	state := isaac.NewConsensusState(home)
-	state.SetHeight(height)
-	state.SetBlock(block)
-	state.SetState(blockState)
+	_ = state.SetHeight(height)
+	_ = state.SetBlock(block)
+	_ = state.SetState(blockState)
 
 	sealBroadcaster, err := isaac.NewDefaultSealBroadcaster(policy, state)
 	if err != nil {
@@ -77,11 +77,12 @@ func createNode(seedString string) (*Node, error) {
 		state:            state,
 		nt:               network.NewNodeTestNetwork(),
 		sealBroadcaster:  sealBroadcaster,
-		sealPool:         isaac.NewDefaultSealPool(home),
+		sealPool:         isaac.NewDefaultSealPool(),
 		proposerSelector: isaac.NewTProposerSelector(),
 		blockStorage:     isaac.NewTBlockStorage(),
 	}
-	node.sealBroadcaster.SetSender(node.nt.Send)
+	_ = node.sealBroadcaster.SetSender(node.nt.Send)
+	node.sealPool.SetLogContext("node", home.Name())
 
 	votingBox := isaac.NewDefaultVotingBox(home, policy)
 
@@ -131,7 +132,7 @@ type Node struct {
 	nt               *network.NodeTestNetwork
 	sealBroadcaster  *isaac.DefaultSealBroadcaster
 	blocker          *isaac.ConsensusBlocker
-	sealPool         isaac.SealPool
+	sealPool         *isaac.DefaultSealPool
 	proposerSelector *isaac.TProposerSelector
 	blockStorage     *isaac.TBlockStorage
 	consensus        *isaac.Consensus
@@ -198,7 +199,7 @@ func main() {
 	}
 
 	for _, node := range nodes {
-		node.state.AddValidators(validators...)
+		_ = node.state.AddValidators(validators...)
 
 		for _, other := range nodes {
 			if node.home.Equal(other.home) {

@@ -223,7 +223,6 @@ func (t *testSeal) TestCustomSealMarshal() {
 		b = a
 	}
 
-	return
 	var unmarshaled CustomSeal
 	{
 		decoded, err := DecodeSeal(CustomSeal{}, b)

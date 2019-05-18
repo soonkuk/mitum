@@ -217,6 +217,4 @@ func (s *TimeSyncer) check() {
 	s.offset = response.ClockOffset
 
 	s.Log().Debug("time checked", "response", response, "offset", s.offset)
-
-	return
 }

@@ -15,13 +15,12 @@ type SealPool interface {
 
 type DefaultSealPool struct {
 	*common.Logger
-	home  *common.HomeNode
 	seals *syncmap.Map // TODO should be stored in persistent storage
 }
 
-func NewDefaultSealPool(home *common.HomeNode) *DefaultSealPool {
+func NewDefaultSealPool() *DefaultSealPool {
 	return &DefaultSealPool{
-		Logger: common.NewLogger(log, "module", "seal-pool", "node", home.Name()),
+		Logger: common.NewLogger(log, "module", "seal-pool"),
 		seals:  &syncmap.Map{},
 	}
 }

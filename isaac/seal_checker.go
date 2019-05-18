@@ -17,15 +17,7 @@ func CheckerSealPool(c *common.ChainChecker) error {
 
 	if err := sealPool.Add(seal); err != nil {
 		if KnownSealFoundError.Equal(err) {
-			cstop, err := common.NewChainCheckerStop(
-				err.(common.Error).Message(),
-				"error", err,
-			)
-			if err != nil {
-				return err
-			} else {
-				return cstop
-			}
+			return common.NewChainCheckerStop(err.(common.Error).Message(), "error", err)
 		}
 
 		return err
@@ -65,17 +57,10 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		)
 	case TransactionSealType:
 		// TODO handle transaction
-		cstop, err := common.NewChainCheckerStop("transaction seal found; this will be implemented")
-		if err != nil {
-			return err
-		} else {
-			return cstop
-		}
+		return common.NewChainCheckerStop("transaction seal found; this will be implemented")
 	default:
 		return common.UnknownSealTypeError.SetMessage("tyep=%v", seal.Type())
 	}
-
-	return nil
 }
 
 // CheckerSealSignedAtTimeIsValid checks `Seal.SignedAt` is not far from now

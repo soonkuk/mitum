@@ -554,7 +554,8 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
-		ballot, _, err := t.newBallotVote(
+		var ballot Ballot
+		ballot, _, err = t.newBallotVote(
 			v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote,
 		)
 		t.NoError(err)

@@ -22,7 +22,7 @@ type testConsensus struct {
 	nt               *network.NodeTestNetwork
 	sealBroadcaster  *DefaultSealBroadcaster
 	blocker          *ConsensusBlocker
-	sealPool         SealPool
+	sealPool         *DefaultSealPool
 	consensus        *Consensus
 	cstate           *ConsensusState
 	proposerSelector *TProposerSelector
@@ -58,7 +58,8 @@ func (t *testConsensus) SetupTest() {
 	t.sealBroadcaster, _ = NewDefaultSealBroadcaster(policy, t.cstate)
 	t.sealBroadcaster.SetSender(t.nt.Send)
 
-	t.sealPool = NewDefaultSealPool(t.home)
+	t.sealPool = NewDefaultSealPool()
+	t.sealPool.SetLogContext("node", t.home.Name())
 
 	t.proposerSelector = NewTProposerSelector()
 	t.proposerSelector.SetProposer(t.home)

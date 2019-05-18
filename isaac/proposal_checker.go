@@ -82,29 +82,19 @@ func CheckerProposalBlock(c *common.ChainChecker) error {
 	}
 
 	if !proposal.Block.Height.Equal(state.Height()) {
-		cstop, err := common.NewChainCheckerStop(
+		return common.NewChainCheckerStop(
 			"proposal has different height",
 			"proposal", proposal.Block.Height,
 			"current", state.Height(),
 		)
-		if err != nil {
-			return err
-		}
-
-		return cstop
 	}
 
 	if !proposal.Block.Current.Equal(state.Block()) {
-		cstop, err := common.NewChainCheckerStop(
+		return common.NewChainCheckerStop(
 			"proposal has different block",
 			"proposal", proposal.Block.Current,
 			"current", state.Block(),
 		)
-		if err != nil {
-			return err
-		}
-
-		return cstop
 	}
 
 	return nil

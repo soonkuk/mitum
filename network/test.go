@@ -78,7 +78,6 @@ func (n *NodeTestNetwork) Send(node common.Node, seal common.Seal) error {
 	if err := seal.Wellformed(); err != nil {
 		log.Crit("not wellformed seal found", "error", err)
 		panic(err)
-		return err
 	}
 
 	if len(n.chans) > 0 {

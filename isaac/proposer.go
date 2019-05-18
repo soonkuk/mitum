@@ -8,10 +8,6 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-var (
-	proposerSelectBase common.Big = common.NewBig(100)
-)
-
 type ProposerSelector interface {
 	Select(common.Hash /* block hash */, common.Big /* height */, Round /* round */) (common.Node, error)
 }

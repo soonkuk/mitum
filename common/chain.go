@@ -11,8 +11,13 @@ import (
 
 type ChainCheckerStop map[string]interface{}
 
-func NewChainCheckerStop(msg string, args ...interface{}) (ChainCheckerStop, error) {
-	return ChainCheckerStop{}.SetMessage(msg, args...)
+func NewChainCheckerStop(msg string, args ...interface{}) ChainCheckerStop {
+	stop, err := ChainCheckerStop{}.SetMessage(msg, args...)
+	if err != nil {
+		stop, _ = ChainCheckerStop{}.SetMessage(msg)
+	}
+
+	return stop
 }
 
 func (c ChainCheckerStop) SetMessage(msg string, args ...interface{}) (ChainCheckerStop, error) {

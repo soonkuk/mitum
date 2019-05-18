@@ -22,16 +22,11 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 			"in_proposal", proposal.Block.Height,
 			"current", state.Height(),
 		)
-		cstop, err := common.NewChainCheckerStop(
+		return common.NewChainCheckerStop(
 			"different height proposal received",
 			"in_proposal", proposal.Block.Height,
 			"current", state.Height(),
 		)
-		if err != nil {
-			return err
-		} else {
-			return cstop
-		}
 	}
 
 	if !proposal.Block.Current.Equal(state.Block()) {
@@ -73,11 +68,7 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 		return err
 	}
 	if result.NotYet() {
-		cstop, err := common.NewChainCheckerStop("voting result, not yet", "result", result)
-		if err != nil {
-			return err
-		}
-		return cstop
+		return common.NewChainCheckerStop("voting result, not yet", "result", result)
 	}
 
 	var last VoteResultInfo

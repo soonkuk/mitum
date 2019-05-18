@@ -69,7 +69,9 @@ end:
 			}
 			if !c.keepRunning {
 				c.Log().Debug("callback called and stopped")
-				defer c.Stop()
+				defer func() {
+					_ = c.Stop()
+				}()
 			}
 		}
 	}

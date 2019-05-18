@@ -165,11 +165,9 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		errChan := make(chan error)
 		c.blocker.Vote(seal, errChan)
 
-		select {
-		case err := <-errChan:
-			if err != nil {
-				c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
-			}
+		err := <-errChan
+		if err != nil {
+			c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
 		}
 	}(seal)
 

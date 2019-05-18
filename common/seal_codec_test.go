@@ -70,7 +70,6 @@ func (t *testSealCodec) TestDecode() {
 	// decode
 	decoded, err := sc.Decode(b)
 	t.NoError(err)
-	return
 	t.NotNil(decoded)
 	t.NoError(decoded.Wellformed())
 

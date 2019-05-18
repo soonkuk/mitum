@@ -1,8 +1,6 @@
 package common
 
 import (
-	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -44,20 +42,6 @@ func (t testNode) TestPublish() {
 
 	t.Equal(address, node.Address())
 	t.Equal(addr, node.Publish().String())
-}
-
-func (t testNode) newValidators(count int) []Validator {
-	var vs []Validator
-	for i := 0; i < count; i++ {
-		addr := fmt.Sprintf("http://%s:%d", RandomUUID(), rand.Int())
-		publish, _ := NewNetAddr(addr)
-
-		v := NewValidator(RandomSeed().Address(), publish)
-
-		vs = append(vs, v)
-	}
-
-	return vs
 }
 
 func TestNode(t *testing.T) {

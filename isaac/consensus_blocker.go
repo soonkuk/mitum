@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -79,10 +80,14 @@ func (c *ConsensusBlocker) Start() error {
 
 func (c *ConsensusBlocker) Join() error {
 	if c.state.NodeState() != NodeStateJoin {
-		c.state.SetNodeState(NodeStateJoin)
+		_ = c.state.SetNodeState(NodeStateJoin)
 	}
 
-	go c.joinConsensus(c.state.Height())
+	go func() {
+		if err := c.joinConsensus(c.state.Height()); err != nil {
+			c.Log().Error("failed to joinConsensus", "error", err)
+		}
+	}()
 
 	return nil
 }
@@ -100,7 +105,7 @@ func (c *ConsensusBlocker) Stop() error {
 	c.stopBlockingChan = nil
 
 	if c.timer != nil {
-		c.timer.Stop()
+		_ = c.timer.Stop()
 	}
 
 	c.Log().Debug("ConsensusBlocker stopped")
@@ -144,7 +149,7 @@ func (c *ConsensusBlocker) startTimer(
 	defer c.Unlock()
 
 	if c.timer != nil {
-		c.timer.Stop()
+		_ = c.timer.Stop()
 		c.timer = nil
 	}
 
@@ -163,7 +168,7 @@ func (c *ConsensusBlocker) startTimer(
 	return c.timer.Start()
 }
 
-func (c *ConsensusBlocker) stopTimer() error {
+func (c *ConsensusBlocker) stopTimer() error { // nolint
 	c.Lock()
 	defer c.Unlock()
 
@@ -171,9 +176,7 @@ func (c *ConsensusBlocker) stopTimer() error {
 		return nil
 	}
 
-	if err := c.timer.Stop(); err != nil {
-		return err
-	}
+	_ = c.timer.Stop()
 	c.timer = nil
 
 	return nil
@@ -200,14 +203,14 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		switch seal.Type() {
 		case ProposalSealType:
 			var proposal Proposal
-			if err := common.CheckSeal(seal, &proposal); err != nil {
+			if err = common.CheckSeal(seal, &proposal); err != nil {
 				return err
 			}
 
 			votingResult, err = c.voteProposal(proposal)
 		case BallotSealType:
 			var ballot Ballot
-			if err := common.CheckSeal(seal, &ballot); err != nil {
+			if err = common.CheckSeal(seal, &ballot); err != nil {
 				return err
 			}
 
@@ -227,13 +230,17 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		case DifferentHeightConsensusError.Code():
 			// TODO go to sync
 			log_.Debug("go to sync", "error", err)
-			c.state.SetNodeState(NodeStateSync)
-			c.Stop()
+			_ = c.state.SetNodeState(NodeStateSync)
+			if err = c.Stop(); err != nil {
+				return err
+			}
 		case DifferentBlockHashConsensusError.Code():
 			// TODO go to sync
 			log_.Debug("go to sync", "error", err)
-			c.state.SetNodeState(NodeStateSync)
-			c.Stop()
+			_ = c.state.SetNodeState(NodeStateSync)
+			if err = c.Stop(); err != nil {
+				return err
+			}
 		}
 
 		return err
@@ -246,7 +253,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	log_.Debug("got votingResult", "result", votingResult)
 
 	if c.state.NodeState() != NodeStateConsensus {
-		c.state.SetNodeState(NodeStateConsensus)
+		_ = c.state.SetNodeState(NodeStateConsensus)
 	}
 
 	switch votingResult.Stage {
@@ -283,7 +290,7 @@ func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, erro
 	checker := common.NewChainChecker(
 		"blocker_check_proposal",
 		common.ContextWithValues(
-			nil,
+			context.Background(),
 			"proposal", proposal,
 			"state", c.state,
 		),
@@ -314,7 +321,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 	ballotChecker := common.NewChainChecker(
 		"blocker_check_ballot",
 		common.ContextWithValues(
-			nil,
+			context.Background(),
 			"ballot", ballot,
 			"state", c.state,
 		),
@@ -339,7 +346,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 	resultChecker := common.NewChainChecker(
 		"blocker_check_ballot_votingresult",
 		common.ContextWithValues(
-			nil,
+			context.Background(),
 			"votingResult", votingResult,
 			"lastVotingResult", c.lastVotingResult,
 			"state", c.state,
@@ -471,26 +478,27 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 	}
 
 	var p Proposal
-	if err := common.CheckSeal(seal, &p); err != nil {
+	if err = common.CheckSeal(seal, &p); err != nil {
 		return common.UnknownSealTypeError.SetMessage(err.Error())
 	}
 
 	// TODO store block and state
-	if _, err := c.blockStorage.NewBlock(p); err != nil {
+	if _, err = c.blockStorage.NewBlock(p); err != nil {
 		return err
 	}
 
 	// update ConsensusBlockerState
 	{
-		prevState := *c.state
+		prevState := &ConsensusState{}
+		*prevState = *c.state // nolint
 
-		if err := c.state.SetHeight(p.Block.Height.Inc()); err != nil {
+		if err = c.state.SetHeight(p.Block.Height.Inc()); err != nil {
 			return err
 		}
-		if err := c.state.SetBlock(p.Block.Next); err != nil {
+		if err = c.state.SetBlock(p.Block.Next); err != nil {
 			return err
 		}
-		if err := c.state.SetState(p.State.Next); err != nil {
+		if err = c.state.SetState(p.State.Next); err != nil {
 			return err
 		}
 

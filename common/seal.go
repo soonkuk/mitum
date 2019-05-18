@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -45,7 +44,6 @@ type Seal interface {
 }
 
 type RawSeal struct {
-	sync.RWMutex
 	parent      Seal
 	sealVersion Version
 	version     Version

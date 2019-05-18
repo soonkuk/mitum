@@ -6,18 +6,6 @@ import (
 )
 
 func PrintJSON(v interface{}, indent bool, escapeHTML bool) string {
-	var b []byte
-	switch v.(type) {
-	case []byte:
-		b = v.([]byte)
-	default:
-		s, err := json.Marshal(v)
-		if err != nil {
-			return "<wrong>"
-		}
-		b = s
-	}
-
 	b, err := EncodeJSON(v, indent, escapeHTML)
 	if err != nil {
 		return ""

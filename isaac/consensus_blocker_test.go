@@ -25,8 +25,7 @@ type testConsensusBlocker struct {
 	policy           ConsensusPolicy
 	votingBox        *TestMockVotingBox
 	sealBroadcaster  *TestSealBroadcaster
-	sealPool         SealPool
-	blocker          *ConsensusBlocker
+	sealPool         *DefaultSealPool
 	proposerSelector *TProposerSelector
 	blockStorage     *TBlockStorage
 }
@@ -52,7 +51,8 @@ func (t *testConsensusBlocker) SetupTest() {
 
 	t.votingBox = &TestMockVotingBox{}
 	t.sealBroadcaster, _ = NewTestSealBroadcaster(t.policy, t.home)
-	t.sealPool = NewDefaultSealPool(t.home)
+	t.sealPool = NewDefaultSealPool()
+	t.sealPool.SetLogContext("node", t.home.Name())
 	t.proposerSelector = NewTProposerSelector()
 	t.proposerSelector.SetProposer(t.home)
 }

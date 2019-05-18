@@ -2,7 +2,6 @@ package network
 
 import (
 	"errors"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,34 +10,6 @@ import (
 	"github.com/spikeekips/mitum/common"
 	"github.com/stretchr/testify/suite"
 )
-
-type testHash struct {
-	I uint64
-}
-
-func (t testHash) MarshalBinary() ([]byte, error) {
-	return []byte(strconv.FormatUint(t.I, 10)), nil
-}
-
-func (t *testHash) UnmarshalBinary(b []byte) error {
-	i, err := strconv.ParseUint(string(b), 10, 64)
-	if err != nil {
-		return err
-	}
-
-	t.I = i
-	return nil
-}
-
-func (t testHash) Hash() common.Hash {
-	encoded, err := t.MarshalBinary()
-	if err != nil {
-		return common.Hash{}
-	}
-
-	hash, _ := common.NewHash("th", encoded)
-	return hash
-}
 
 type testNodeNetwork struct {
 	suite.Suite
