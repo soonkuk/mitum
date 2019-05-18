@@ -140,8 +140,20 @@ func (b Ballot) Wellformed() error {
 		return err
 	}
 
+	if !b.Stage.IsValid() {
+		return BallotNotWellformedError.SetMessage("Stage is invalid")
+	}
+
 	if !b.Stage.CanVote() {
 		return BallotNotWellformedError.SetMessage("Stage is not for vote")
+	}
+
+	if !b.Vote.IsValid() {
+		return BallotNotWellformedError.SetMessage("Vote is invalid")
+	}
+
+	if !b.Vote.CanVote() {
+		return BallotNotWellformedError.SetMessage("Vote is not for vote")
 	}
 
 	if b.Stage == VoteStageINIT {
@@ -160,18 +172,6 @@ func (b Ballot) Wellformed() error {
 		if !b.Proposal.IsValid() {
 			return BallotNotWellformedError.SetMessage("Proposal is empty")
 		}
-	}
-
-	if !b.Stage.IsValid() {
-		return BallotNotWellformedError.SetMessage("Stage is invalid")
-	}
-
-	if !b.Vote.IsValid() {
-		return BallotNotWellformedError.SetMessage("Vote is invalid")
-	}
-
-	if !b.Vote.CanVote() {
-		return BallotNotWellformedError.SetMessage("Vote is not for vote")
 	}
 
 	if b.Vote != VoteYES && b.Stage != VoteStageSIGN {

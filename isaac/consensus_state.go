@@ -133,6 +133,11 @@ func (c *ConsensusState) Validators() []common.Validator {
 	return validators
 }
 
+func (c *ConsensusState) ExistsValidators(validator common.Address) bool {
+	_, found := c.validators[validator]
+	return found
+}
+
 func (c *ConsensusState) AddValidators(validators ...common.Validator) error {
 	c.Lock()
 	defer c.Unlock()
@@ -150,15 +155,15 @@ func (c *ConsensusState) AddValidators(validators ...common.Validator) error {
 	return nil
 }
 
-func (c *ConsensusState) RemoveValidators(validators ...common.Validator) error {
+func (c *ConsensusState) RemoveValidators(validators ...common.Address) error {
 	c.Lock()
 	defer c.Unlock()
 
 	for _, validator := range validators {
-		if _, found := c.validators[validator.Address()]; !found {
+		if _, found := c.validators[validator]; !found {
 			continue
 		}
-		delete(c.validators, validator.Address())
+		delete(c.validators, validator)
 	}
 
 	return nil

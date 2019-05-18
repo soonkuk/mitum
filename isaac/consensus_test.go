@@ -44,12 +44,11 @@ func (t *testConsensus) SetupTest() {
 	t.cstate.SetBlock(t.block)
 	t.cstate.SetState(t.state)
 
-	policy := ConsensusPolicy{
-		NetworkID:       common.TestNetworkID,
-		Total:           t.total,
-		Threshold:       t.threshold,
-		TimeoutWaitSeal: time.Second * 3,
-	}
+	policy := DefaultConsensusPolicy()
+	policy.NetworkID = common.TestNetworkID
+	policy.Total = t.total
+	policy.Threshold = t.threshold
+	policy.TimeoutWaitSeal = time.Second * 3
 
 	votingBox := NewDefaultVotingBox(t.home, policy)
 
@@ -80,14 +79,16 @@ func (t *testConsensus) SetupTest() {
 	t.NoError(err)
 	t.consensus = consensus
 
-	err = t.nt.AddReceiver(t.consensus.Receiver())
+	err = t.nt.AddReceiver("consensus-receiver", t.consensus.Receiver())
 	t.NoError(err)
+	t.nt.SkipCheckValidator = true
 
 	t.consensus.SetContext(
 		nil, // nolint
 		"policy", policy,
 		"state", t.cstate,
 		"sealPool", t.sealPool,
+		"proposerSelector", t.proposerSelector,
 	)
 
 	t.cstate.SetNodeState(NodeStateJoin)

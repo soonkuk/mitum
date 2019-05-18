@@ -48,11 +48,12 @@ var (
 	block      common.Hash           = common.NewRandomHash("bk")
 	blockState []byte                = []byte("initial state")
 	policy     isaac.ConsensusPolicy = isaac.ConsensusPolicy{
-		NetworkID:             common.TestNetworkID,
-		Total:                 uint(len(seeds)),
-		Threshold:             uint(len(seeds) - 1),
-		TimeoutWaitSeal:       time.Second * 3,
-		AvgBlockRoundInterval: time.Second * 5,
+		NetworkID:                 common.TestNetworkID,
+		Total:                     uint(len(seeds)),
+		Threshold:                 uint(len(seeds) - 1),
+		TimeoutWaitSeal:           time.Second * 3,
+		AvgBlockRoundInterval:     time.Second * 5,
+		SealSignedAtAllowDuration: time.Second * 3,
 	}
 )
 
@@ -115,6 +116,7 @@ func createNode(seedString string) (*Node, error) {
 		"policy", policy,
 		"state", node.state,
 		"sealPool", node.sealPool,
+		"proposerSelector", node.proposerSelector,
 	)
 
 	node.log = log.New(log15.Ctx{

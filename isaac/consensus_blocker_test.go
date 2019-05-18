@@ -35,13 +35,13 @@ func (t *testConsensusBlocker) SetupSuite() {
 }
 
 func (t *testConsensusBlocker) SetupTest() {
-	t.policy = ConsensusPolicy{
-		NetworkID:             common.TestNetworkID,
-		Total:                 t.total,
-		Threshold:             t.threshold,
-		TimeoutWaitSeal:       time.Second * 3,
-		AvgBlockRoundInterval: time.Millisecond * 300,
-	}
+	t.policy = DefaultConsensusPolicy()
+	t.policy.NetworkID = common.TestNetworkID
+	t.policy.Total = t.total
+	t.policy.Threshold = t.threshold
+	t.policy.TimeoutWaitSeal = time.Second * 3
+	t.policy.AvgBlockRoundInterval = time.Millisecond * 300
+
 	t.cstate = NewConsensusState(t.home)
 	t.cstate.SetHeight(t.height)
 	t.cstate.SetBlock(t.block)

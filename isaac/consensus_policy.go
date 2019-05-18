@@ -14,9 +14,10 @@ type ConsensusPolicy struct {
 	BaseFee                    common.Big       `json:"base_fee"`  // minimum fee for operation
 	MaxTransactionsInProposal  uint             `json:"max_transactions_in_proposal"`
 	MaxOperationsInTransaction uint             `json:"max_operations_in_transaction"`
-	AvgBlockRoundInterval      time.Duration    `json:"avg_block_round_interval"` // average interval for each round
-	TimeoutWaitSeal            time.Duration    `json:"timeout_wait_seal"`        // wait time for incoming seal
-	ExpireDurationVote         time.Duration    `json:"expire_duration_vote"`     // VotingBoxStageNode.votedAt expires after duration
+	AvgBlockRoundInterval      time.Duration    `json:"avg_block_round_interval"`      // average interval for each round
+	TimeoutWaitSeal            time.Duration    `json:"timeout_wait_seal"`             // wait time for incoming seal
+	ExpireDurationVote         time.Duration    `json:"expire_duration_vote"`          // VotingBoxStageNode.votedAt expires after duration
+	SealSignedAtAllowDuration  time.Duration    `json:"seal_signed_at_allowd_uration"` // Seal.SignedAt() should be within duration; too old should be ignored, and too ahead also too
 }
 
 func DefaultConsensusPolicy() ConsensusPolicy {
@@ -27,6 +28,7 @@ func DefaultConsensusPolicy() ConsensusPolicy {
 		AvgBlockRoundInterval:      time.Second * 3,
 		TimeoutWaitSeal:            time.Second * 3,
 		ExpireDurationVote:         time.Second * 10,
+		SealSignedAtAllowDuration:  time.Second * 30, // 30 seconds
 	}
 }
 

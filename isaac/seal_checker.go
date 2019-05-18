@@ -4,6 +4,59 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
+func CheckerSealFromKnowValidator(c *common.ChainChecker) error {
+	var seal common.Seal
+	if err := c.ContextValue("seal", &seal); err != nil {
+		return err
+	}
+
+	var state *ConsensusState
+	if err := c.ContextValue("state", &state); err != nil {
+		return err
+	}
+
+	isFromHome := seal.Source() == state.Home().Address()
+	_ = c.SetContext("isFromHome", isFromHome)
+	if isFromHome {
+		c.Log().Debug("seal is from home", "seal", seal.Hash())
+	}
+
+	if !isFromHome && !state.ExistsValidators(seal.Source()) {
+		return SealNotFromValidatorsError
+	}
+
+	return nil
+}
+
+func CheckerSealIsValid(c *common.ChainChecker) error {
+	var seal common.Seal
+	if err := c.ContextValue("seal", &seal); err != nil {
+		return err
+	}
+
+	var policy ConsensusPolicy
+	if err := c.ContextValue("policy", &policy); err != nil {
+		return err
+	}
+
+	// NOTE checks `Seal.SignedAt` is not far from now
+	if !seal.SignedAt().Between(common.Now(), policy.SealSignedAtAllowDuration) {
+		return OverSealSignedAtAllowDurationError.AppendMessage(
+			"duration=%v", policy.SealSignedAtAllowDuration,
+		)
+	}
+
+	if err := seal.Wellformed(); err != nil {
+		return err
+	}
+
+	if err := seal.CheckSignature(policy.NetworkID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func CheckerSealPool(c *common.ChainChecker) error {
 	var sealPool SealPool
 	if err := c.ContextValue("sealPool", &sealPool); err != nil {
@@ -39,11 +92,9 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		_ = c.SetContext("proposal", seal.(Proposal))
 
 		return common.NewChainChecker(
-			"Proposal checker",
+			"proposal-checker",
 			c.Context(),
 			CheckerProposalIsValid,
-			CheckerProposalProposerIsFromKnowns,
-			CheckerProposalProposerIsValid,
 			CheckerProposalBlock,
 			CheckerProposalState,
 		)
@@ -51,9 +102,10 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		_ = c.SetContext("ballot", seal.(Ballot))
 
 		return common.NewChainChecker(
-			"ballot checker",
+			"ballot-checker",
 			c.Context(),
 			CheckerBallotProposal,
+			CheckerBallotHasValidProposal,
 		)
 	case TransactionSealType:
 		// TODO handle transaction
@@ -61,10 +113,4 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 	default:
 		return common.UnknownSealTypeError.SetMessage("tyep=%v", seal.Type())
 	}
-}
-
-// CheckerSealSignedAtTimeIsValid checks `Seal.SignedAt` is not far from now
-func CheckerSealSignedAtTimeIsValid(c *common.ChainChecker) error {
-	// TODO test
-	return nil
 }

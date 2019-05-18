@@ -6,6 +6,7 @@ import (
 
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/network"
 )
 
 type Consensus struct {
@@ -55,6 +56,22 @@ func (c *Consensus) Start() error {
 			"%s; '%v' is missing in context",
 			ConsensusNotReadyError.Message(),
 			"policy",
+		)
+	}
+
+	if _, ok := c.Context().Value("state").(*ConsensusState); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"state",
+		)
+	}
+
+	if _, ok := c.Context().Value("proposerSelector").(ProposerSelector); !ok {
+		return ConsensusNotReadyError.SetMessage(
+			"%s; '%v' is missing in context",
+			ConsensusNotReadyError.Message(),
+			"proposerSelector",
 		)
 	}
 
@@ -112,8 +129,33 @@ func (c *Consensus) SetContext(ctx context.Context, args ...interface{}) {
 	c.ctx = common.ContextWithValues(ctx, args...)
 }
 
-func (c *Consensus) Receiver() chan common.Seal {
-	return c.receiver
+func (c *Consensus) Receiver() network.ReceiverFunc {
+	return c.receiverFunc
+}
+
+func (c *Consensus) receiverFunc(seal common.Seal) error {
+	checker := common.NewChainChecker(
+		"receive-seal-checker",
+		common.ContextWithValues(
+			c.ctx,
+			"seal", seal,
+		),
+		CheckerSealFromKnowValidator,
+		CheckerSealIsValid,
+		CheckerSealPool,
+		CheckerSealTypes,
+	)
+	checker.SetLogContext("node", c.home.Name())
+	if err := checker.Check(); err != nil {
+		checker.Log().Error("failed to check", "error", err)
+		return err
+	}
+
+	go func() {
+		c.receiver <- seal
+	}()
+
+	return nil
 }
 
 // TODO Please correct this boring method name, `schedule` :(
@@ -141,21 +183,6 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 	// NOTE these seal should be verified that is wellformed before.
 	log_ := c.Log().New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
-	checker := common.NewChainChecker(
-		"receiveSeal",
-		common.ContextWithValues(
-			c.ctx,
-			"seal", seal,
-		),
-		CheckerSealPool,
-		CheckerSealTypes,
-	)
-	checker.SetLogContext("module", "receive-seal", "node", c.home.Name())
-	if err := checker.Check(); err != nil {
-		log_.Error("failed to checker for seal", "error", err)
-		return err
-	}
-
 	if !c.state.NodeState().CanVote() {
 		log_.Error("node cannot vote", "state", c.state.NodeState())
 		return nil
@@ -165,8 +192,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) error {
 		errChan := make(chan error)
 		c.blocker.Vote(seal, errChan)
 
-		err := <-errChan
-		if err != nil {
+		if err := <-errChan; err != nil {
 			c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
 		}
 	}(seal)

@@ -26,6 +26,9 @@ const (
 	BlockNotFoundErrorCode
 	IgnoreVotingResultErrorCode
 	BallotIsTooOldErrorCode
+	SealNotFromValidatorsErrorCode
+	OverSealSignedAtAllowDurationErrorCode
+	ProposalHasInvalidProposerErrorCode
 )
 
 var (
@@ -51,4 +54,7 @@ var (
 	BlockNotFoundError                   common.Error = common.NewError("isaac", BlockNotFoundErrorCode, "block not found")
 	IgnoreVotingResultError              common.Error = common.NewError("isaac", IgnoreVotingResultErrorCode, "ignore votingResult")
 	BallotIsTooOldError                  common.Error = common.NewError("isaac", BallotIsTooOldErrorCode, "ballot is too old")
+	SealNotFromValidatorsError           common.Error = common.NewError("isaac", SealNotFromValidatorsErrorCode, "seal is not from validators")
+	OverSealSignedAtAllowDurationError   common.Error = common.NewError("isaac", OverSealSignedAtAllowDurationErrorCode, "Seal.SignedAt() is not within SealSignedAtAllowDuration")
+	ProposalHasInvalidProposerError      common.Error = common.NewError("isaac", ProposalHasInvalidProposerErrorCode, "Proposal has invalid proposer")
 )

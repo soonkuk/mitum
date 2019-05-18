@@ -282,13 +282,8 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 }
 
 func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, error) {
-	log_ := c.Log().New(log15.Ctx{
-		"seal":      proposal.Hash(),
-		"seal_type": proposal.Type(),
-	})
-
 	checker := common.NewChainChecker(
-		"blocker_check_proposal",
+		"blocker-vote-proposal-checker",
 		common.ContextWithValues(
 			context.Background(),
 			"proposal", proposal,
@@ -297,13 +292,12 @@ func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, erro
 		CheckerBlockerProposalBlock,
 	)
 	checker.SetLogContext(
-		"module", "vote-proposal-checker",
 		"node", c.state.Home().Name(),
 		"seal", proposal.Hash(),
 		"seal_type", proposal.Type(),
 	)
 	if err := checker.Check(); err != nil {
-		log_.Error("checker failed; proposal", "error", err)
+		checker.Log().Error("failed to check", "error", err)
 		return VoteResultInfo{}, err
 	}
 
@@ -311,15 +305,10 @@ func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, erro
 }
 
 func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
-	log_ := c.Log().New(log15.Ctx{
-		"seal":      ballot.Hash(),
-		"seal_type": ballot.Type(),
-	})
-
 	logContext := []interface{}{"node", c.state.Home().Name(), "seal", ballot.Hash(), "seal_type", ballot.Type()}
 
 	ballotChecker := common.NewChainChecker(
-		"blocker_check_ballot",
+		"blocker-vote-ballot-checker",
 		common.ContextWithValues(
 			context.Background(),
 			"ballot", ballot,
@@ -327,12 +316,9 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		),
 		CheckerBlockerBallot,
 	)
-	ballotChecker.SetLogContext(append(
-		[]interface{}{"module", "vote-ballot-checker"},
-		logContext...,
-	)...)
+	ballotChecker.SetLogContext(logContext...)
 	if err := ballotChecker.Check(); err != nil {
-		log_.Error("checker failed; ballot", "error", err)
+		ballotChecker.Log().Error("failed to check", "error", err)
 		return VoteResultInfo{}, err
 	}
 
@@ -344,7 +330,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 	c.RLock()
 
 	resultChecker := common.NewChainChecker(
-		"blocker_check_ballot_votingresult",
+		"blocker-vote-ballot-result-checker",
 		common.ContextWithValues(
 			context.Background(),
 			"votingResult", votingResult,
@@ -353,13 +339,10 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		),
 		CheckerBlockerBallotVotingResult,
 	)
-	resultChecker.SetLogContext(append(
-		[]interface{}{"module", "vote-ballot-result-checker"},
-		ballotChecker.LogContext()...,
-	)...)
+	resultChecker.SetLogContext(ballotChecker.LogContext()...)
 	c.RUnlock()
 	if err := resultChecker.Check(); err != nil {
-		log_.Error("checker failed; ballot votingResult", "error", err)
+		resultChecker.Log().Error("failed to check", "error", err)
 		return votingResult, err
 	}
 

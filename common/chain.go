@@ -55,7 +55,7 @@ type ChainChecker struct {
 
 func NewChainChecker(name string, ctx context.Context, checkers ...ChainCheckerFunc) *ChainChecker {
 	return &ChainChecker{
-		Logger:      NewLogger(log, "name", name),
+		Logger:      NewLogger(log, "module", name),
 		checkers:    checkers,
 		ctx:         ctx,
 		originalCtx: ctx,

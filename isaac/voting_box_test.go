@@ -21,7 +21,7 @@ type testVotingBox struct {
 
 func (t *testVotingBox) SetupTest() {
 	t.home = common.NewRandomHome()
-	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
+
 	t.votingBox = NewDefaultVotingBox(t.home, t.policy)
 	t.seals = map[common.Hash]common.Seal{}
 	t.proposeSeals = map[common.Hash]Proposal{}
@@ -753,7 +753,10 @@ type testVotingBoxStage struct {
 }
 
 func (t *testVotingBox) SetupSuite() {
-	t.policy = ConsensusPolicy{NetworkID: common.TestNetworkID, Total: 4, Threshold: 3}
+	t.policy = DefaultConsensusPolicy()
+	t.policy.NetworkID = common.TestNetworkID
+	t.policy.Total = 4
+	t.policy.Threshold = 3
 }
 
 func (t *testVotingBoxStage) newSeed() common.Seed {

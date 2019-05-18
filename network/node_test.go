@@ -25,19 +25,27 @@ func (t *testNodeNetwork) newSeal() common.TestNewSeal {
 
 func (t *testNodeNetwork) TestMultipleReceiver() {
 	network := NewNodeTestNetwork()
-	network.skipCheckValidator = true
+	network.SkipCheckValidator = true
 
 	node := common.NewRandomHome()
 
 	// 2 receiver channel
-	receiver0 := make(chan common.Seal)
+	chanReceiver0 := make(chan common.Seal)
+	receiverFunc0 := func(seal common.Seal) error {
+		chanReceiver0 <- seal
+		return nil
+	}
 
-	err := network.AddReceiver(receiver0)
+	err := network.AddReceiver("receiver0", receiverFunc0)
 	t.NoError(err)
 
-	receiver1 := make(chan common.Seal)
+	chanReceiver1 := make(chan common.Seal)
+	receiverFunc1 := func(seal common.Seal) error {
+		chanReceiver1 <- seal
+		return nil
+	}
 
-	err = network.AddReceiver(receiver1)
+	err = network.AddReceiver("receiver1", receiverFunc1)
 	t.NoError(err)
 
 	count := 10
@@ -55,13 +63,13 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 	end:
 		for {
 			select {
-			case _, notClosed := <-receiver0:
+			case _, notClosed := <-chanReceiver0:
 				if !notClosed {
 					break end
 				}
 				wg.Done()
 				atomic.AddUint64(&counted, 1)
-			case _, notClosed := <-receiver1:
+			case _, notClosed := <-chanReceiver1:
 				if !notClosed {
 					break end
 				}
@@ -97,8 +105,8 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 	send(0)
 
 	wg.Wait()
-	close(receiver0)
-	close(receiver1)
+	close(chanReceiver0)
+	close(chanReceiver1)
 
 	countedFinal := atomic.LoadUint64(&counted)
 	t.Equal(uint64(count*2), countedFinal)
@@ -111,10 +119,15 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 	node := common.NewRandomHome()
 
 	// 1 receiver channel
-	receiver0 := make(chan common.Seal)
-	defer close(receiver0)
+	chanReceiver0 := make(chan common.Seal)
+	receiverFunc0 := func(seal common.Seal) error {
+		chanReceiver0 <- seal
+		return nil
+	}
 
-	err := network.AddReceiver(receiver0)
+	defer close(chanReceiver0)
+
+	err := network.AddReceiver("receiver0", receiverFunc0)
 	t.NoError(err)
 
 	count := 10
@@ -142,7 +155,7 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 	end:
 		for {
 			select {
-			case seal, notClosed := <-receiver0:
+			case seal, notClosed := <-chanReceiver0:
 				hash, received := receive(seal, notClosed)
 				if !received {
 					break end
@@ -150,7 +163,7 @@ func (t *testNodeNetwork) TestRemoveReceiver() {
 				atomic.AddUint64(&counted, 1)
 
 				if hash.Equal(stop) {
-					network.RemoveReceiver(receiver0)
+					network.RemoveReceiver("receiver0")
 				}
 			case <-time.After(time.Millisecond * 100):
 				break end

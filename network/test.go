@@ -12,15 +12,15 @@ import (
 
 type NodeTestNetwork struct {
 	sync.RWMutex
-	chans              map[string]chan<- common.Seal
-	validatorsChan     map[common.Address]chan<- common.Seal
-	skipCheckValidator bool
+	chans              map[string]ReceiverFunc
+	validatorsChan     map[common.Address]ReceiverFunc
+	SkipCheckValidator bool
 }
 
 func NewNodeTestNetwork() *NodeTestNetwork {
 	return &NodeTestNetwork{
-		chans:          map[string]chan<- common.Seal{},
-		validatorsChan: map[common.Address]chan<- common.Seal{},
+		chans:          map[string]ReceiverFunc{},
+		validatorsChan: map[common.Address]ReceiverFunc{},
 	}
 }
 
@@ -32,37 +32,35 @@ func (n *NodeTestNetwork) Stop() error {
 	return nil
 }
 
-func (n *NodeTestNetwork) AddReceiver(c chan<- common.Seal) error {
+func (n *NodeTestNetwork) AddReceiver(name string, f ReceiverFunc) error {
 	n.Lock()
 	defer n.Unlock()
 
-	p := fmt.Sprintf("%p", c)
-	if _, found := n.chans[p]; found {
+	if _, found := n.chans[name]; found {
 		return ReceiverAlreadyRegisteredError
 	}
 
-	n.chans[p] = c
+	n.chans[name] = f
 	return nil
 }
 
-func (n *NodeTestNetwork) RemoveReceiver(c chan common.Seal) error {
+func (n *NodeTestNetwork) RemoveReceiver(name string) error {
 	n.Lock()
 	defer n.Unlock()
 
-	p := fmt.Sprintf("%p", c)
-	if _, found := n.chans[p]; !found {
+	if _, found := n.chans[name]; !found {
 		return ReceiverNotRegisteredError
 	}
 
-	delete(n.chans, p)
+	delete(n.chans, name)
 	return nil
 }
 
-func (n *NodeTestNetwork) AddValidatorChan(validator common.Validator, c chan<- common.Seal) *NodeTestNetwork {
+func (n *NodeTestNetwork) AddValidatorChan(validator common.Validator, f ReceiverFunc) *NodeTestNetwork {
 	n.Lock()
 	defer n.Unlock()
 
-	n.validatorsChan[validator.Address()] = c
+	n.validatorsChan[validator.Address()] = f
 
 	return n
 }
@@ -81,17 +79,22 @@ func (n *NodeTestNetwork) Send(node common.Node, seal common.Seal) error {
 	}
 
 	if len(n.chans) > 0 {
-		for _, c := range n.chans {
-			c <- seal
+		for _, f := range n.chans {
+			if err := f(seal); err != nil {
+				log.Error("failed to receive", "error", err)
+				return err
+			}
 		}
 	}
 
 	sender, found := n.validatorsChan[node.Address()]
-	if found {
-		sender <- seal
-	} else if !n.skipCheckValidator {
-		return fmt.Errorf("not registered node for broadcasting: %v", node.Address())
+	if !found {
+		if n.SkipCheckValidator {
+			return nil
+		} else {
+			return fmt.Errorf("not registered node for broadcasting: %v", node.Address())
+		}
 	}
 
-	return nil
+	return sender(seal)
 }
