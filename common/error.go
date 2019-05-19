@@ -7,20 +7,23 @@ import (
 type Error struct {
 	code    string
 	message string
+	err     error
 }
 
 func (e Error) MarshalJSON() ([]byte, error) {
-	return EncodeJSON(map[string]string{
+	m := map[string]interface{}{
 		"code":    e.code,
 		"message": e.message,
-	}, false, false)
+	}
+	if e.err != nil {
+		m["err"] = e.err
+	}
+
+	return EncodeJSON(m, false, false)
 }
 
 func (e Error) Error() string {
-	b, _ := EncodeJSON(map[string]string{
-		"code":    e.code,
-		"message": e.message,
-	}, false, false)
+	b, _ := EncodeJSON(e, false, false)
 
 	return TerminalLogString(string(b))
 }
@@ -33,7 +36,23 @@ func (e Error) Message() string {
 	return e.message
 }
 
-// TODO remvoe SetMessage, AppendMessage will be used
+func (e Error) SetError(err error) Error {
+	se, ok := err.(Error)
+	if !ok {
+		return e.SetMessage(err.Error())
+	}
+
+	if e.Equal(se) {
+		return e.SetMessage(se.Message())
+	}
+
+	return Error{
+		code:    e.code,
+		message: e.message,
+		err:     se,
+	}
+}
+
 func (e Error) SetMessage(format string, args ...interface{}) Error {
 	return Error{code: e.code, message: fmt.Sprintf(format, args...)}
 }

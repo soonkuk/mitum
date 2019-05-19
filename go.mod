@@ -18,6 +18,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/stellar/go v0.0.0-20190412203019-6147ce7d857b
 	github.com/stretchr/testify v1.3.0
+	github.com/syndtr/goleveldb v1.0.0
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/sync v0.0.0-20190412183630-56d357773e84
 	golang.org/x/tools v0.0.0-20190411180116-681f9ce8ac52

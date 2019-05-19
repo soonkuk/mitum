@@ -161,7 +161,7 @@ func (b Ballot) Wellformed() error {
 			return BallotNotWellformedError.SetMessage("Proposer is empty; INIT")
 		}
 
-		if b.Proposal.IsValid() {
+		if !b.Proposal.Empty() {
 			return BallotNotWellformedError.SetMessage("Proposal is not empty")
 		}
 	} else {
@@ -169,7 +169,7 @@ func (b Ballot) Wellformed() error {
 			return BallotNotWellformedError.SetMessage("Proposer is not empty; not INIT")
 		}
 
-		if !b.Proposal.IsValid() {
+		if b.Proposal.Empty() {
 			return BallotNotWellformedError.SetMessage("Proposal is empty")
 		}
 	}

@@ -114,7 +114,7 @@ func (t *testNodeNetwork) TestMultipleReceiver() {
 
 func (t *testNodeNetwork) TestRemoveReceiver() {
 	network := NewNodeTestNetwork()
-	network.skipCheckValidator = true
+	network.SkipCheckValidator = true
 
 	node := common.NewRandomHome()
 

@@ -8,6 +8,7 @@ import (
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/isaac"
 	"github.com/spikeekips/mitum/network"
+	"github.com/spikeekips/mitum/storage"
 )
 
 var log log15.Logger = log15.New("module", "node-network-test")
@@ -25,6 +26,7 @@ func init() {
 		common.Log(),
 		isaac.Log(),
 		network.Log(),
+		storage.Log(),
 	}
 	for _, l := range loggers {
 		l.SetHandler(handler)

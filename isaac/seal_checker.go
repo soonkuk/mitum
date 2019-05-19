@@ -106,6 +106,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			c.Context(),
 			CheckerBallotProposal,
 			CheckerBallotHasValidProposal,
+			CheckerBallotHasValidProposr,
 		)
 	case TransactionSealType:
 		// TODO handle transaction

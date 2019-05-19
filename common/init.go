@@ -1,14 +1,14 @@
 package common
 
 import (
-	logging "github.com/inconshreveable/log15"
+	"github.com/inconshreveable/log15"
 )
 
 var InTest bool
 var DEBUG bool
 
-var log logging.Logger = logging.New("module", "common")
+var log log15.Logger = log15.New("module", "common")
 
-func Log() logging.Logger {
+func Log() log15.Logger {
 	return log
 }

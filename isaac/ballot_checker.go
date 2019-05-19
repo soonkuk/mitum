@@ -23,7 +23,6 @@ func CheckerBallotProposal(c *common.ChainChecker) error {
 	if !ballot.Proposal.Empty() {
 		seal, err := sealPool.Get(ballot.Proposal)
 		if SealNotFoundError.Equal(err) {
-			panic(nil)
 			// TODO unknown Proposal found, request from other nodes
 			return nil
 		}
@@ -41,7 +40,7 @@ func CheckerBallotHasValidProposal(c *common.ChainChecker) error {
 	}
 
 	// NOTE INIT ballot does not have Proposal
-	if ballot.Proposal.Empty() {
+	if ballot.Stage == VoteStageINIT {
 		return nil
 	}
 
@@ -50,17 +49,8 @@ func CheckerBallotHasValidProposal(c *common.ChainChecker) error {
 		return err
 	}
 
-	// check Proposer
-	if ballot.Proposer != proposal.Source() {
-		return BallotNotWellformedError.SetMessage(
-			"ballot has problem; proposer is not matched; ballot=%v proposal=%v",
-			ballot.Proposer,
-			proposal.Source(),
-		)
-	}
-
 	// check Height
-	if ballot.Height.Equal(proposal.Block.Height) {
+	if !ballot.Height.Equal(proposal.Block.Height) {
 		return BallotNotWellformedError.SetMessage(
 			"ballot has problem; height is not matched; ballot=%v proposal=%v",
 			ballot.Height,
@@ -77,5 +67,20 @@ func CheckerBallotHasValidProposal(c *common.ChainChecker) error {
 		)
 	}
 
+	return nil
+}
+
+func CheckerBallotHasValidProposr(c *common.ChainChecker) error {
+	var ballot Ballot
+	if err := c.ContextValue("ballot", &ballot); err != nil {
+		return err
+	}
+
+	// NOTE INIT ballot should have Proposer
+	if ballot.Stage != VoteStageINIT {
+		return nil
+	}
+
+	// TODO proposer should be checked
 	return nil
 }
