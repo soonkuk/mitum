@@ -13,8 +13,9 @@ const (
 )
 
 var (
-	ZeroTime   Time = Time{Time: time.Time{}}
-	timeSyncer *TimeSyncer
+	ZeroTime              Time = Time{Time: time.Time{}}
+	timeSyncer            *TimeSyncer
+	allowedTimeSyncOffset = time.Duration(time.Millisecond * 500)
 )
 
 func FormatISO8601(t Time) string {
@@ -200,6 +201,9 @@ func (s *TimeSyncer) Offset() time.Duration {
 }
 
 func (s *TimeSyncer) check() {
+	s.Lock()
+	defer s.Unlock()
+
 	response, err := ntp.Query(s.server)
 	if err != nil {
 		s.Log().Error("failed to query", "error", err)
@@ -210,11 +214,29 @@ func (s *TimeSyncer) check() {
 		s.Log().Error("failed to validate response", "response", response, "error", err)
 		return
 	}
+	defer func() {
+		s.Log().Debug("time checked", "response", response, "offset", s.offset)
+	}()
 
-	s.Lock()
-	defer s.Unlock()
+	if s.offset < 1 {
+		s.setOffset(response.ClockOffset)
+		return
+	}
 
-	s.offset = response.ClockOffset
+	diff := s.offset - response.ClockOffset
+	if diff > 0 {
+		if diff < allowedTimeSyncOffset {
+			return
+		}
+	} else if diff < 0 {
+		if diff > allowedTimeSyncOffset*-1 {
+			return
+		}
+	}
 
-	s.Log().Debug("time checked", "response", response, "offset", s.offset)
+	s.setOffset(response.ClockOffset)
+}
+
+func (s *TimeSyncer) setOffset(offset time.Duration) {
+	s.offset = offset
 }
