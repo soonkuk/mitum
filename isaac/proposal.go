@@ -8,6 +8,7 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
+// TODO reshape to be similar to Ballot
 type Proposal struct {
 	common.RawSeal
 	// TODO

@@ -39,7 +39,6 @@ type Seal interface {
 	SignedAt() Time // signed time
 	GenerateHash() (Hash, error)
 	CheckSignature(NetworkID) error
-	Raw() RawSeal
 	String() string
 }
 
@@ -292,10 +291,6 @@ func (r RawSeal) MarshalJSON() ([]byte, error) {
 
 func (r RawSeal) String() string {
 	return TerminalLogString(PrintJSON(r, true, false))
-}
-
-func (r RawSeal) Raw() RawSeal {
-	return r
 }
 
 func (r RawSeal) SealVersion() Version {

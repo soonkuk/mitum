@@ -30,7 +30,7 @@ func NewRandomHash(hint string) Hash {
 	return h
 }
 
-func NewRandomHome() *HomeNode {
+func NewRandomHome() HomeNode {
 	return NewHome(RandomSeed(), NetAddr{})
 }
 

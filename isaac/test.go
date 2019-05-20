@@ -36,21 +36,52 @@ func NewTestSealBallot(
 	round Round,
 	stage VoteStage,
 	vote Vote,
+	block common.Hash,
 ) Ballot {
-	return NewBallot(proposal, proposer, height, round, stage, vote)
+	var ballot Ballot
+	switch stage {
+	case VoteStageINIT:
+		ballot = NewINITBallot(
+			height,
+			round,
+			proposer,
+			nil, // TODO set validators
+		)
+	case VoteStageSIGN:
+		ballot = NewSIGNBallot(
+			height,
+			round,
+			proposer,
+			nil, // TODO set validators
+			proposal,
+			block,
+			vote,
+		)
+	case VoteStageACCEPT:
+		ballot = NewACCEPTBallot(
+			height,
+			round,
+			proposer,
+			nil, // TODO set validators
+			proposal,
+			block,
+		)
+	}
+
+	return ballot
 }
 
 // TODO remove if unused
 type TestSealBroadcaster struct {
 	sync.RWMutex
 	policy     ConsensusPolicy
-	home       *common.HomeNode
+	home       common.HomeNode
 	senderChan chan common.Seal
 }
 
 func NewTestSealBroadcaster(
 	policy ConsensusPolicy,
-	home *common.HomeNode,
+	home common.HomeNode,
 ) (*TestSealBroadcaster, error) {
 	return &TestSealBroadcaster{
 		policy: policy,

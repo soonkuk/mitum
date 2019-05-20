@@ -20,9 +20,11 @@ func (t *testSealChecker) TestCheckerSealTypesSealedSeal() {
 		Round(2),
 		VoteStageSIGN,
 		VoteYES,
+		common.NewRandomHash("bk"),
 	)
 
-	err := ballot.Sign(common.TestNetworkID, common.RandomSeed())
+	seal := ballot.(SIGNBallot)
+	err := (&seal).Sign(common.TestNetworkID, common.RandomSeed())
 	t.NoError(err)
 
 	sealed, err := common.NewSealedSeal(ballot)

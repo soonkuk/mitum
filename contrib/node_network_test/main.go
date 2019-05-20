@@ -130,7 +130,7 @@ func createNode(seedString string) (*Node, error) {
 }
 
 type Node struct {
-	home             *common.HomeNode
+	home             common.HomeNode
 	log              log15.Logger
 	state            *isaac.ConsensusState
 	nt               *network.NodeTestNetwork

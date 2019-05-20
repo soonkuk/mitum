@@ -9,7 +9,7 @@ import (
 
 type ConsensusState struct {
 	sync.RWMutex
-	home       *common.HomeNode
+	home       common.HomeNode
 	height     common.Big  // last Block.Height
 	block      common.Hash // Block.Hash()
 	state      []byte      // last State.Root.Hash()
@@ -17,7 +17,7 @@ type ConsensusState struct {
 	validators map[common.Address]common.Validator
 }
 
-func NewConsensusState(home *common.HomeNode) *ConsensusState {
+func NewConsensusState(home common.HomeNode) *ConsensusState {
 	return &ConsensusState{
 		home:       home,
 		nodeState:  NodeStateBooting,
@@ -46,7 +46,7 @@ func (c *ConsensusState) String() string {
 	return common.TerminalLogString(string(b))
 }
 
-func (c *ConsensusState) Home() *common.HomeNode {
+func (c *ConsensusState) Home() common.HomeNode {
 	c.RLock()
 	defer c.RUnlock()
 

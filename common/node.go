@@ -128,21 +128,21 @@ type HomeNode struct {
 	seed Seed
 }
 
-func NewHome(seed Seed, publish NetAddr) *HomeNode {
-	return &HomeNode{
+func NewHome(seed Seed, publish NetAddr) HomeNode {
+	return HomeNode{
 		BaseNode: NewBaseNode(seed.Address(), publish),
 		seed:     seed,
 	}
 }
 
-func (n *HomeNode) Seed() Seed {
+func (n HomeNode) Seed() Seed {
 	n.RLock()
 	defer n.RUnlock()
 
 	return n.seed
 }
 
-func (n *HomeNode) UnmarshalBinary(b []byte) error {
+func (n HomeNode) UnmarshalBinary(b []byte) error {
 	var node BaseNode
 	if err := Decode(b, &node); err != nil {
 		return err

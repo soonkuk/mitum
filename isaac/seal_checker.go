@@ -98,7 +98,8 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			CheckerProposalBlock,
 			CheckerProposalState,
 		)
-	case BallotSealType:
+	case INITBallotSealType, SIGNBallotSealType, ACCEPTBallotSealType:
+		// TODO check separately
 		_ = c.SetContext("ballot", seal.(Ballot))
 
 		return common.NewChainChecker(
@@ -112,6 +113,6 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		// TODO handle transaction
 		return common.NewChainCheckerStop("transaction seal found; this will be implemented")
 	default:
-		return common.UnknownSealTypeError.SetMessage("tyep=%v", seal.Type())
+		return common.UnknownSealTypeError.SetMessage("type=%v", seal.Type())
 	}
 }

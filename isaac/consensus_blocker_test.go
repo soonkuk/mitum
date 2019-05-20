@@ -20,7 +20,7 @@ type testConsensusBlocker struct {
 	total     uint
 	threshold uint
 
-	home             *common.HomeNode
+	home             common.HomeNode
 	cstate           *ConsensusState
 	policy           ConsensusPolicy
 	votingBox        *TestMockVotingBox
@@ -99,6 +99,8 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	votingResult := VoteResultInfo{
 		Proposed: true,
 		Proposal: proposal.Hash(),
+		Proposer: proposal.Source(),
+		Block:    proposal.Block.Next,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -128,14 +130,14 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	}
 
 	// sign ballot is received
-	t.Equal(BallotSealType, receivedSeal.Type())
+	t.Equal(SIGNBallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
-	t.True(votingResult.Height.Equal(receivedBallot.Height))
-	t.Equal(round, receivedBallot.Round)
+	t.True(votingResult.Height.Equal(receivedBallot.Height()))
+	t.Equal(round, receivedBallot.Round())
 	t.Equal(t.home.Address(), receivedBallot.Source())
-	t.Equal(VoteStageSIGN, receivedBallot.Stage)
-	t.True(receivedBallot.Vote.IsValid())
+	t.Equal(VoteStageSIGN, receivedBallot.Stage())
+	t.True(receivedBallot.Vote().IsValid())
 }
 
 // TestSIGN simulates, sign ballots consensused,
@@ -148,12 +150,13 @@ func (t *testConsensusBlocker) TestSIGN() {
 
 	proposal := common.NewRandomHash("sl")
 
-	ballot := NewBallot(
-		proposal,
-		t.home.Address(),
+	ballot := NewSIGNBallot(
 		t.height,
 		round,
-		VoteStageSIGN,
+		t.home.Address(),
+		nil, // TODO set validators
+		proposal,
+		common.NewRandomHash("bk"),
 		VoteYES,
 	)
 
@@ -164,6 +167,8 @@ func (t *testConsensusBlocker) TestSIGN() {
 
 	votingResult := VoteResultInfo{
 		Proposed: false,
+		Proposer: t.home.Address(),
+		Block:    ballot.Block(),
 		Proposal: proposal,
 		Result:   VoteResultYES,
 		Height:   t.height,
@@ -193,15 +198,15 @@ func (t *testConsensusBlocker) TestSIGN() {
 		receivedBallot = b
 	}
 
-	// sign ballot is received
-	t.Equal(BallotSealType, receivedSeal.Type())
+	// accept ballot is received
+	t.Equal(ACCEPTBallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
-	t.True(votingResult.Height.Equal(receivedBallot.Height))
-	t.Equal(round, receivedBallot.Round)
+	t.True(votingResult.Height.Equal(receivedBallot.Height()))
+	t.Equal(round, receivedBallot.Round())
 	t.Equal(t.home.Address(), receivedBallot.Source())
-	t.Equal(VoteStageACCEPT, receivedBallot.Stage)
-	t.True(receivedBallot.Vote.IsValid())
+	t.Equal(VoteStageACCEPT, receivedBallot.Stage())
+	t.True(receivedBallot.Vote().IsValid())
 }
 
 // TestACCEPT simulates, accept ballots consensused, blocker will,
@@ -241,13 +246,13 @@ func (t *testConsensusBlocker) TestACCEPT() {
 		t.NoError(err)
 	}
 
-	ballot := NewBallot(
-		proposal.Hash(),
-		t.home.Address(),
+	ballot := NewACCEPTBallot(
 		t.height,
 		round,
-		VoteStageACCEPT,
-		VoteYES,
+		t.home.Address(),
+		nil, // TODO set validators
+		proposal.Hash(),
+		common.NewRandomHash("bk"),
 	)
 	err := ballot.Sign(common.TestNetworkID, t.home.Seed())
 	t.NoError(err)
@@ -295,12 +300,13 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 	round := Round(1)
 	proposal := common.NewRandomHash("sl")
 
-	ballot := NewBallot(
-		proposal,
-		t.home.Address(),
+	ballot := NewSIGNBallot(
 		t.height,
 		round,
-		VoteStageSIGN,
+		t.home.Address(),
+		nil, // TODO set validators
+		proposal,
+		common.NewRandomHash("bk"),
 		VoteNOP,
 	)
 
@@ -340,16 +346,16 @@ func (t *testConsensusBlocker) TestSIGNButNOP() {
 		receivedBallot = b
 	}
 
-	t.Equal(BallotSealType, receivedSeal.Type())
+	t.Equal(INITBallotSealType, receivedSeal.Type())
 	t.NoError(receivedSeal.Wellformed())
 
 	// should be round + 1
-	t.Equal(round+1, receivedBallot.Round)
+	t.Equal(round+1, receivedBallot.Round())
 
-	t.True(votingResult.Height.Equal(receivedBallot.Height))
+	t.True(votingResult.Height.Equal(receivedBallot.Height()))
 	t.Equal(t.home.Address(), receivedBallot.Source())
-	t.Equal(VoteStageINIT, receivedBallot.Stage)
-	t.True(receivedBallot.Vote.IsValid())
+	t.Equal(VoteStageINIT, receivedBallot.Stage())
+	t.True(receivedBallot.Vote().IsValid())
 }
 
 // TestFreshNewProposalButExpired simulates, new proposal is received, but next
@@ -381,6 +387,8 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 	votingResult := VoteResultInfo{
 		Proposed: true,
 		Proposal: proposal.Hash(),
+		Proposer: proposal.Source(),
+		Block:    proposal.Block.Next,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -413,11 +421,11 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 		receivedBallot = b
 	}
 
-	t.True(votingResult.Height.Equal(receivedBallot.Height))
-	t.Equal(round+1, receivedBallot.Round)
+	t.True(votingResult.Height.Equal(receivedBallot.Height()))
+	t.Equal(round+1, receivedBallot.Round())
 	t.Equal(t.home.Address(), receivedBallot.Source())
-	t.Equal(VoteStageINIT, receivedBallot.Stage)
-	t.Equal(VoteYES, receivedBallot.Vote)
+	t.Equal(VoteStageINIT, receivedBallot.Stage())
+	t.Equal(VoteYES, receivedBallot.Vote())
 }
 
 // TestWaitingBallotButExpired simulates that proposal accepted, but next
@@ -454,11 +462,11 @@ func (t *testConsensusBlocker) TestWaitingBallotButExpired() {
 		receivedBallot = b
 	}
 
-	t.True(t.height.Equal(receivedBallot.Height))
-	t.Equal(round+1, receivedBallot.Round)
+	t.True(t.height.Equal(receivedBallot.Height()))
+	t.Equal(round+1, receivedBallot.Round())
 	t.Equal(t.home.Address(), receivedBallot.Source())
-	t.Equal(VoteStageINIT, receivedBallot.Stage)
-	t.Equal(VoteYES, receivedBallot.Vote)
+	t.Equal(VoteStageINIT, receivedBallot.Stage())
+	t.Equal(VoteYES, receivedBallot.Vote())
 }
 
 // TestProposeNewProposal simulates, init ballots consensused, blocker will,
@@ -479,13 +487,11 @@ func (t *testConsensusBlocker) TestProposeNewProposalNextRound() {
 	}
 	t.votingBox.SetResult(votingResult, nil)
 
-	ballot := NewBallot(
-		votingResult.Proposal,
-		t.home.Address(),
+	ballot := NewINITBallot(
 		t.height,
 		votingResult.Round,
-		votingResult.Stage,
-		VoteYES,
+		t.home.Address(),
+		nil, // TODO set validators
 	)
 	_ = ballot.Sign(common.TestNetworkID, t.home.Seed())
 	_ = t.sealPool.Add(ballot)

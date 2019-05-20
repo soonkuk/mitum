@@ -11,7 +11,7 @@ import (
 
 type testVotingBox struct {
 	suite.Suite
-	home         *common.HomeNode
+	home         common.HomeNode
 	votingBox    *DefaultVotingBox
 	seals        map[common.Hash]common.Seal
 	proposeSeals map[common.Hash]Proposal
@@ -28,8 +28,8 @@ func (t *testVotingBox) SetupTest() {
 	t.ballotSeals = map[common.Hash]Ballot{}
 }
 
-func (t *testVotingBox) newNodes(n uint) []*common.HomeNode {
-	var nodes []*common.HomeNode
+func (t *testVotingBox) newNodes(n uint) []common.HomeNode {
+	var nodes []common.HomeNode
 	for i := uint(0); i < n; i++ {
 		nodes = append(nodes, common.NewRandomHome())
 	}
@@ -38,48 +38,65 @@ func (t *testVotingBox) newNodes(n uint) []*common.HomeNode {
 }
 
 func (t *testVotingBox) newBallot(
-	node *common.HomeNode,
+	node common.HomeNode,
 	proposal common.Hash,
+	proposer common.Address,
 	height common.Big,
 	stage VoteStage,
 	round Round,
 	vote Vote,
+	block common.Hash,
 ) (Ballot, error) {
 	ballot := NewTestSealBallot(
 		proposal,
-		node.Address(),
+		proposer,
 		height,
 		round,
 		stage,
 		vote,
+		block,
 	)
 
-	err := ballot.Sign(common.TestNetworkID, node.Seed())
-	if err != nil {
-		return Ballot{}, err
+	var seal common.Seal
+	var err error
+	switch stage {
+	case VoteStageSIGN:
+		s := ballot.(SIGNBallot)
+		err = (&s).Sign(common.TestNetworkID, node.Seed())
+		seal = s
+	case VoteStageACCEPT:
+		s := ballot.(ACCEPTBallot)
+		err = (&s).Sign(common.TestNetworkID, node.Seed())
+		seal = s
 	}
 
-	t.seals[ballot.Hash()] = ballot
+	if err != nil {
+		return nil, err
+	}
 
-	return ballot, nil
+	t.seals[seal.Hash()] = seal
+
+	return seal.(Ballot), nil
 }
 
 func (t *testVotingBox) newBallotVote(
-	node *common.HomeNode,
+	node common.HomeNode,
 	proposal common.Hash,
+	proposer common.Address,
 	height common.Big,
 	stage VoteStage,
 	round Round,
 	vote Vote,
+	block common.Hash,
 ) (Ballot, VoteResultInfo, error) {
-	ballot, err := t.newBallot(node, proposal, height, stage, round, vote)
+	ballot, err := t.newBallot(node, proposal, proposer, height, stage, round, vote, block)
 	if err != nil {
-		return Ballot{}, VoteResultInfo{}, err
+		return nil, VoteResultInfo{}, err
 	}
 
 	result, err := t.votingBox.Vote(ballot)
 	if err != nil {
-		return Ballot{}, result, err
+		return nil, result, err
 	}
 
 	return ballot, result, nil
@@ -164,7 +181,16 @@ func (t *testVotingBox) TestVoteCurrent() {
 		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
-		_, _, err := t.newBallotVote(v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote)
+		_, _, err := t.newBallotVote(
+			v0,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v0Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -180,7 +206,16 @@ func (t *testVotingBox) TestVoteCurrent() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
-		_, _, err := t.newBallotVote(v1, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		_, _, err := t.newBallotVote(
+			v1,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v1Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -196,7 +231,16 @@ func (t *testVotingBox) TestVoteCurrent() {
 		v2 := common.NewRandomHome()
 		v2Vote := VoteNOP
 
-		_, _, err := t.newBallotVote(v2, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v2Vote)
+		_, _, err := t.newBallotVote(
+			v2,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v2Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -227,7 +271,16 @@ func (t *testVotingBox) TestVoteUnknown() {
 		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
-		_, _, err := t.newBallotVote(v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote)
+		_, _, err := t.newBallotVote(
+			v0,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v0Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -245,7 +298,16 @@ func (t *testVotingBox) TestVoteUnknown() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
-		ballot, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		ballot, _, err := t.newBallotVote(
+			v1,
+			phash1,
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v1Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -282,7 +344,16 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		v0 := common.NewRandomHome()
 		v0Vote := VoteYES
 
-		_, _, err := t.newBallotVote(v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote)
+		_, _, err := t.newBallotVote(
+			v0,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v0Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -300,7 +371,16 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteNOP
 
-		ballot, _, err := t.newBallotVote(v1, phash1, proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		ballot, _, err := t.newBallotVote(
+			v1,
+			phash1,
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v1Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -328,7 +408,16 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		v1 := common.NewRandomHome()
 		v1Vote := VoteYES
 
-		_, _, err := t.newBallotVote(v1, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v1Vote)
+		_, _, err := t.newBallotVote(
+			v1,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v1Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		current, unknown := votingBox.Voted(v1.Address())
@@ -355,6 +444,8 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 	height := common.NewBig(200)
 	stage := VoteStageACCEPT
 	round := Round(99)
+	proposer := t.home.Address()
+	block := common.NewRandomHash("bk")
 
 	{ // vote under threshold
 		for i, n := range nodes {
@@ -363,6 +454,8 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 			}
 			_, err := vo.Vote(
 				phash,
+				proposer,
+				block,
 				n.Address(),
 				height,
 				round,
@@ -389,6 +482,8 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 			}
 			_, err := vo.Vote(
 				phash,
+				proposer,
+				block,
 				n.Address(),
 				height,
 				round,
@@ -425,6 +520,8 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 
 	height := common.NewBig(200)
 	round := Round(99)
+	proposer := t.home.Address()
+	block := common.NewRandomHash("bk")
 
 	{ // vote under threshold
 		for i, n := range nodes {
@@ -434,6 +531,8 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 
 			_, err := vo.Vote(
 				common.NewRandomHash("sl"), // different proposal
+				proposer,
+				block,
 				n.Address(),
 				height,
 				round,
@@ -469,6 +568,8 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 
 			_, err := vo.Vote(
 				common.NewRandomHash("sl"), // different proposal
+				proposer,
+				block,
 				n.Address(),
 				height,
 				round,
@@ -495,6 +596,8 @@ func (t *testVotingBox) TestCloseVotingBoxStage() {
 	st := NewVotingBoxStage(
 		t.policy,
 		common.NewRandomHash("sl"),
+		t.home.Address(),
+		common.NewRandomHash("bk"),
 		common.NewBig(33),
 		Round(0),
 		VoteStageSIGN,
@@ -518,6 +621,8 @@ func (t *testVotingBox) TestCloseUnknown() {
 		address := common.NewRandomHome().Address()
 		_, err := un.Vote(
 			common.NewRandomHash("sl"),
+			t.home.Address(),
+			common.NewRandomHash("bk"),
 			address,
 			common.NewBig(1),
 			Round(0),
@@ -556,7 +661,14 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 
 		var ballot Ballot
 		ballot, _, err = t.newBallotVote(
-			v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, v0Vote,
+			v0,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v0Vote,
+			proposal.Block.Current,
 		)
 		t.NoError(err)
 
@@ -600,7 +712,14 @@ func (t *testVotingBox) TestAlreadyVotedCurrentButExpired() {
 	{ // v0 vote the current proposal
 		var err error
 		ballot, _, err = t.newBallotVote(
-			v0, proposal.Hash(), proposal.Block.Height, VoteStageSIGN, round, VoteYES,
+			v0,
+			proposal.Hash(),
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			VoteYES,
+			proposal.Block.Current,
 		)
 		t.NoError(err)
 
@@ -636,7 +755,16 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 		v0Vote := VoteYES
 
 		var ballot Ballot
-		ballot, _, err = t.newBallotVote(v0, phashUnknown, proposal.Block.Height, VoteStageSIGN, round, v0Vote)
+		ballot, _, err = t.newBallotVote(
+			v0,
+			phashUnknown,
+			proposal.Source(),
+			proposal.Block.Height,
+			VoteStageSIGN,
+			round,
+			v0Vote,
+			proposal.Block.Current,
+		)
 		t.NoError(err)
 
 		// check
@@ -673,6 +801,8 @@ func (t *testVotingBox) TestOpenedVoteResultInfoStageINIT() {
 func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 	// open new current
 	proposal := NewTestProposal(t.home.Address(), nil)
+	err := proposal.Sign(common.TestNetworkID, t.home.Seed())
+	t.NoError(err)
 
 	t.votingBox.Open(proposal)
 
@@ -680,10 +810,12 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 		_, _, err := t.newBallotVote(
 			common.NewRandomHome(),
 			proposal.Hash(),
+			proposal.Source(),
 			proposal.Block.Height,
 			VoteStageSIGN,
 			proposal.Round,
 			VoteYES,
+			proposal.Block.Current,
 		)
 		t.NoError(err)
 	}
@@ -703,10 +835,12 @@ func (t *testVotingBox) TestMajorityInUnknownCloseCurrent() {
 			_, r, err := t.newBallotVote(
 				other,
 				otherPhash,
+				proposal.Source(),
 				proposal.Block.Height,
 				otherStage,
 				otherRound,
 				VoteYES,
+				proposal.Block.Current,
 			)
 			t.NoError(err)
 			if r.NotYet() {
@@ -749,10 +883,12 @@ func TestVotingBox(t *testing.T) {
 
 type testVotingBoxStage struct {
 	suite.Suite
+	home   common.HomeNode
 	policy ConsensusPolicy
 }
 
 func (t *testVotingBox) SetupSuite() {
+	t.home = common.NewRandomHome()
 	t.policy = DefaultConsensusPolicy()
 	t.policy.NetworkID = common.TestNetworkID
 	t.policy.Total = 4
@@ -776,6 +912,8 @@ func (t *testVotingBoxStage) newVotingBoxStage() *VotingBoxStage {
 	return NewVotingBoxStage(
 		t.policy,
 		common.NewRandomHash("sl"),
+		t.home.Address(),
+		common.NewRandomHash("bk"),
 		common.NewBig(33),
 		Round(0),
 		VoteStageSIGN,

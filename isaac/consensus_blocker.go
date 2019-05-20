@@ -208,8 +208,22 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 			}
 
 			votingResult, err = c.voteProposal(proposal)
-		case BallotSealType:
-			var ballot Ballot
+		case INITBallotSealType:
+			var ballot INITBallot
+			if err = common.CheckSeal(seal, &ballot); err != nil {
+				return err
+			}
+
+			votingResult, err = c.voteBallot(ballot)
+		case SIGNBallotSealType:
+			var ballot SIGNBallot
+			if err = common.CheckSeal(seal, &ballot); err != nil {
+				return err
+			}
+
+			votingResult, err = c.voteBallot(ballot)
+		case ACCEPTBallotSealType:
+			var ballot ACCEPTBallot
 			if err = common.CheckSeal(seal, &ballot); err != nil {
 				return err
 			}
@@ -267,6 +281,8 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		if votingResult.Result == VoteResultYES {
 			return c.goToNextStage(
 				votingResult.Proposal,
+				votingResult.Proposer,
+				votingResult.Block,
 				votingResult.Height,
 				votingResult.Round,
 				votingResult.Stage.Next(),
@@ -392,14 +408,14 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 
 	vote := VoteYES
 
-	// broadcast sign ballot
-
-	ballot := NewBallot(
-		votingResult.Proposal,
-		"",
+	// NOTE broadcast sign ballot
+	ballot := NewSIGNBallot(
 		votingResult.Height,
 		votingResult.Round,
-		VoteStageSIGN,
+		votingResult.Proposer,
+		nil, // TODO set validators
+		votingResult.Proposal,
+		votingResult.Block,
 		vote,
 	)
 
@@ -410,9 +426,11 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 	return nil
 }
 
-// goToNextStage goes to next stage
+// goToNextStage goes to next stage; the next stage should be ACCEPT
 func (c *ConsensusBlocker) goToNextStage(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
@@ -431,14 +449,14 @@ func (c *ConsensusBlocker) goToNextStage(
 		return err
 	}
 
-	// broadcast next stage ballot
-	ballot := NewBallot(
-		proposal,
-		"",
+	// NOTE broadcast next stage ballot
+	ballot := NewACCEPTBallot(
 		height,
 		round,
-		stage,
-		VoteYES,
+		proposer,
+		nil, // TODO set validators
+		proposal,
+		block,
 	)
 
 	if err := c.sealBroadcaster.Send(&ballot); err != nil {
@@ -550,13 +568,11 @@ func (c *ConsensusBlocker) broadcastINIT(height common.Big, round Round) error {
 	if err != nil {
 		return err
 	}
-	ballot := NewBallot(
-		common.Hash{},
-		proposer.Address(),
+	ballot := NewINITBallot(
 		height,
 		round,
-		VoteStageINIT,
-		VoteYES,
+		proposer.Address(),
+		nil, // TODO set validators
 	)
 
 	// TODO self-signed ballot should not be needed to broadcast

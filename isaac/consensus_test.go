@@ -18,7 +18,7 @@ type testConsensus struct {
 	total     uint
 	threshold uint
 
-	home             *common.HomeNode
+	home             common.HomeNode
 	nt               *network.NodeTestNetwork
 	sealBroadcaster  *DefaultSealBroadcaster
 	blocker          *ConsensusBlocker

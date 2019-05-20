@@ -51,10 +51,10 @@ func CheckerBlockerBallot(c *common.ChainChecker) error {
 		return err
 	}
 
-	if ballot.Height.Cmp(state.Height()) < 0 {
+	if ballot.Height().Cmp(state.Height()) < 0 {
 		c.Log().Debug(
 			"lower height ballot received",
-			"in_ballot", ballot.Height,
+			"in_ballot", ballot.Height(),
 			"current", state.Height(),
 		)
 	}

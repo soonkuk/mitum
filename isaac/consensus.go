@@ -16,13 +16,13 @@ type Consensus struct {
 	stop     chan bool
 	voteChan chan common.Seal
 	ctx      context.Context
-	home     *common.HomeNode
+	home     common.HomeNode
 	blocker  *ConsensusBlocker
 	state    *ConsensusState
 }
 
 func NewConsensus(
-	home *common.HomeNode,
+	home common.HomeNode,
 	state *ConsensusState,
 	blocker *ConsensusBlocker,
 ) (*Consensus, error) {

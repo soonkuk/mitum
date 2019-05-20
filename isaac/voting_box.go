@@ -20,14 +20,14 @@ type VotingBox interface {
 type DefaultVotingBox struct {
 	sync.RWMutex
 	*common.Logger
-	home     *common.HomeNode
+	home     common.HomeNode
 	policy   ConsensusPolicy
 	current  *VotingBoxProposal
 	previous *VotingBoxProposal
 	unknown  *VotingBoxUnknown
 }
 
-func NewDefaultVotingBox(home *common.HomeNode, policy ConsensusPolicy) *DefaultVotingBox {
+func NewDefaultVotingBox(home common.HomeNode, policy ConsensusPolicy) *DefaultVotingBox {
 	return &DefaultVotingBox{
 		home:    home,
 		Logger:  common.NewLogger(log, "module", "voting-box", "node", home.Name()),
@@ -63,7 +63,14 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.current = NewVotingBoxProposal(r.policy, proposal.Hash(), proposal.Block.Height, proposal.Round)
+	r.current = NewVotingBoxProposal(
+		r.policy,
+		proposal.Hash(),
+		proposal.Source(),
+		proposal.Block.Next,
+		proposal.Block.Height,
+		proposal.Round,
+	)
 
 	// import from others
 	for _, u := range r.unknown.Proposal(proposal.Hash()) {
@@ -77,6 +84,8 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 	result := VoteResultInfo{
 		Result:      VoteResultYES,
 		Proposal:    proposal.Hash(),
+		Proposer:    proposal.Source(),
+		Block:       proposal.Block.Next,
 		Height:      proposal.Block.Height,
 		Round:       proposal.Round,
 		Stage:       VoteStageINIT, // NOTE will broadcast sign ballot
@@ -144,12 +153,14 @@ func (r *DefaultVotingBox) afterMajority(result VoteResultInfo) error {
 
 func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
 	result, err := r.vote(
-		ballot.Proposal,
+		ballot.Proposal(),
+		ballot.Proposer(),
+		ballot.Block(),
 		ballot.Source(),
-		ballot.Height,
-		ballot.Round,
-		ballot.Stage,
-		ballot.Vote,
+		ballot.Height(),
+		ballot.Round(),
+		ballot.Stage(),
+		ballot.Vote(),
 		ballot.Hash(),
 	)
 	if err != nil {
@@ -157,10 +168,10 @@ func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
 	}
 
 	if result.NotYet() {
-		result.Height = ballot.Height
-		result.Round = ballot.Round
-		result.Stage = ballot.Stage
-		result.Proposal = ballot.Proposal
+		result.Height = ballot.Height()
+		result.Round = ballot.Round()
+		result.Stage = ballot.Stage()
+		result.Proposal = ballot.Proposal()
 
 		return result, nil
 	}
@@ -170,6 +181,8 @@ func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
 
 func (r *DefaultVotingBox) vote(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	source common.Address,
 	height common.Big,
 	round Round,
@@ -180,6 +193,8 @@ func (r *DefaultVotingBox) vote(
 	// vote for unknown
 	log_ := r.Log().New(log15.Ctx{
 		"proposal": proposal,
+		"proposer": proposer,
+		"block":    block,
 		"source":   source,
 		"height":   height,
 		"round":    round,
@@ -193,6 +208,8 @@ func (r *DefaultVotingBox) vote(
 		log_.Debug("trying to vote to unknown")
 		return r.voteUnknown(
 			proposal,
+			proposer,
+			block,
 			source,
 			height,
 			round,
@@ -205,6 +222,8 @@ func (r *DefaultVotingBox) vote(
 	log_.Debug("trying to vote to known")
 	return r.voteKnown(
 		proposal,
+		proposer,
+		block,
 		source,
 		stage,
 		vote,
@@ -214,6 +233,8 @@ func (r *DefaultVotingBox) vote(
 
 func (r *DefaultVotingBox) voteKnown(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	source common.Address,
 	stage VoteStage,
 	vote Vote,
@@ -270,6 +291,8 @@ func (r *DefaultVotingBox) voteKnown(
 
 func (r *DefaultVotingBox) voteUnknown(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	source common.Address,
 	height common.Big,
 	round Round,
@@ -291,6 +314,8 @@ func (r *DefaultVotingBox) voteUnknown(
 
 	_, err := r.unknown.Vote(
 		proposal,
+		proposer,
+		block,
 		source,
 		height,
 		round,
@@ -379,6 +404,8 @@ func (r *DefaultVotingBox) ProposalVoted(proposal common.Hash) bool {
 type VotingBoxProposal struct {
 	policy      ConsensusPolicy
 	proposal    common.Hash
+	proposer    common.Address
+	block       common.Hash
 	height      common.Big
 	round       Round
 	stage       VoteStage
@@ -389,17 +416,21 @@ type VotingBoxProposal struct {
 func NewVotingBoxProposal(
 	policy ConsensusPolicy,
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	height common.Big,
 	round Round,
 ) *VotingBoxProposal {
 	return &VotingBoxProposal{
 		policy:      policy,
 		proposal:    proposal,
+		proposer:    proposer,
+		block:       block,
 		height:      height,
 		round:       round,
 		stage:       VoteStageINIT,
-		stageSIGN:   NewVotingBoxStage(policy, proposal, height, round, VoteStageSIGN),
-		stageACCEPT: NewVotingBoxStage(policy, proposal, height, round, VoteStageACCEPT),
+		stageSIGN:   NewVotingBoxStage(policy, proposal, proposer, block, height, round, VoteStageSIGN),
+		stageACCEPT: NewVotingBoxStage(policy, proposal, proposer, block, height, round, VoteStageACCEPT),
 	}
 }
 
@@ -506,6 +537,8 @@ func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vo
 func (v *VotingBoxProposal) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"proposal":    v.proposal,
+		"proposer":    v.proposer,
+		"block":       v.block,
 		"height":      v.height,
 		"round":       v.round,
 		"stage":       v.stage,
@@ -524,6 +557,8 @@ type VotingBoxStage struct {
 	sync.RWMutex
 	policy   ConsensusPolicy
 	proposal common.Hash
+	proposer common.Address
+	block    common.Hash
 	height   common.Big
 	round    Round
 	stage    VoteStage
@@ -534,6 +569,8 @@ type VotingBoxStage struct {
 func NewVotingBoxStage(
 	policy ConsensusPolicy,
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
@@ -541,6 +578,8 @@ func NewVotingBoxStage(
 	return &VotingBoxStage{
 		policy:   policy,
 		proposal: proposal,
+		proposer: proposer,
+		block:    block,
 		height:   height,
 		round:    round,
 		stage:    stage,
@@ -657,6 +696,8 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 	}
 
 	r.Proposal = v.proposal
+	r.Proposer = v.proposer
+	r.Block = v.block
 	r.Height = v.height
 	r.Round = v.round
 	r.Stage = v.stage
@@ -674,6 +715,8 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 func (v *VotingBoxStage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"proposal": v.proposal,
+		"proposer": v.proposer,
+		"block":    v.block,
 		"height":   v.height,
 		"round":    v.round,
 		"stage":    v.stage,
@@ -756,6 +799,8 @@ func (v *VotingBoxUnknown) Len() int {
 
 func (v *VotingBoxUnknown) Vote(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	source common.Address,
 	height common.Big,
 	round Round,
@@ -763,7 +808,7 @@ func (v *VotingBoxUnknown) Vote(
 	vote Vote,
 	seal common.Hash,
 ) (*VotingBoxUnknown, error) {
-	u, err := NewVotingBoxUnknownVote(proposal, source, height, round, stage, vote, seal)
+	u, err := NewVotingBoxUnknownVote(proposal, proposer, block, source, height, round, stage, vote, seal)
 	if err != nil {
 		return v, err
 	}
@@ -1026,6 +1071,8 @@ type VotingBoxUnknownVote struct {
 	VotingBoxStageNode
 	source   common.Address
 	proposal common.Hash
+	proposer common.Address
+	block    common.Hash
 	height   common.Big
 	round    Round
 	stage    VoteStage
@@ -1033,6 +1080,8 @@ type VotingBoxUnknownVote struct {
 
 func NewVotingBoxUnknownVote(
 	proposal common.Hash,
+	proposer common.Address,
+	block common.Hash,
 	source common.Address,
 	height common.Big,
 	round Round,
@@ -1043,6 +1092,8 @@ func NewVotingBoxUnknownVote(
 	return VotingBoxUnknownVote{
 		VotingBoxStageNode: NewVotingBoxStageNode(vote, seal),
 		proposal:           proposal,
+		proposer:           proposer,
+		block:              block,
 		source:             source,
 		height:             height,
 		round:              round,
@@ -1058,6 +1109,8 @@ func (v VotingBoxUnknownVote) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"source":   v.source,
 		"proposal": v.proposal,
+		"proposer": v.proposer,
+		"block":    v.block,
 		"height":   v.height,
 		"round":    v.round,
 		"stage":    v.stage,
