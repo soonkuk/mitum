@@ -29,6 +29,7 @@ const (
 	SealNotFromValidatorsErrorCode
 	OverSealSignedAtAllowDurationErrorCode
 	ProposalHasInvalidProposerErrorCode
+	ConsensusButBlockDoesNotMatchErrorCode
 )
 
 var (
@@ -57,4 +58,5 @@ var (
 	SealNotFromValidatorsError           common.Error = common.NewError("isaac", SealNotFromValidatorsErrorCode, "seal is not from validators")
 	OverSealSignedAtAllowDurationError   common.Error = common.NewError("isaac", OverSealSignedAtAllowDurationErrorCode, "Seal.SignedAt() is not within SealSignedAtAllowDuration")
 	ProposalHasInvalidProposerError      common.Error = common.NewError("isaac", ProposalHasInvalidProposerErrorCode, "Proposal has invalid proposer")
+	ConsensusButBlockDoesNotMatchError   common.Error = common.NewError("isaac", ConsensusButBlockDoesNotMatchErrorCode, "consensus, but VoteResultInfo.Block does not match with previous result")
 )

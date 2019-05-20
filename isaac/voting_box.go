@@ -51,9 +51,13 @@ func (r *DefaultVotingBox) Unknown() *VotingBoxUnknown {
 // Open starts new DefaultVotingBox for node.
 func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 	if r.current != nil {
-		if r.current.proposal.Equal(proposal.Hash()) {
+		if r.current.IsProposalOpened(proposal.Hash()) {
 			return VoteResultInfo{}, VotingBoxProposalAlreadyStartedError.SetMessage(
-				"close running VotingBox first",
+				"ialready opened in current",
+			)
+		} else if r.previous.IsProposalOpened(proposal.Hash()) {
+			return VoteResultInfo{}, VotingBoxProposalAlreadyStartedError.SetMessage(
+				"already opened in previous",
 			)
 		}
 
@@ -74,7 +78,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 
 	// import from others
 	for _, u := range r.unknown.Proposal(proposal.Hash()) {
-		_, err := r.current.Vote(u.source, u.stage, u.vote, u.seal)
+		_, err := r.current.Vote(u.source, u.stage, u.vote, u.seal, proposal.Block.Next)
 		if err != nil {
 			return VoteResultInfo{}, err
 		}
@@ -92,7 +96,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		Proposed:    true,
 		LastVotedAt: common.Now(),
 		Voted: map[common.Address]VotingBoxStageNode{
-			proposal.Source(): NewVotingBoxStageNode(VoteYES, proposal.Hash()),
+			proposal.Source(): NewVotingBoxStageNode(VoteYES, proposal.Hash(), proposal.Block.Next),
 		},
 	}
 
@@ -264,7 +268,7 @@ func (r *DefaultVotingBox) voteKnown(
 		return VoteResultInfo{}, SealAlreadyVotedError
 	}
 
-	vs, err := p.Vote(source, stage, vote, seal)
+	vs, err := p.Vote(source, stage, vote, seal, block)
 	if err != nil {
 		return VoteResultInfo{}, err
 	}
@@ -434,6 +438,10 @@ func NewVotingBoxProposal(
 	}
 }
 
+func (v *VotingBoxProposal) IsProposalOpened(proposal common.Hash) bool {
+	return v.proposal.Equal(proposal)
+}
+
 func (v *VotingBoxProposal) Stage(stage VoteStage) *VotingBoxStage {
 	switch stage {
 	case VoteStageSIGN:
@@ -517,7 +525,7 @@ func (v *VotingBoxProposal) SealVoted(seal common.Hash) bool {
 	return false
 }
 
-func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vote, seal common.Hash) (
+func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vote, seal, block common.Hash) (
 	*VotingBoxStage,
 	error,
 ) {
@@ -531,7 +539,7 @@ func (v *VotingBoxProposal) Vote(source common.Address, stage VoteStage, vote Vo
 		return nil, InvalidVoteStageError
 	}
 
-	return vs.Vote(source, vote, seal)
+	return vs.Vote(source, vote, seal, block)
 }
 
 func (v *VotingBoxProposal) MarshalJSON() ([]byte, error) {
@@ -643,11 +651,11 @@ func (v *VotingBoxStage) Cancel(source common.Address) bool {
 	return true
 }
 
-func (v *VotingBoxStage) Vote(source common.Address, vote Vote, seal common.Hash) (*VotingBoxStage, error) {
+func (v *VotingBoxStage) Vote(source common.Address, vote Vote, seal, block common.Hash) (*VotingBoxStage, error) {
 	v.Lock()
 	defer v.Unlock()
 
-	v.voted[source] = NewVotingBoxStageNode(vote, seal)
+	v.voted[source] = NewVotingBoxStageNode(vote, seal, block)
 	return v, nil
 }
 
@@ -695,9 +703,33 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 		return r
 	}
 
+	// NOTE if VoteYES, but Blocks are different
+	var majorBlock common.Hash = v.block
+	if result == VoteResultYES {
+		blocks := map[common.Hash]uint{}
+		for _, t := range v.voted {
+			if t.Expired(v.policy.ExpireDurationVote) {
+				continue
+			} else if t.vote != VoteYES {
+				continue
+			}
+
+			blocks[t.block]++
+			if len(blocks) == 1 {
+				majorBlock = t.block
+			} else if blocks[t.block] > blocks[majorBlock] {
+				majorBlock = t.block
+			}
+		}
+
+		if blocks[majorBlock] < threshold {
+			r.Result = VoteResultDRAW
+		}
+	}
+
 	r.Proposal = v.proposal
 	r.Proposer = v.proposer
-	r.Block = v.block
+	r.Block = majorBlock
 	r.Height = v.height
 	r.Round = v.round
 	r.Stage = v.stage
@@ -732,13 +764,15 @@ func (v *VotingBoxStage) String() string {
 
 type VotingBoxStageNode struct {
 	vote    Vote
+	block   common.Hash
 	seal    common.Hash
 	votedAt common.Time
 }
 
-func NewVotingBoxStageNode(vote Vote, hash common.Hash) VotingBoxStageNode {
+func NewVotingBoxStageNode(vote Vote, hash common.Hash, block common.Hash) VotingBoxStageNode {
 	return VotingBoxStageNode{
 		vote:    vote,
+		block:   block,
 		seal:    hash,
 		votedAt: common.Now(),
 	}
@@ -758,8 +792,9 @@ func (v VotingBoxStageNode) Expired(d time.Duration) bool {
 
 func (v VotingBoxStageNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"vote": v.vote,
-		"seal": v.seal,
+		"vote":  v.vote,
+		"block": v.block,
+		"seal":  v.seal,
 	})
 }
 
@@ -978,6 +1013,30 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 		return r
 	}
 
+	var majorBlock common.Hash
+	if result == VoteResultYES {
+		blocks := map[common.Hash]uint{}
+		for _, t := range found {
+			if t.Expired(v.policy.ExpireDurationVote) {
+				continue
+			} else if t.vote != VoteYES {
+				continue
+			}
+
+			blocks[t.block]++
+			if len(blocks) == 1 {
+				majorBlock = t.block
+			} else if blocks[t.block] > blocks[majorBlock] {
+				majorBlock = t.block
+			}
+		}
+
+		if blocks[majorBlock] < threshold {
+			r.Result = VoteResultDRAW
+			return r
+		}
+	}
+
 	var voted []VotingBoxUnknownVote
 	for _, l := range byProposal {
 		voted = append(voted, l...)
@@ -989,6 +1048,7 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 
 	r.LastVotedAt = voted[0].votedAt
 
+	r.Block = majorBlock
 	r.Proposal = found[0].proposal
 	r.Height = found[0].height
 	r.Round = found[0].round
@@ -1090,7 +1150,7 @@ func NewVotingBoxUnknownVote(
 	seal common.Hash,
 ) (VotingBoxUnknownVote, error) {
 	return VotingBoxUnknownVote{
-		VotingBoxStageNode: NewVotingBoxStageNode(vote, seal),
+		VotingBoxStageNode: NewVotingBoxStageNode(vote, seal, block),
 		proposal:           proposal,
 		proposer:           proposer,
 		block:              block,

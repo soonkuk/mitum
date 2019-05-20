@@ -87,6 +87,7 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 		log_.Debug(
 			"height, lower than current state",
 		)
+		// TODO this ballot should be ignored in blocker
 		return nil
 	}
 
@@ -94,6 +95,7 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 		log_.Debug(
 			"height, lower than last result",
 		)
+		// TODO this ballot should be ignored in blocker
 		return nil
 	}
 
@@ -103,6 +105,7 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 
 	if result.Height.Equal(last.Height) && result.Round == last.Round && result.Stage <= last.Stage {
 		log_.Debug("already finished; earlier stage found")
+		// TODO this ballot should be ignored in blocker
 		return nil
 	}
 
@@ -112,6 +115,14 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 			"height=%v, current height=%v",
 			result.Height,
 			state.Height(),
+		)
+	}
+
+	if !last.Block.Empty() && !result.Block.Equal(last.Block) {
+		return ConsensusButBlockDoesNotMatchError.AppendMessage(
+			"result block=%v, last block=%v",
+			result.Block,
+			last.Block,
 		)
 	}
 

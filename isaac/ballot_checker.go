@@ -20,7 +20,7 @@ func CheckerBallotProposal(c *common.ChainChecker) error {
 	}
 
 	// NOTE INIT ballot does not have Proposal
-	if !ballot.Proposal().Empty() {
+	if ballot.Type() != INITBallotSealType {
 		seal, err := sealPool.Get(ballot.Proposal())
 		if SealNotFoundError.Equal(err) {
 			// TODO unknown Proposal found, request from other nodes

@@ -71,7 +71,6 @@ func NewTestSealBallot(
 	return ballot
 }
 
-// TODO remove if unused
 type TestSealBroadcaster struct {
 	sync.RWMutex
 	policy     ConsensusPolicy

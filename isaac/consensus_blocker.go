@@ -10,8 +10,6 @@ import (
 	"github.com/spikeekips/mitum/common"
 )
 
-// TODO voting internal scheduler: dynamically change the voting internal
-
 type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
 
 type ConsensusBlocker struct {
@@ -255,6 +253,8 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 			if err = c.Stop(); err != nil {
 				return err
 			}
+		case ConsensusButBlockDoesNotMatchError.Code():
+			log_.Error("something wrong", "erorr", cerr)
 		}
 
 		return err
@@ -343,27 +343,28 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		return VoteResultInfo{}, err
 	}
 
-	c.RLock()
-
-	resultChecker := common.NewChainChecker(
-		"blocker-vote-ballot-result-checker",
-		common.ContextWithValues(
-			context.Background(),
-			"votingResult", votingResult,
-			"lastVotingResult", c.lastVotingResult,
-			"state", c.state,
-		),
-		CheckerBlockerBallotVotingResult,
-	)
-	resultChecker.SetLogContext(ballotChecker.LogContext()...)
-	c.RUnlock()
-	if err := resultChecker.Check(); err != nil {
-		resultChecker.Log().Error("failed to check", "error", err)
-		return votingResult, err
-	}
-
 	if votingResult.NotYet() {
 		return votingResult, nil
+	}
+
+	{
+		c.RLock()
+		resultChecker := common.NewChainChecker(
+			"blocker-vote-ballot-result-checker",
+			common.ContextWithValues(
+				context.Background(),
+				"votingResult", votingResult,
+				"lastVotingResult", c.lastVotingResult,
+				"state", c.state,
+			),
+			CheckerBlockerBallotVotingResult,
+		)
+		resultChecker.SetLogContext(ballotChecker.LogContext()...)
+		c.RUnlock()
+		if err := resultChecker.Check(); err != nil {
+			resultChecker.Log().Error("failed to check", "error", err)
+			return votingResult, err
+		}
 	}
 
 	c.Lock()

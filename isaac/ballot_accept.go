@@ -103,7 +103,9 @@ func (b ACCEPTBallot) SerializeRLP() ([]interface{}, error) {
 }
 
 func (b *ACCEPTBallot) UnserializeRLP(m []rlp.RawValue) error {
-	// TODO check length of `m`
+	if len(m) != 13 {
+		return BallotNotWellformedError.SetMessage("insufficient rlp.RawValue for ACCEPTBallot")
+	}
 
 	var stage VoteStage
 	if err := common.Decode(m[6], &stage); err != nil {

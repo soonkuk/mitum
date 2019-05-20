@@ -593,11 +593,12 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 }
 
 func (t *testVotingBox) TestCloseVotingBoxStage() {
+	block := common.NewRandomHash("bk")
 	st := NewVotingBoxStage(
 		t.policy,
 		common.NewRandomHash("sl"),
 		t.home.Address(),
-		common.NewRandomHash("bk"),
+		block,
 		common.NewBig(33),
 		Round(0),
 		VoteStageSIGN,
@@ -610,7 +611,7 @@ func (t *testVotingBox) TestCloseVotingBoxStage() {
 	node := t.newNodes(1)[0]
 
 	// even closed, vote can be possible
-	st.Vote(node.Address(), VoteYES, common.NewRandomHash("sl"))
+	st.Vote(node.Address(), VoteYES, common.NewRandomHash("sl"), block)
 }
 
 func (t *testVotingBox) TestCloseUnknown() {
@@ -927,10 +928,10 @@ func (t *testVotingBoxStage) TestVote() {
 	nodes := t.makeNodes(nodeCount)
 
 	{
-		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
 
 		yes, nop := st.VoteCount()
 		t.Equal(3, yes)
@@ -945,12 +946,12 @@ func (t *testVotingBoxStage) TestMultipleVote() {
 	nodes := t.makeNodes(nodeCount)
 
 	{ // node3 vote again with same vote
-		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
 
-		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
 
 		yes, nop := st.VoteCount()
 
@@ -960,16 +961,16 @@ func (t *testVotingBoxStage) TestMultipleVote() {
 	}
 
 	{ // node3 overturns it's vote
-		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
 
 		yes, nop := st.VoteCount()
 		t.Equal(3, yes)
 		t.Equal(1, nop)
 
-		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
 
 		yes, nop = st.VoteCount()
 
@@ -987,8 +988,8 @@ func (t *testVotingBoxStage) TestCanCount() {
 	nodes := t.makeNodes(total)
 
 	{ // under threshold
-		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"))
-		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
 
 		t.Equal(2, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -998,8 +999,8 @@ func (t *testVotingBoxStage) TestCanCount() {
 	}
 
 	{ // vote count is over threshold, but draw
-		st.Vote(nodes[2].Address(), VoteNOP, common.NewRandomHash("sl"))
-		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"))
+		st.Vote(nodes[2].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
+		st.Vote(nodes[3].Address(), VoteNOP, common.NewRandomHash("sl"), st.block)
 
 		t.Equal(4, st.Count())
 		canCount := st.CanCount(total, threshold)
@@ -1009,13 +1010,68 @@ func (t *testVotingBoxStage) TestCanCount() {
 	}
 
 	{ // vote count is over threshold, and yes
-		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"))
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"), st.block)
 
 		t.Equal(4, st.Count())
 		canCount := st.CanCount(total, threshold)
 		t.True(canCount)
 		ri := st.Majority(total, threshold)
 		t.Equal(VoteResultYES, ri.Result)
+	}
+}
+
+// TestSIGNYesButDifferentBlock checks sign ballots get consensus, but there are
+// no major block within yes ballot
+func (t *testVotingBoxStage) TestSIGNYesButDifferentBlock() {
+	var total uint = 4
+	threshold := uint(math.Round(float64(4) * float64(0.67)))
+	nodes := t.makeNodes(total)
+
+	majorBlock := common.NewRandomHash("bk")
+
+	{ // over yes threshold
+		st := t.newVotingBoxStage()
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+
+		t.Equal(4, st.Count())
+		canCount := st.CanCount(total, threshold)
+		t.True(canCount)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultYES, ri.Result)
+		t.Equal(majorBlock, ri.Block)
+	}
+
+	{ // over yes threshold, but different block, but major block is over threshold
+		st := t.newVotingBoxStage()
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"), common.NewRandomHash("bk"))
+
+		t.Equal(4, st.Count())
+		canCount := st.CanCount(total, threshold)
+		t.True(canCount)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultYES, ri.Result)
+		t.Equal(majorBlock, ri.Block)
+	}
+
+	{ // over yes threshold, but different block, but no blocks are under threshold
+		anotherBlock := common.NewRandomHash("bk")
+		st := t.newVotingBoxStage()
+		st.Vote(nodes[0].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[1].Address(), VoteYES, common.NewRandomHash("sl"), majorBlock)
+		st.Vote(nodes[2].Address(), VoteYES, common.NewRandomHash("sl"), anotherBlock)
+		st.Vote(nodes[3].Address(), VoteYES, common.NewRandomHash("sl"), anotherBlock)
+
+		t.Equal(4, st.Count())
+		canCount := st.CanCount(total, threshold)
+		t.True(canCount)
+		ri := st.Majority(total, threshold)
+		t.Equal(VoteResultDRAW, ri.Result)
 	}
 }
 

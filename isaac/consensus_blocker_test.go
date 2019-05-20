@@ -532,6 +532,135 @@ end:
 	t.Equal(proposer.Address(), receivedProposal.Source())
 }
 
+// TestACCEPTedButBlockDoesNotMatch simulates, ACCEPT ballots gets consensus,
+// but VoteResultInfo.Block does not match with previous SIGNed
+// VoteResultInfo.Block
+func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
+	defer common.DebugPanic()
+
+	blocker := t.newBlocker()
+	defer blocker.Stop()
+
+	round := Round(1)
+	proposer, _ := t.proposerSelector.Select(t.cstate.block, t.cstate.height, round+1)
+	nextBlock := common.NewRandomHash("bk")
+
+	proposal := NewTestProposal(t.home.Address(), nil)
+
+	{ // correcting proposal
+		proposal.Block.Height = t.cstate.height
+		proposal.Block.Current = t.cstate.block
+		proposal.Block.Next = nextBlock
+		proposal.State.Current = t.state
+		proposal.State.Next = []byte("showme")
+		proposal.Round = round
+	}
+
+	_ = proposal.Sign(common.TestNetworkID, t.home.Seed())
+	_ = t.sealPool.Add(proposal)
+
+	bChan := make(chan common.Seal, 1)
+	defer close(bChan)
+	t.sealBroadcaster.SetSenderChan(bChan)
+
+	{ // signed
+		votingResult := VoteResultInfo{
+			Proposed: false,
+			Proposal: proposal.Hash(),
+			Proposer: proposer.Address(),
+			Block:    proposal.Block.Next,
+			Result:   VoteResultYES,
+			Height:   t.cstate.height,
+			Round:    round,
+			Stage:    VoteStageSIGN,
+		}
+		t.votingBox.SetResult(votingResult, nil)
+
+		ballot := NewSIGNBallot(
+			t.cstate.height,
+			round,
+			t.home.Address(),
+			nil, // TODO set validators
+			proposal.Hash(),
+			proposal.Block.Next,
+			VoteYES,
+		)
+
+		_ = ballot.Sign(common.TestNetworkID, t.home.Seed())
+		_ = t.sealPool.Add(ballot)
+
+		errChan := make(chan error)
+		blocker.Vote(ballot, errChan)
+		t.NoError(<-errChan)
+		defer close(errChan)
+
+		var receivedSeal common.Seal
+		var receivedBallot ACCEPTBallot
+	end0:
+		for {
+			select {
+			case <-time.After(time.Second):
+				t.Empty("timeout to wait receivedSeal")
+				return
+			case receivedSeal = <-bChan:
+				if receivedSeal.Type() != ACCEPTBallotSealType {
+					continue
+				}
+
+				receivedBallot = receivedSeal.(ACCEPTBallot)
+				break end0
+			}
+		}
+
+		t.Equal(t.cstate.height, receivedBallot.Height())
+		t.Equal(proposal.Block.Next, receivedBallot.Block())
+		t.Equal(votingResult.Round, receivedBallot.Round())
+		t.Equal(proposer.Address(), receivedBallot.Source())
+	}
+
+	{ // accepted, but block does not matched
+		unknownBlock := common.NewRandomHash("bk")
+		votingResult := VoteResultInfo{
+			Proposed: false,
+			Proposal: proposal.Hash(),
+			Proposer: proposer.Address(),
+			Block:    unknownBlock,
+			Result:   VoteResultYES,
+			Height:   t.cstate.height,
+			Round:    round,
+			Stage:    VoteStageACCEPT,
+		}
+		t.votingBox.SetResult(votingResult, nil)
+
+		ballot := NewACCEPTBallot(
+			t.cstate.height,
+			round,
+			t.home.Address(),
+			nil, // TODO set validators
+			proposal.Hash(),
+			unknownBlock, // set unknown block
+		)
+
+		_ = ballot.Sign(common.TestNetworkID, t.home.Seed())
+		_ = t.sealPool.Add(ballot)
+
+		errChan := make(chan error)
+		defer close(errChan)
+		blocker.Vote(ballot, errChan)
+
+		err := <-errChan
+		t.True(ConsensusButBlockDoesNotMatchError.Equal(err))
+
+	end1:
+		for {
+			select {
+			case <-time.After(time.Second):
+				break end1
+			}
+		}
+	}
+}
+
 func TestConsensusBlockerTotal4Threshold3(t *testing.T) {
 	suite.Run(
 		t,
