@@ -7,13 +7,13 @@ import (
 
 type ACCEPTBallot struct {
 	common.RawSeal
-	stage      VoteStage        `json:"stage"`
-	proposer   common.Address   `json:"proposer"`
-	validators []common.Address `json:"validators"`
-	height     common.Big       `json:"height"`
-	round      Round            `json:"round"`
-	proposal   common.Hash      `json:"proposal"`
-	block      common.Hash      `json:"block"`
+	stage      VoteStage
+	proposer   common.Address
+	validators []common.Address
+	height     common.Big
+	round      Round
+	proposal   common.Hash
+	block      common.Hash
 }
 
 func NewACCEPTBallot(

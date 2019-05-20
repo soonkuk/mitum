@@ -7,14 +7,14 @@ import (
 
 type SIGNBallot struct {
 	common.RawSeal
-	stage      VoteStage        `json:"stage"`
-	proposer   common.Address   `json:"proposer"`
-	validators []common.Address `json:"validators"`
-	height     common.Big       `json:"height"`
-	round      Round            `json:"round"`
-	proposal   common.Hash      `json:"proposal"`
-	block      common.Hash      `json:"block"`
-	vote       Vote             `json:"vote"`
+	stage      VoteStage
+	proposer   common.Address
+	validators []common.Address
+	height     common.Big
+	round      Round
+	proposal   common.Hash
+	block      common.Hash
+	vote       Vote
 }
 
 func NewSIGNBallot(

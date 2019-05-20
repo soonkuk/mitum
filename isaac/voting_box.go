@@ -226,7 +226,6 @@ func (r *DefaultVotingBox) vote(
 	log_.Debug("trying to vote to known")
 	return r.voteKnown(
 		proposal,
-		proposer,
 		block,
 		source,
 		stage,
@@ -237,7 +236,6 @@ func (r *DefaultVotingBox) vote(
 
 func (r *DefaultVotingBox) voteKnown(
 	proposal common.Hash,
-	proposer common.Address,
 	block common.Hash,
 	source common.Address,
 	stage VoteStage,

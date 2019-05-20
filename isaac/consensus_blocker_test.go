@@ -650,14 +650,6 @@ func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
 
 		err := <-errChan
 		t.True(ConsensusButBlockDoesNotMatchError.Equal(err))
-
-	end1:
-		for {
-			select {
-			case <-time.After(time.Second):
-				break end1
-			}
-		}
 	}
 }
 

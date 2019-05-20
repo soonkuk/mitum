@@ -170,32 +170,24 @@ end:
 				continue
 			}
 
-			go func() {
-				if err := c.receiveSeal(seal); err != nil {
-					c.Log().Error("failed to receive seal", "error", err)
-				}
-			}()
+			go c.receiveSeal(seal)
 		}
 	}
 }
 
-func (c *Consensus) receiveSeal(seal common.Seal) error {
+func (c *Consensus) receiveSeal(seal common.Seal) {
 	// NOTE these seal should be verified that is wellformed before.
 	log_ := c.Log().New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	if !c.state.NodeState().CanVote() {
 		log_.Error("node cannot vote", "state", c.state.NodeState())
-		return nil
+		return
 	}
 
-	go func(seal common.Seal) {
-		errChan := make(chan error)
-		c.blocker.Vote(seal, errChan)
+	errChan := make(chan error)
+	c.blocker.Vote(seal, errChan)
 
-		if err := <-errChan; err != nil {
-			c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
-		}
-	}(seal)
-
-	return nil
+	if err := <-errChan; err != nil {
+		c.Log().Error("failed to vote", "seal", seal.Hash(), "error", err)
+	}
 }

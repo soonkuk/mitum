@@ -4,7 +4,6 @@ import (
 	"encoding"
 	"encoding/json"
 	"strings"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -124,7 +123,6 @@ func (n BaseNode) String() string {
 
 type HomeNode struct {
 	BaseNode
-	sync.RWMutex
 	seed Seed
 }
 
@@ -136,9 +134,6 @@ func NewHome(seed Seed, publish NetAddr) HomeNode {
 }
 
 func (n HomeNode) Seed() Seed {
-	n.RLock()
-	defer n.RUnlock()
-
 	return n.seed
 }
 
