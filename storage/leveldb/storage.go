@@ -218,7 +218,7 @@ func (s *Storage) Iterator(prefix []byte, reverse bool, callback func([]byte, []
 	return nil
 }
 
-func (s *Storage) NewTransaction() (*Storage, error) {
+func (s *Storage) NewTransaction() (storage.Storage, error) {
 	s.Lock()
 	defer s.Unlock()
 

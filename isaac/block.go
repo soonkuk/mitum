@@ -13,20 +13,36 @@ var (
 type Block struct {
 	version common.Version
 
-	height   common.Big
-	hash     common.Hash
-	prevHash common.Hash
-
-	state     []byte
-	prevState []byte
-
-	proposer   common.Address
-	round      Round
-	proposedAt common.Time
-	proposal   common.Hash // Seal(Proposal).Hash()
-	validators []common.Validator
-
+	hash         common.Hash
+	height       common.Big
+	prevHash     common.Hash
+	state        []byte
+	prevState    []byte
+	proposer     common.Address
+	round        Round
+	validators   []common.Validator
 	transactions []common.Hash
+	proposal     common.Hash
+	proposedAt   common.Time
+}
+
+// TODO
+func NewBlockFromProposal(proposal Proposal) (Block, error) {
+	block := Block{
+		version:      CurrentBlockVersion,
+		hash:         proposal.Block.Next,
+		height:       proposal.Block.Height.Inc(),
+		prevHash:     proposal.Block.Current,
+		state:        proposal.State.Next,
+		prevState:    proposal.State.Current,
+		proposer:     proposal.Source(),
+		round:        proposal.Round,
+		transactions: proposal.Transactions,
+		proposal:     proposal.Hash(),
+		proposedAt:   proposal.SignedAt(),
+	}
+
+	return block, nil
 }
 
 func (b Block) Version() common.Version {
@@ -55,6 +71,61 @@ func (b Block) PrevState() []byte {
 
 func (b Block) Transactions() []common.Hash {
 	return b.transactions
+}
+
+func (b Block) MarshalBinary() ([]byte, error) {
+	version, err := b.version.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := b.hash.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	prevHash, err := b.prevHash.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	proposedAt, err := b.proposedAt.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	proposal, err := b.proposal.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	var transactions [][]byte
+	for _, t := range b.transactions {
+		h, err := t.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, h)
+	}
+
+	return common.Encode([]interface{}{
+		version,
+		b.height,
+		hash,
+		prevHash,
+		b.state,
+		b.prevState,
+		b.proposer,
+		b.round,
+		proposedAt,
+		proposal,
+		transactions,
+	})
+}
+
+func (b Block) UnmarshalBinary(y []byte) error {
+	// TODO
+	return nil
 }
 
 func (b Block) MarshalJSON() ([]byte, error) {

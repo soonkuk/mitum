@@ -26,7 +26,7 @@ func (t *testLevelDB) TearDownTest() {
 	t.s.Close()
 }
 
-func (t *testLevelDB) insertData(s *Storage, prefix []byte, count int) [][][]byte {
+func (t *testLevelDB) insertData(s storage.Storage, prefix []byte, count int) [][][]byte {
 	if s == nil {
 		s = t.s
 	}
@@ -363,7 +363,7 @@ func (t *testLevelDB) TestTransactionInsert() {
 	}
 
 	{ // after Commit(), :)
-		err = ts.Commit()
+		err = ts.(*Storage).Commit()
 		t.NoError(err)
 
 		var returned [][][]byte
@@ -404,7 +404,7 @@ func (t *testLevelDB) TestTransactionDiscard() {
 	}
 
 	{ // after Discard(), :)
-		err = ts.Discard()
+		err = ts.(*Storage).Discard()
 		t.NoError(err)
 
 		var returned [][][]byte

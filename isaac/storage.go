@@ -2,31 +2,49 @@ package isaac
 
 import (
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/storage"
 )
 
 // TODO state should be considered
 type BlockStorage interface {
-	NewBlock(Proposal) (Block, error)
+	NewBlock(Proposal) (Block, storage.Batch, error)
 	LatestBlock() (Block, error)
 	BlockByProposal(common.Hash) (Block, error)
 }
 
 type DefaultBlockStorage struct {
 	*common.Logger
+	st storage.Storage
 }
 
-func NewDefaultBlockStorage() (*DefaultBlockStorage, error) {
+func NewDefaultBlockStorage(st storage.Storage) (*DefaultBlockStorage, error) {
 	return &DefaultBlockStorage{
 		Logger: common.NewLogger(log),
+		st:     st,
 	}, nil
 }
 
-func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, error) {
-	// TODO store block
+func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error) {
+	// TODO store block with Batch
 
 	d.Log().Debug("new block created", "proposal", proposal)
 
-	return Block{}, nil
+	batch := d.st.Batch()
+
+	block, err := NewBlockFromProposal(proposal)
+	if err != nil {
+		return Block{}, nil, err
+	}
+
+	bytes, err := block.MarshalBinary()
+	if err != nil {
+		return Block{}, nil, err
+	}
+
+	// TODO needs storage key
+	batch.Put(block.Hash().Bytes(), bytes)
+
+	return block, batch, nil
 }
 
 func (d *DefaultBlockStorage) LatestBlock() (Block, error) {

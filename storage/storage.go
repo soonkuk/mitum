@@ -12,7 +12,7 @@ type Storage interface {
 		reverse bool,
 		callback func([]byte, []byte) bool,
 	) error
-	NewTransaction() error // NOTE deprecated; NewTransaction() available only one at a time
+	NewTransaction() (Storage, error) // NOTE deprecated; NewTransaction() available only one at a time
 	Batch() Batch
 	WriteBatch(Batch) error
 }

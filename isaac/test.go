@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/storage"
 )
 
 func NewTestProposal(proposer common.Address, transactions []common.Hash) Proposal {
@@ -158,7 +159,7 @@ func (t *TBlockStorage) Blocks() []Block {
 	return t.blocks
 }
 
-func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
+func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error) {
 	t.Lock()
 	defer t.Unlock()
 
@@ -180,7 +181,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, error) {
 	t.blocksbyProposal[proposal.Hash()] = block
 
 	t.Log().Debug("new block created", "proposal", proposal.Hash(), "block", block)
-	return block, nil
+	return block, &storage.TBatch{}, nil
 }
 
 func (t *TBlockStorage) LatestBlock() (Block, error) {

@@ -466,7 +466,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 	}
 
 	// TODO store block and state
-	if _, err = c.blockStorage.NewBlock(p); err != nil {
+	if _, _, err = c.blockStorage.NewBlock(p); err != nil {
 		return err
 	}
 
