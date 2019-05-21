@@ -24,13 +24,13 @@ type Block struct {
 	transactions []common.Hash
 	proposal     common.Hash
 	proposedAt   common.Time
+	createdAt    common.Time // NOTE ignored for hash
 }
 
 // TODO
 func NewBlockFromProposal(proposal Proposal) (Block, error) {
 	block := Block{
 		version:      CurrentBlockVersion,
-		hash:         proposal.Block.Next,
 		height:       proposal.Block.Height.Inc(),
 		prevHash:     proposal.Block.Current,
 		state:        proposal.State.Next,
@@ -42,7 +42,33 @@ func NewBlockFromProposal(proposal Proposal) (Block, error) {
 		proposedAt:   proposal.SignedAt(),
 	}
 
+	hash, err := block.generateHash()
+	if err != nil {
+		return Block{}, err
+	}
+
+	block.hash = hash
+
 	return block, nil
+}
+
+func (b Block) generateHash() (common.Hash, error) {
+	s, err := b.serializeRLP(true /* skipHash */)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	encoded, err := common.Encode(s[1:]) // NOTE remove hash
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	hash, err := common.NewHash("bk", encoded)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	return hash, nil
 }
 
 func (b Block) Version() common.Version {
@@ -73,14 +99,14 @@ func (b Block) Transactions() []common.Hash {
 	return b.transactions
 }
 
-func (b Block) MarshalBinary() ([]byte, error) {
+func (b Block) serializeRLP(skipHash bool) ([]interface{}, error) {
 	version, err := b.version.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
 
 	hash, err := b.hash.MarshalBinary()
-	if err != nil {
+	if !skipHash && err != nil {
 		return nil, err
 	}
 
@@ -108,10 +134,10 @@ func (b Block) MarshalBinary() ([]byte, error) {
 		transactions = append(transactions, h)
 	}
 
-	return common.Encode([]interface{}{
+	return []interface{}{
+		hash,
 		version,
 		b.height,
-		hash,
 		prevHash,
 		b.state,
 		b.prevState,
@@ -120,7 +146,16 @@ func (b Block) MarshalBinary() ([]byte, error) {
 		proposedAt,
 		proposal,
 		transactions,
-	})
+	}, nil
+}
+
+func (b Block) MarshalBinary() ([]byte, error) {
+	s, err := b.serializeRLP(false)
+	if err != nil {
+		return nil, err
+	}
+
+	return common.Encode(s)
 }
 
 func (b Block) UnmarshalBinary(y []byte) error {

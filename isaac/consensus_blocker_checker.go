@@ -37,6 +37,8 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 		)
 	}
 
+	// TODO check votingbox is opened or not
+
 	return nil
 }
 

@@ -65,7 +65,7 @@ func (t *testConsensusBlocker) newBlocker() *ConsensusBlocker {
 		t.sealBroadcaster,
 		t.sealPool,
 		t.proposerSelector,
-		t.blockStorage,
+		NewNullProposalValidator(t.blockStorage),
 	)
 	b.Start()
 
@@ -85,7 +85,6 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 	{ // correcting proposal
 		proposal.Block.Height = t.height
 		proposal.Block.Current = t.block
-		proposal.Block.Next = common.NewRandomHash("bk")
 		proposal.State.Current = t.state
 		proposal.State.Next = []byte("showme")
 		proposal.Round = round
@@ -100,7 +99,6 @@ func (t *testConsensusBlocker) TestFreshNewProposal() {
 		Proposed: true,
 		Proposal: proposal.Hash(),
 		Proposer: proposal.Source(),
-		Block:    proposal.Block.Next,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -234,7 +232,6 @@ func (t *testConsensusBlocker) TestACCEPT() {
 		{ // correcting proposal
 			proposal.Block.Height = t.height
 			proposal.Block.Current = t.block
-			proposal.Block.Next = common.NewRandomHash("bk")
 			proposal.State.Current = t.state
 			proposal.State.Next = []byte("showme")
 			proposal.Round = round
@@ -278,9 +275,7 @@ func (t *testConsensusBlocker) TestACCEPT() {
 	t.NoError(<-errChan)
 
 	{ //check state
-		fmt.Println(proposal.Block.Height.Inc(), t.cstate.Height())
 		t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
-		t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 		t.Equal(proposal.State.Next, t.cstate.State())
 		t.NotEmpty(t.blockStorage.Blocks())
 		t.True(t.blockStorage.Blocks()[0].proposal.Equal(proposal.Hash()))
@@ -373,7 +368,6 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 	{ // correcting proposal
 		proposal.Block.Height = t.height
 		proposal.Block.Current = t.block
-		proposal.Block.Next = common.NewRandomHash("bk")
 		proposal.State.Current = t.state
 		proposal.State.Next = []byte("showme")
 		proposal.Round = round
@@ -388,7 +382,6 @@ func (t *testConsensusBlocker) TestFreshNewProposalButExpired() {
 		Proposed: true,
 		Proposal: proposal.Hash(),
 		Proposer: proposal.Source(),
-		Block:    proposal.Block.Next,
 		Result:   VoteResultYES,
 		Height:   t.height,
 		Round:    round,
@@ -550,7 +543,6 @@ func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
 	{ // correcting proposal
 		proposal.Block.Height = t.cstate.height
 		proposal.Block.Current = t.cstate.block
-		proposal.Block.Next = nextBlock
 		proposal.State.Current = t.state
 		proposal.State.Next = []byte("showme")
 		proposal.Round = round
@@ -567,8 +559,8 @@ func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
 		votingResult := VoteResultInfo{
 			Proposed: false,
 			Proposal: proposal.Hash(),
+			Block:    nextBlock,
 			Proposer: proposer.Address(),
-			Block:    proposal.Block.Next,
 			Result:   VoteResultYES,
 			Height:   t.cstate.height,
 			Round:    round,
@@ -582,7 +574,7 @@ func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
 			t.home.Address(),
 			nil, // TODO set validators
 			proposal.Hash(),
-			proposal.Block.Next,
+			nextBlock,
 			VoteYES,
 		)
 
@@ -613,7 +605,7 @@ func (t *testConsensusBlocker) TestACCEPTedButBlockDoesNotMatch() {
 		}
 
 		t.Equal(t.cstate.height, receivedBallot.Height())
-		t.Equal(proposal.Block.Next, receivedBallot.Block())
+		t.Equal(nextBlock, receivedBallot.Block())
 		t.Equal(votingResult.Round, receivedBallot.Round())
 		t.Equal(proposer.Address(), receivedBallot.Source())
 	}

@@ -8,18 +8,17 @@ import (
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/storage"
+	"github.com/spikeekips/mitum/storage/leveldbstorage"
 )
 
 func NewTestProposal(proposer common.Address, transactions []common.Hash) Proposal {
 	currentBlockHash, _ := common.NewHash("bk", []byte(common.RandomUUID()))
-	nextBlockHash, _ := common.NewHash("bk", []byte(common.RandomUUID()))
 
 	return NewProposal(
 		Round(0),
 		ProposalBlock{
 			Height:  common.NewBig(99),
 			Current: currentBlockHash,
-			Next:    nextBlockHash,
 		},
 		ProposalState{
 			Current: []byte(common.RandomUUID()),
@@ -173,12 +172,14 @@ type TBlockStorage struct {
 	*common.Logger
 	blocks           []Block
 	blocksbyProposal map[common.Hash]Block
+	st               *leveldbstorage.Storage
 }
 
 func NewTBlockStorage() *TBlockStorage {
 	return &TBlockStorage{
 		Logger:           common.NewLogger(log),
 		blocksbyProposal: map[common.Hash]Block{},
+		st:               leveldbstorage.NewMemStorage(),
 	}
 }
 
@@ -189,6 +190,10 @@ func (t *TBlockStorage) Blocks() []Block {
 	return t.blocks
 }
 
+func (t *TBlockStorage) Storage() storage.Storage {
+	return t.st
+}
+
 func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error) {
 	t.Lock()
 	defer t.Unlock()
@@ -196,7 +201,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error
 	block := Block{
 		version:      CurrentBlockVersion,
 		height:       proposal.Block.Height.Inc(),
-		hash:         proposal.Block.Next,
+		hash:         common.NewRandomHash("bk"), // TODO set new block hash
 		prevHash:     proposal.Block.Current,
 		state:        proposal.State.Next,
 		prevState:    proposal.State.Current,
@@ -229,4 +234,32 @@ func (t *TBlockStorage) BlockByProposal(proposal common.Hash) (Block, error) {
 	}
 
 	return block, nil
+}
+
+type NullProposalValidator struct {
+	bst BlockStorage
+}
+
+func NewNullProposalValidator(bst BlockStorage) *NullProposalValidator {
+	return &NullProposalValidator{
+		bst: bst,
+	}
+}
+
+func (n *NullProposalValidator) Validate(proposal Proposal) (Block, Vote, error) {
+	block, _, err := n.bst.NewBlock(proposal)
+	if err != nil {
+		return Block{}, VoteNONE, err
+	}
+
+	return block, VoteYES, nil
+}
+
+func (n *NullProposalValidator) Store(proposal Proposal) error {
+	_, _, err := n.bst.NewBlock(proposal)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

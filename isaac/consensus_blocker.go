@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/inconshreveable/log15"
+
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/element"
 )
 
 type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
@@ -21,13 +23,14 @@ type ConsensusBlocker struct {
 	lastVotingResult       VoteResultInfo
 	lastFinishedProposalAt common.Time
 
-	policy           ConsensusPolicy
-	state            *ConsensusState
-	votingBox        VotingBox
-	sealBroadcaster  SealBroadcaster
-	sealPool         SealPool
-	proposerSelector ProposerSelector
-	blockStorage     BlockStorage
+	policy                ConsensusPolicy
+	state                 *ConsensusState
+	votingBox             VotingBox
+	sealBroadcaster       SealBroadcaster
+	sealPool              SealPool
+	proposerSelector      ProposerSelector
+	transactionValidation *TransactionValidation
+	proposalValidator     ProposalValidator
 }
 
 func NewConsensusBlocker(
@@ -37,18 +40,19 @@ func NewConsensusBlocker(
 	sealBroadcaster SealBroadcaster,
 	sealPool SealPool,
 	proposerSelector ProposerSelector,
-	blockStorage BlockStorage,
+	proposalValidator ProposalValidator,
 ) *ConsensusBlocker {
 	return &ConsensusBlocker{
-		Logger:           common.NewLogger(log, "node", state.Home().Name(), "module", "blocker"),
-		blockingChan:     make(chan ConsensusBlockerBlockingChanFunc),
-		policy:           policy,
-		state:            state,
-		votingBox:        votingBox,
-		sealBroadcaster:  sealBroadcaster,
-		sealPool:         sealPool,
-		proposerSelector: proposerSelector,
-		blockStorage:     blockStorage,
+		Logger:                common.NewLogger(log, "node", state.Home().Name(), "module", "blocker"),
+		blockingChan:          make(chan ConsensusBlockerBlockingChanFunc),
+		policy:                policy,
+		state:                 state,
+		votingBox:             votingBox,
+		sealBroadcaster:       sealBroadcaster,
+		sealPool:              sealPool,
+		proposerSelector:      proposerSelector,
+		transactionValidation: NewTransactionValidation(),
+		proposalValidator:     proposalValidator,
 	}
 }
 
@@ -70,7 +74,6 @@ func (c *ConsensusBlocker) Start() error {
 		"seal-broadcastor", fmt.Sprintf("%T", c.sealBroadcaster),
 		"seal-pool", fmt.Sprintf("%T", c.sealPool),
 		"proposer-selector", fmt.Sprintf("%T", c.proposerSelector),
-		"block-storage", fmt.Sprintf("%T", c.blockStorage),
 	)
 
 	return nil
@@ -273,7 +276,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	switch votingResult.Stage {
 	case VoteStageINIT:
 		if votingResult.Proposed {
-			return c.doProposeAccepted(votingResult)
+			return c.doProposeAccepted(seal, votingResult)
 		}
 
 		return c.runNewRound(votingResult.Height, votingResult.Round)
@@ -394,8 +397,13 @@ func (c *ConsensusBlocker) joinConsensus(height common.Big) error {
 // - validate proposal
 // - decide YES/NOP
 // - broadcast sign ballot
-func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error {
+func (c *ConsensusBlocker) doProposeAccepted(seal common.Seal, votingResult VoteResultInfo) error {
 	c.Log().Debug("proposal accepted", "result", votingResult)
+
+	var proposal Proposal
+	if err := common.CheckSeal(seal, &proposal); err != nil {
+		return err
+	}
 
 	err := c.startTimer("proposal-accepted-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(votingResult.Height, votingResult.Round+1)
@@ -404,10 +412,10 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		return err
 	}
 
-	// TODO validate proposal
-	// TODO decide YES/NOP
-
-	vote := VoteYES
+	block, vote, err := c.proposalValidator.Validate(proposal)
+	if err != nil {
+		return err
+	}
 
 	// NOTE broadcast sign ballot
 	ballot := NewSIGNBallot(
@@ -416,7 +424,7 @@ func (c *ConsensusBlocker) doProposeAccepted(votingResult VoteResultInfo) error 
 		votingResult.Proposer,
 		nil, // TODO set validators
 		votingResult.Proposal,
-		votingResult.Block,
+		block.Hash(),
 		vote,
 	)
 
@@ -485,7 +493,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 	}
 
 	// TODO store block and state
-	if _, _, err = c.blockStorage.NewBlock(p); err != nil {
+	if err = c.proposalValidator.Store(p); err != nil {
 		return err
 	}
 
@@ -497,9 +505,10 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 		if err = c.state.SetHeight(p.Block.Height.Inc()); err != nil {
 			return err
 		}
-		if err = c.state.SetBlock(p.Block.Next); err != nil {
-			return err
-		}
+		// TODO set new block's hash
+		// if err = c.state.SetBlock(<new block hash>); err != nil {
+		// 	return err
+		// }
 		if err = c.state.SetState(p.State.Next); err != nil {
 			return err
 		}
@@ -611,19 +620,40 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 	}
 
 	log_.Debug("proposer is home; new proposal will be proposed")
-	// TODO validate transactions.
+
+	// TODO these transactions are from transaction pool
+	transactions := []element.Transaction{}
+
+	var valids, invalids []common.Hash
+	if len(transactions) > 0 {
+		var err error
+		valids, invalids, err = c.transactionValidation.Validate(transactions)
+		if err != nil {
+			log_.Error("failed to validate transactions", "error", err)
+			return err
+		}
+	}
+	log_.Debug(
+		"transactons validated",
+		"transactions", len(transactions),
+		"valids", valids,
+		"invalids", invalids,
+	)
+
+	// TODO remove valids and invalids transactions
+	// - remove transaction pool
+
 	proposal := NewProposal(
 		round,
 		ProposalBlock{
 			Height:  height,
 			Current: c.state.Block(),
-			Next:    common.NewRandomHash("bk"), // TODO should be determined by validation
 		},
 		ProposalState{
 			Current: c.state.State(),
 			Next:    []byte("next state"), // TODO should be determined by validation
 		},
-		nil, // TODO transactions
+		valids, // TODO transactions
 	)
 
 	// NOTE will propose after,

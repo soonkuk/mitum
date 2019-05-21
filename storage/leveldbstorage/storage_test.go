@@ -7,10 +7,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/spikeekips/mitum/common"
-	"github.com/spikeekips/mitum/storage"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
+
+	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/storage"
 )
 
 type testLevelDB struct {

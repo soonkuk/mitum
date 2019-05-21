@@ -71,7 +71,7 @@ func (t *testConsensus) SetupTest() {
 		t.sealBroadcaster,
 		t.sealPool,
 		t.proposerSelector,
-		t.blockStorage,
+		NewNullProposalValidator(t.blockStorage),
 	)
 	t.blocker.Start()
 
@@ -127,7 +127,6 @@ func (t *testConsensus) TestNew() {
 	ticker.Stop()
 
 	t.True(proposal.Block.Height.Inc().Equal(t.cstate.Height()))
-	t.True(proposal.Block.Next.Equal(t.cstate.Block()))
 	t.Equal(proposal.State.Next, t.cstate.State())
 
 	t.Equal(NodeStateConsensus, t.cstate.NodeState())

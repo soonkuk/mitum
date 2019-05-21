@@ -71,14 +71,13 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		r.policy,
 		proposal.Hash(),
 		proposal.Source(),
-		proposal.Block.Next,
 		proposal.Block.Height,
 		proposal.Round,
 	)
 
 	// import from others
 	for _, u := range r.unknown.Proposal(proposal.Hash()) {
-		_, err := r.current.Vote(u.source, u.stage, u.vote, u.seal, proposal.Block.Next)
+		_, err := r.current.Vote(u.source, u.stage, u.vote, u.seal, u.block)
 		if err != nil {
 			return VoteResultInfo{}, err
 		}
@@ -89,15 +88,11 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		Result:      VoteResultYES,
 		Proposal:    proposal.Hash(),
 		Proposer:    proposal.Source(),
-		Block:       proposal.Block.Next,
 		Height:      proposal.Block.Height,
 		Round:       proposal.Round,
 		Stage:       VoteStageINIT, // NOTE will broadcast sign ballot
 		Proposed:    true,
 		LastVotedAt: common.Now(),
-		Voted: map[common.Address]VotingBoxStageNode{
-			proposal.Source(): NewVotingBoxStageNode(VoteYES, proposal.Hash(), proposal.Block.Next),
-		},
 	}
 
 	return result, nil
@@ -407,7 +402,6 @@ type VotingBoxProposal struct {
 	policy      ConsensusPolicy
 	proposal    common.Hash
 	proposer    common.Address
-	block       common.Hash
 	height      common.Big
 	round       Round
 	stage       VoteStage
@@ -419,7 +413,6 @@ func NewVotingBoxProposal(
 	policy ConsensusPolicy,
 	proposal common.Hash,
 	proposer common.Address,
-	block common.Hash,
 	height common.Big,
 	round Round,
 ) *VotingBoxProposal {
@@ -427,12 +420,11 @@ func NewVotingBoxProposal(
 		policy:      policy,
 		proposal:    proposal,
 		proposer:    proposer,
-		block:       block,
 		height:      height,
 		round:       round,
 		stage:       VoteStageINIT,
-		stageSIGN:   NewVotingBoxStage(policy, proposal, proposer, block, height, round, VoteStageSIGN),
-		stageACCEPT: NewVotingBoxStage(policy, proposal, proposer, block, height, round, VoteStageACCEPT),
+		stageSIGN:   NewVotingBoxStage(policy, proposal, proposer, height, round, VoteStageSIGN),
+		stageACCEPT: NewVotingBoxStage(policy, proposal, proposer, height, round, VoteStageACCEPT),
 	}
 }
 
@@ -544,7 +536,6 @@ func (v *VotingBoxProposal) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"proposal":    v.proposal,
 		"proposer":    v.proposer,
-		"block":       v.block,
 		"height":      v.height,
 		"round":       v.round,
 		"stage":       v.stage,
@@ -564,7 +555,6 @@ type VotingBoxStage struct {
 	policy   ConsensusPolicy
 	proposal common.Hash
 	proposer common.Address
-	block    common.Hash
 	height   common.Big
 	round    Round
 	stage    VoteStage
@@ -576,7 +566,6 @@ func NewVotingBoxStage(
 	policy ConsensusPolicy,
 	proposal common.Hash,
 	proposer common.Address,
-	block common.Hash,
 	height common.Big,
 	round Round,
 	stage VoteStage,
@@ -585,7 +574,6 @@ func NewVotingBoxStage(
 		policy:   policy,
 		proposal: proposal,
 		proposer: proposer,
-		block:    block,
 		height:   height,
 		round:    round,
 		stage:    stage,
@@ -702,7 +690,7 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 	}
 
 	// NOTE if VoteYES, but Blocks are different
-	var majorBlock common.Hash = v.block
+	var majorBlock common.Hash
 	if result == VoteResultYES {
 		blocks := map[common.Hash]uint{}
 		for _, t := range v.voted {
@@ -746,7 +734,6 @@ func (v *VotingBoxStage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"proposal": v.proposal,
 		"proposer": v.proposer,
-		"block":    v.block,
 		"height":   v.height,
 		"round":    v.round,
 		"stage":    v.stage,

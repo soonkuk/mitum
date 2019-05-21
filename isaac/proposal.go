@@ -160,7 +160,6 @@ func (p Proposal) Wellformed() error {
 type ProposalBlock struct {
 	Height  common.Big  `json:"height"`
 	Current common.Hash `json:"current"`
-	Next    common.Hash `json:"next"`
 }
 
 func (bb ProposalBlock) MarshalBinary() ([]byte, error) {
@@ -169,15 +168,9 @@ func (bb ProposalBlock) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 
-	nextHash, err := bb.Next.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
 	return common.Encode([]interface{}{
 		bb.Height,
 		currentHash,
-		nextHash,
 	})
 }
 
@@ -192,8 +185,8 @@ func (bb *ProposalBlock) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	var current, next common.Hash
-	var currentByte, nextByte []byte
+	var current common.Hash
+	var currentByte []byte
 
 	if err := common.Decode(m[1], &currentByte); err != nil {
 		return err
@@ -201,15 +194,8 @@ func (bb *ProposalBlock) UnmarshalBinary(b []byte) error {
 		return err
 	}
 
-	if err := common.Decode(m[2], &nextByte); err != nil {
-		return err
-	} else if err := next.UnmarshalBinary(nextByte); err != nil {
-		return err
-	}
-
 	bb.Height = height
 	bb.Current = current
-	bb.Next = next
 
 	return nil
 }
@@ -217,10 +203,6 @@ func (bb *ProposalBlock) UnmarshalBinary(b []byte) error {
 func (bb ProposalBlock) Wellformed() error {
 	if !bb.Current.IsValid() {
 		return ProposalNotWellformedError.SetMessage("Proposal.Block.Current is empty")
-	}
-
-	if !bb.Next.IsValid() {
-		return ProposalNotWellformedError.SetMessage("Proposal.Block.Next is empty")
 	}
 
 	return nil

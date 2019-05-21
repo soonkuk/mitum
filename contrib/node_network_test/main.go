@@ -96,7 +96,7 @@ func createNode(seedString string) (*Node, error) {
 		node.sealBroadcaster,
 		node.sealPool,
 		node.proposerSelector,
-		node.blockStorage,
+		isaac.NewDefaultProposalValidator(node.blockStorage, state),
 	)
 	consensus, err := isaac.NewConsensus(home, state, blocker)
 	if err != nil {

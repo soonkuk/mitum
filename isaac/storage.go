@@ -7,6 +7,7 @@ import (
 
 // TODO state should be considered
 type BlockStorage interface {
+	Storage() storage.Storage
 	NewBlock(Proposal) (Block, storage.Batch, error)
 	LatestBlock() (Block, error)
 	BlockByProposal(common.Hash) (Block, error)
@@ -22,6 +23,10 @@ func NewDefaultBlockStorage(st storage.Storage) (*DefaultBlockStorage, error) {
 		Logger: common.NewLogger(log),
 		st:     st,
 	}, nil
+}
+
+func (d *DefaultBlockStorage) Storage() storage.Storage {
+	return d.st
 }
 
 func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error) {

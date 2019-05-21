@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/spikeekips/mitum/common"
-	leveldbstorage "github.com/spikeekips/mitum/storage/leveldb"
+	"github.com/spikeekips/mitum/storage/leveldbstorage"
 )
 
 type testStorage struct {
@@ -29,7 +29,6 @@ func (t *testStorage) TestNewBlock() {
 	{ // correcting proposal
 		proposal.Block.Height = common.NewBig(33)
 		proposal.Block.Current = common.NewRandomHash("bk")
-		proposal.Block.Next = common.NewRandomHash("bk")
 		proposal.State.Current = []byte("current state")
 		proposal.State.Next = []byte("next state")
 		proposal.Round = 0
