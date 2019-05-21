@@ -15,11 +15,11 @@ type ConsensusBlockerBlockingChanFunc func() (common.Seal, chan<- error)
 type ConsensusBlocker struct {
 	sync.RWMutex
 	*common.Logger
-	stopBlockingChan     chan bool
-	blockingChan         chan ConsensusBlockerBlockingChanFunc
-	timer                *common.CallbackTimer
-	lastVotingResult     VoteResultInfo
-	lastFinishedProposal *Proposal
+	stopBlockingChan       chan bool
+	blockingChan           chan ConsensusBlockerBlockingChanFunc
+	timer                  *common.CallbackTimer
+	lastVotingResult       VoteResultInfo
+	lastFinishedProposalAt common.Time
 
 	policy           ConsensusPolicy
 	state            *ConsensusState
@@ -514,8 +514,12 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 			"new-state-hash", c.state.State(),
 		)
 
-		c.lastFinishedProposal = &p
+		c.lastFinishedProposalAt = p.SignedAt()
 	}
+
+	c.Lock()
+	c.lastVotingResult = VoteResultInfo{}
+	c.Unlock()
 
 	// propose or wait new proposal
 	err = c.startTimer("finish-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
@@ -626,8 +630,8 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 	// duration = ConsensusPolicy.AvgBlockRoundInterval - (<Latest block's Proposal.SignedAt> - <Now()>)
 	// if duration is under 0, after 300 millisecond
 	var delay = time.Millisecond * 300
-	if c.lastFinishedProposal != nil {
-		delay = c.policy.AvgBlockRoundInterval - common.Now().Sub(c.lastFinishedProposal.SignedAt())
+	if !c.lastFinishedProposalAt.IsZero() {
+		delay = c.policy.AvgBlockRoundInterval - common.Now().Sub(c.lastFinishedProposalAt)
 		if delay < 0 {
 			delay = time.Second
 		}
