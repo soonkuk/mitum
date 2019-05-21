@@ -11,9 +11,9 @@ var (
 )
 
 type Block struct {
-	version common.Version
-
+	version      common.Version
 	hash         common.Hash
+	createdAt    common.Time // NOTE ignored for hash
 	height       common.Big
 	prevHash     common.Hash
 	state        []byte
@@ -24,7 +24,6 @@ type Block struct {
 	transactions []common.Hash
 	proposal     common.Hash
 	proposedAt   common.Time
-	createdAt    common.Time // NOTE ignored for hash
 }
 
 func NewBlockFromProposal(proposal Proposal) (Block, error) {
@@ -39,6 +38,7 @@ func NewBlockFromProposal(proposal Proposal) (Block, error) {
 		transactions: proposal.Transactions,
 		proposal:     proposal.Hash(),
 		proposedAt:   proposal.SignedAt(),
+		createdAt:    common.Now(),
 	}
 
 	hash, err := block.generateHash()
@@ -57,7 +57,7 @@ func (b Block) generateHash() (common.Hash, error) {
 		return common.Hash{}, err
 	}
 
-	encoded, err := common.Encode(s[1:]) // NOTE remove hash
+	encoded, err := common.Encode(s[2:]) // NOTE ignore hash and createdAt
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -139,6 +139,7 @@ func (b Block) serializeRLP(skipHash bool) ([]interface{}, error) {
 
 	return []interface{}{
 		hash,
+		b.createdAt,
 		version,
 		b.height,
 		prevHash,
@@ -180,6 +181,7 @@ func (b Block) MarshalJSON() ([]byte, error) {
 		"proposal":     b.proposal,
 		"validators":   b.validators,
 		"transactions": b.transactions,
+		"created_at":   b.createdAt,
 	}, false, false)
 }
 

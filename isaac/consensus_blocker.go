@@ -212,8 +212,8 @@ func (c *ConsensusBlocker) handle(seal common.Seal) error {
 		log_.Debug("go to sync", "error", err)
 		_ = c.state.SetNodeState(NodeStateSync)
 		go func() {
-			if err := c.Stop(); err != nil {
-				c.Log().Error("failed to stop")
+			if e := c.Stop(); e != nil {
+				c.Log().Error("failed to stop", "error", e)
 			}
 		}()
 	default:
@@ -509,7 +509,8 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 		switch {
 		case ValidationIsNotDoneError.Equal(err):
 			// NOTE validate proposal
-			_, vote, err := c.proposalValidator.Validate(p)
+			var vote Vote
+			_, vote, err = c.proposalValidator.Validate(p)
 			if err != nil {
 				return FailedToStoreBlockError.SetError(err)
 			} else if vote == VoteNOP {
@@ -655,7 +656,6 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 
 	var valids, invalids []common.Hash
 	if len(transactions) > 0 {
-		var err error
 		valids, invalids, err = c.transactionValidation.Validate(transactions)
 		if err != nil {
 			log_.Error("failed to validate transactions", "error", err)

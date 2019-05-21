@@ -5,7 +5,6 @@ import (
 )
 
 var InTest bool
-var DEBUG bool
 
 var log log15.Logger = log15.New("module", "common")
 

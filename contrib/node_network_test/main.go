@@ -16,7 +16,6 @@ var log log15.Logger = log15.New("module", "node-network-test")
 
 func init() {
 	common.InTest = false
-	common.DEBUG = true
 
 	handler, _ := common.LogHandler(common.LogFormatter("json"), "")
 	handler = log15.LvlFilterHandler(log15.LvlDebug, handler)
