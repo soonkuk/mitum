@@ -219,7 +219,7 @@ func (s *TimeSyncer) check() {
 	}()
 
 	if s.offset < 1 {
-		s.setOffset(response.ClockOffset)
+		s.offset = response.ClockOffset
 		return
 	}
 
@@ -234,9 +234,5 @@ func (s *TimeSyncer) check() {
 		}
 	}
 
-	s.setOffset(response.ClockOffset)
-}
-
-func (s *TimeSyncer) setOffset(offset time.Duration) {
-	s.offset = offset
+	s.offset = response.ClockOffset
 }
