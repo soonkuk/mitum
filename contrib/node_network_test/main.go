@@ -9,6 +9,7 @@ import (
 	"github.com/spikeekips/mitum/isaac"
 	"github.com/spikeekips/mitum/network"
 	"github.com/spikeekips/mitum/storage"
+	"github.com/spikeekips/mitum/storage/leveldbstorage"
 )
 
 var log log15.Logger = log15.New("module", "node-network-test")
@@ -75,6 +76,7 @@ func createNode(seedString string) (*Node, error) {
 		return nil, err
 	}
 
+	blockStorage, _ := isaac.NewDefaultBlockStorage(leveldbstorage.NewMemStorage())
 	node := &Node{
 		home:             home,
 		state:            state,
@@ -82,7 +84,7 @@ func createNode(seedString string) (*Node, error) {
 		sealBroadcaster:  sealBroadcaster,
 		sealPool:         isaac.NewDefaultSealPool(),
 		proposerSelector: isaac.NewTProposerSelector(),
-		blockStorage:     isaac.NewTBlockStorage(),
+		blockStorage:     blockStorage,
 	}
 	_ = node.sealBroadcaster.SetSender(node.nt.Send)
 	node.sealPool.SetLogContext("node", home.Name())
@@ -138,7 +140,7 @@ type Node struct {
 	blocker          *isaac.ConsensusBlocker
 	sealPool         *isaac.DefaultSealPool
 	proposerSelector *isaac.TProposerSelector
-	blockStorage     *isaac.TBlockStorage
+	blockStorage     *isaac.DefaultBlockStorage
 	consensus        *isaac.Consensus
 }
 

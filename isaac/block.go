@@ -27,7 +27,6 @@ type Block struct {
 	createdAt    common.Time // NOTE ignored for hash
 }
 
-// TODO
 func NewBlockFromProposal(proposal Proposal) (Block, error) {
 	block := Block{
 		version:      CurrentBlockVersion,
@@ -93,6 +92,10 @@ func (b Block) State() []byte {
 
 func (b Block) PrevState() []byte {
 	return b.prevState
+}
+
+func (b Block) Proposal() common.Hash {
+	return b.proposal
 }
 
 func (b Block) Transactions() []common.Hash {

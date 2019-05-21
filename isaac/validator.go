@@ -70,13 +70,27 @@ func (v *DefaultProposalValidator) Validate(proposal Proposal) (Block, Vote, err
 	return block, VoteYES, nil
 }
 
+func (v *DefaultProposalValidator) Validated(proposal common.Hash) bool {
+	v.RLock()
+	defer v.RUnlock()
+
+	return v.block.proposal.Equal(proposal)
+}
+
 func (v *DefaultProposalValidator) Store(proposal Proposal) error {
+	v.RLock()
+	defer v.RUnlock()
+
 	if v.block.Hash().Empty() {
 		return ValidationIsNotDoneError.AppendMessage("block is nil")
 	}
 
-	if !v.block.proposal.Equal(proposal.Hash()) {
-		return ValidationIsNotDoneError.AppendMessage("proposal is not validated")
+	if !v.Validated(proposal.Hash()) {
+		return ValidationIsNotDoneError.AppendMessage(
+			"proposal is not validated; validated=%v proposal=%v",
+			v.block.Proposal(),
+			proposal.Hash(),
+		)
 	}
 
 	if v.batch == nil {

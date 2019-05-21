@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/storage"
 )
@@ -20,7 +21,7 @@ type DefaultBlockStorage struct {
 
 func NewDefaultBlockStorage(st storage.Storage) (*DefaultBlockStorage, error) {
 	return &DefaultBlockStorage{
-		Logger: common.NewLogger(log),
+		Logger: common.NewLogger(log, "module", "block-storage"),
 		st:     st,
 	}, nil
 }
@@ -32,8 +33,9 @@ func (d *DefaultBlockStorage) Storage() storage.Storage {
 func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error) {
 	// TODO store block with Batch
 
-	d.Log().Debug("new block created", "proposal", proposal)
+	log_ := d.Log().New(log15.Ctx{"proposal": proposal.Hash()})
 
+	log_.Debug("new block will be prepared")
 	batch := d.st.Batch()
 
 	block, err := NewBlockFromProposal(proposal)
@@ -48,6 +50,8 @@ func (d *DefaultBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch,
 
 	// TODO needs storage key
 	batch.Put(block.Hash().Bytes(), bytes)
+
+	log_.Debug("new block prepared", "block", block)
 
 	return block, batch, nil
 }

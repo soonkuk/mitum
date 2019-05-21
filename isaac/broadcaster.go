@@ -47,7 +47,11 @@ func (i *DefaultSealBroadcaster) Send(
 	}
 
 	log_ := i.Log().New(log15.Ctx{"seal": seal.Hash()})
-	log_.Debug("seal will be broadcasted", "excludes", excludes, "validators", i.state.Validators())
+	log_.Debug(
+		"seal will be broadcasted",
+		"excludes", excludes,
+		"validators", i.state.Validators(),
+	)
 
 	var targets = []common.Node{i.state.Home()}
 	for _, node := range i.state.Validators() {

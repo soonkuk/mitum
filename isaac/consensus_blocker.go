@@ -111,7 +111,7 @@ func (c *ConsensusBlocker) Stop() error {
 
 	c.Log().Debug("ConsensusBlocker stopped")
 
-	// votingBox also be cleared automatically
+	// NOTE votingBox also be cleared automatically
 	if err := c.votingBox.Clear(); err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ end:
 
 			seal, errChan := f()
 
-			err := c.vote(seal)
+			err := c.handle(seal)
 			if errChan != nil {
 				errChan <- err
 			}
@@ -191,7 +191,38 @@ func (c *ConsensusBlocker) Vote(seal common.Seal, errChan chan<- error) {
 	}()
 }
 
-// vote votes and decides the next action.
+// NOTE vote votes and decides the next action.
+func (c *ConsensusBlocker) handle(seal common.Seal) error {
+	err := c.vote(seal)
+	if err == nil {
+		return nil
+	}
+
+	log_ := c.Log().New(log15.Ctx{
+		"seal":      seal.Hash(),
+		"seal_type": seal.Type(),
+	})
+
+	switch {
+	case DifferentHeightConsensusError.Equal(err),
+		DifferentBlockHashConsensusError.Equal(err),
+		ValidationIsNotDoneError.Equal(err),
+		ConsensusButBlockDoesNotMatchError.Equal(err):
+		// TODO go to sync
+		log_.Debug("go to sync", "error", err)
+		_ = c.state.SetNodeState(NodeStateSync)
+		go func() {
+			if err := c.Stop(); err != nil {
+				c.Log().Error("failed to stop")
+			}
+		}()
+	default:
+		log_.Error("something wrong", "error", err)
+	}
+
+	return err
+}
+
 func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	log_ := c.Log().New(log15.Ctx{
 		"seal":      seal.Hash(),
@@ -236,30 +267,6 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 	}
 
 	if err != nil {
-		cerr, ok := err.(common.Error)
-		if !ok {
-			return err
-		}
-
-		switch cerr.Code() {
-		case DifferentHeightConsensusError.Code():
-			// TODO go to sync
-			log_.Debug("go to sync", "error", err)
-			_ = c.state.SetNodeState(NodeStateSync)
-			if err = c.Stop(); err != nil {
-				return err
-			}
-		case DifferentBlockHashConsensusError.Code():
-			// TODO go to sync
-			log_.Debug("go to sync", "error", err)
-			_ = c.state.SetNodeState(NodeStateSync)
-			if err = c.Stop(); err != nil {
-				return err
-			}
-		case ConsensusButBlockDoesNotMatchError.Code():
-			log_.Error("something wrong", "erorr", cerr)
-		}
-
 		return err
 	}
 
@@ -267,7 +274,7 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		return nil
 	}
 
-	log_.Debug("got votingResult", "result", votingResult)
+	log_.Debug("got votingResult", "votingResult", votingResult)
 
 	if c.state.NodeState() != NodeStateConsensus {
 		_ = c.state.SetNodeState(NodeStateConsensus)
@@ -480,7 +487,8 @@ func (c *ConsensusBlocker) goToNextStage(
 // - update ConsensusBlockerState
 // - ready to start new block
 func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
-	c.Log().Debug("finishing round", "proposal", proposal)
+	log_ := c.Log().New(log15.Ctx{"proposal": proposal})
+	log_.Debug("finishing round")
 
 	seal, err := c.sealPool.Get(proposal)
 	if err != nil {
@@ -492,9 +500,30 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 		return common.UnknownSealTypeError.SetMessage(err.Error())
 	}
 
-	// TODO store block and state
+	// NOTE if failed to store,
+	// - err is ValidationIsNotDoneError; validate it
+	//   - if failed to validate or VoteNOP, go to sync
+	// TODO test
 	if err = c.proposalValidator.Store(p); err != nil {
-		return err
+		log_.Error("failed to store", "error", err)
+		switch {
+		case ValidationIsNotDoneError.Equal(err):
+			// NOTE validate proposal
+			_, vote, err := c.proposalValidator.Validate(p)
+			if err != nil {
+				return FailedToStoreBlockError.SetError(err)
+			} else if vote == VoteNOP {
+				return FailedToStoreBlockError.AppendMessage(
+					"proposal validated, but VoteNOP; proposal=%v",
+					proposal,
+				)
+			}
+			if err = c.proposalValidator.Store(p); err != nil {
+				return FailedToStoreBlockError.SetError(err)
+			}
+		default:
+			return FailedToStoreBlockError.SetError(err)
+		}
 	}
 
 	// update ConsensusBlockerState
@@ -513,7 +542,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 			return err
 		}
 
-		c.Log().Debug(
+		log_.Debug(
 			"finished round",
 			"old-block-height", prevState.Height().String(),
 			"old-block-hash", prevState.Block(),

@@ -32,6 +32,7 @@ const (
 	ConsensusButBlockDoesNotMatchErrorCode
 	ValidationIsRunningErrorCode
 	ValidationIsNotDoneErrorCode
+	FailedToStoreBlockErrorCode
 )
 
 var (
@@ -63,4 +64,5 @@ var (
 	ConsensusButBlockDoesNotMatchError   common.Error = common.NewError("isaac", ConsensusButBlockDoesNotMatchErrorCode, "consensus, but VoteResultInfo.Block does not match with previous result")
 	ValidationIsRunningError             common.Error = common.NewError("isaac", ValidationIsRunningErrorCode, "validation is running")
 	ValidationIsNotDoneError             common.Error = common.NewError("isaac", ValidationIsNotDoneErrorCode, "validation is not done")
+	FailedToStoreBlockError              common.Error = common.NewError("isaac", FailedToStoreBlockErrorCode, "failed to store")
 )

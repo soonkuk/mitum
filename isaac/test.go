@@ -215,7 +215,7 @@ func (t *TBlockStorage) NewBlock(proposal Proposal) (Block, storage.Batch, error
 	t.blocks = append(t.blocks, block)
 	t.blocksbyProposal[proposal.Hash()] = block
 
-	t.Log().Debug("new block created", "proposal", proposal.Hash(), "block", block)
+	t.Log().Debug("new block prepared", "proposal", proposal.Hash(), "block", block)
 	return block, &storage.TBatch{}, nil
 }
 
