@@ -34,10 +34,10 @@ import FilterListIcon from '@material-ui/icons/FilterList';
 import SettingsOverscanIcon from '@material-ui/icons/SettingsOverscan';
 import stringify from 'csv-stringify';
 import colormap from 'colormap';
+import markdown from 'markdown';
 
 import Log from './log'
 import raw from './raw'
-
 
 const styles = theme => ({
   root: {
@@ -349,6 +349,11 @@ class CenteredGrid extends React.Component {
     return true
   }
 
+  sanitizeRecordMessage(message) {
+    var a = markdown.markdown.toHTML(message)
+    return a.slice(3, a.length - 4)
+  }
+
   renderRecord(first, record, nodes) {
     const { classes } = this.props;
 
@@ -389,9 +394,7 @@ class CenteredGrid extends React.Component {
                 backgroundColor: this.state.moduleColors[this.state.modules.indexOf(record.module)],
                 color: fontColorByBG(this.state.moduleColors[this.state.modules.indexOf(record.module)]),
               }} />
-              <Typography key={record.id + node + 'ty'}>
-                {record.message}
-              </Typography>
+              <span dangerouslySetInnerHTML={{__html: this.sanitizeRecordMessage(record.message)}} />
             </div>
             ) : (
               <Typography key={record.id + node + 'ty'}></Typography>

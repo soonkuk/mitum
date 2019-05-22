@@ -277,3 +277,10 @@ table.scrollable tbody tr.row-detail-open {
 table.scrollable tbody tr td:first-child > span {
   font-size: 0.7rem !important;
 }
+
+table.scrollable tbody tr td .record code {
+  font-size: 0.7rem !important;
+  background: #efecec;
+  padding: 0.1rem 0.2rem 0.1rem 0.2rem;
+  border-radius: 0.2rem;
+}
