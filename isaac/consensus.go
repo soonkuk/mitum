@@ -44,6 +44,7 @@ func (c *Consensus) Name() string {
 }
 
 func (c *Consensus) Start() error {
+	c.Log().Debug("trying to start consensus")
 	if c.stop != nil {
 		return common.StartStopperAlreadyStartedError
 	}
@@ -85,12 +86,15 @@ func (c *Consensus) Start() error {
 
 	go c.schedule()
 
+	c.Log().Debug("consensus started")
 	return nil
 }
 
 func (c *Consensus) Stop() error {
 	c.Lock()
 	defer c.Unlock()
+
+	c.Log().Debug("trying to stop consensus")
 
 	if c.stop == nil {
 		return nil
@@ -164,6 +168,7 @@ end:
 	for {
 		select {
 		case <-c.stop:
+			c.Log().Debug("consensus stopped")
 			break end
 		case seal, notClosed := <-c.receiver:
 			if !notClosed {

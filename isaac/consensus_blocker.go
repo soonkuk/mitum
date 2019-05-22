@@ -57,6 +57,7 @@ func NewConsensusBlocker(
 }
 
 func (c *ConsensusBlocker) Start() error {
+	c.Log().Debug("trying to start blocker")
 	if c.stopBlockingChan != nil {
 		return common.StartStopperAlreadyStartedError
 	}
@@ -80,6 +81,7 @@ func (c *ConsensusBlocker) Start() error {
 }
 
 func (c *ConsensusBlocker) Join() error {
+	c.Log().Debug("trying to join consensus")
 	if c.state.NodeState() != NodeStateJoin {
 		_ = c.state.SetNodeState(NodeStateJoin)
 	}
@@ -97,6 +99,7 @@ func (c *ConsensusBlocker) Stop() error {
 	c.Lock()
 	defer c.Unlock()
 
+	c.Log().Debug("trying to stop blocker")
 	if c.stopBlockingChan == nil {
 		return nil
 	}
@@ -108,8 +111,6 @@ func (c *ConsensusBlocker) Stop() error {
 	if c.timer != nil {
 		_ = c.timer.Stop()
 	}
-
-	c.Log().Debug("ConsensusBlocker stopped")
 
 	// NOTE votingBox also be cleared automatically
 	if err := c.votingBox.Clear(); err != nil {
@@ -124,6 +125,7 @@ end:
 	for {
 		select {
 		case <-c.stopBlockingChan:
+			c.Log().Debug("blocker stopped")
 			break end
 		case f, notClosed := <-c.blockingChan:
 			if !notClosed {
@@ -154,7 +156,7 @@ func (c *ConsensusBlocker) startTimer(
 		c.timer = nil
 	}
 
-	// TODO initial timeout
+	// TODO timer initial timeout
 	c.timer = common.NewCallbackTimer(
 		timeout,
 		callback,
@@ -162,7 +164,7 @@ func (c *ConsensusBlocker) startTimer(
 	)
 	c.timer.SetLogger(log)
 	c.timer.SetLogContext(
-		"module", name,
+		"module", fmt.Sprintf("%s-%s", name, common.RandomUUID()[:8]),
 		"node", c.state.Home().Name(),
 	)
 
@@ -193,15 +195,17 @@ func (c *ConsensusBlocker) Vote(seal common.Seal, errChan chan<- error) {
 
 // NOTE vote votes and decides the next action.
 func (c *ConsensusBlocker) handle(seal common.Seal) error {
-	err := c.vote(seal)
-	if err == nil {
-		return nil
-	}
-
 	log_ := c.Log().New(log15.Ctx{
 		"seal":      seal.Hash(),
 		"seal_type": seal.Type(),
 	})
+
+	log_.Debug(fmt.Sprintf("`%v` seal reached to blocker", seal.Type()))
+
+	err := c.vote(seal)
+	if err == nil {
+		return nil
+	}
 
 	switch {
 	case DifferentHeightConsensusError.Equal(err),
@@ -209,7 +213,7 @@ func (c *ConsensusBlocker) handle(seal common.Seal) error {
 		ValidationIsNotDoneError.Equal(err),
 		ConsensusButBlockDoesNotMatchError.Equal(err):
 		// TODO go to sync
-		log_.Debug("go to sync", "error", err)
+		log_.Debug("blocker can not handle seal; go to sync", "error", err)
 		_ = c.state.SetNodeState(NodeStateSync)
 		go func() {
 			if e := c.Stop(); e != nil {
@@ -388,8 +392,6 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 // - latest known height block
 // - round 0
 func (c *ConsensusBlocker) joinConsensus(height common.Big) error {
-	c.Log().Debug("trying to join consensus", "height", height)
-
 	err := c.startTimer("join-consensus-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, Round(0))
 	})
@@ -707,13 +709,24 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 }
 
 func (c *ConsensusBlocker) broadcastProposal(proposal Proposal) error {
-	err := c.sealBroadcaster.Send(&proposal)
-	if err != nil {
+	if err := c.sealBroadcaster.Send(&proposal); err != nil {
 		c.Log().Error("failed to broadcast", "proposal", proposal.Hash())
 		return err
 	}
 
 	c.Log().Debug("proposal broadcasted", "proposal", proposal.Hash())
+
+	/*
+		go func() {
+			<-time.After(time.Millisecond * 300)
+				err := c.startTimer("propose-but-timeout-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+					return c.broadcastINIT(proposal.Block.Height, proposal.Round+1)
+				})
+				if err != nil {
+					c.Log().Error("failed to start timer")
+				}
+		}()
+	*/
 
 	return nil
 }

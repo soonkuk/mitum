@@ -12,6 +12,7 @@ import (
 
 type NodeTestNetwork struct {
 	sync.RWMutex
+	*common.Logger
 	chans              map[string]ReceiverFunc
 	validatorsChan     map[common.Address]ReceiverFunc
 	SkipCheckValidator bool
@@ -19,16 +20,21 @@ type NodeTestNetwork struct {
 
 func NewNodeTestNetwork() *NodeTestNetwork {
 	return &NodeTestNetwork{
+		Logger:         common.NewLogger(log, "module", "node-test-network"),
 		chans:          map[string]ReceiverFunc{},
 		validatorsChan: map[common.Address]ReceiverFunc{},
 	}
 }
 
 func (n *NodeTestNetwork) Start() error {
+	n.Log().Debug("trying to start node network")
+	n.Log().Debug("node network started")
 	return nil
 }
 
 func (n *NodeTestNetwork) Stop() error {
+	n.Log().Debug("trying to stop node network")
+	n.Log().Debug("node network stopped")
 	return nil
 }
 

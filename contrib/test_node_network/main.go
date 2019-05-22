@@ -9,35 +9,11 @@ import (
 	"github.com/spikeekips/mitum/isaac"
 	"github.com/spikeekips/mitum/network"
 	"github.com/spikeekips/mitum/storage"
-	"github.com/spikeekips/mitum/storage/leveldbstorage"
+
+	"github.com/spikeekips/mitum/contrib/test_node_network/lib"
 )
 
-var log log15.Logger = log15.New("module", "node-network-test")
-
-func init() {
-	common.InTest = false
-
-	handler, _ := common.LogHandler(common.LogFormatter("json"), "")
-	handler = log15.LvlFilterHandler(log15.LvlDebug, handler)
-	handler = log15.CallerFileHandler(handler)
-
-	loggers := []log15.Logger{
-		log,
-		common.Log(),
-		isaac.Log(),
-		network.Log(),
-		storage.Log(),
-	}
-	for _, l := range loggers {
-		l.SetHandler(handler)
-	}
-
-	{
-		syncer, _ := common.NewTimeSyncer("zero.bora.net", time.Second*10)
-		_ = syncer.Start()
-		common.SetTimeSyncer(syncer)
-	}
-}
+var log log15.Logger = log15.New("module", "test-node-network")
 
 var (
 	seeds []string = []string{
@@ -68,194 +44,90 @@ var (
 	}
 )
 
-func createNode(seedString string) (*Node, error) {
-	seed, err := common.SeedFromString(seedString)
-	if err != nil {
-		return nil, err
+func init() {
+	common.InTest = false
+
+	handler, _ := common.LogHandler(common.LogFormatter("json"), "")
+	handler = log15.LvlFilterHandler(log15.LvlDebug, handler)
+	handler = log15.CallerFileHandler(handler)
+
+	loggers := []log15.Logger{
+		log,
+		common.Log(),
+		isaac.Log(),
+		network.Log(),
+		storage.Log(),
+		lib.Log(),
 	}
-	home := common.NewHome(seed, common.NetAddr{})
-	state := isaac.NewConsensusState(home)
-	_ = state.SetHeight(height)
-	_ = state.SetBlock(block)
-	_ = state.SetState(blockState)
-
-	sealBroadcaster, err := isaac.NewDefaultSealBroadcaster(policy, state)
-	if err != nil {
-		return nil, err
-	}
-
-	blockStorage, _ := isaac.NewDefaultBlockStorage(leveldbstorage.NewMemStorage())
-	node := &Node{
-		home:             home,
-		state:            state,
-		nt:               network.NewNodeTestNetwork(),
-		sealBroadcaster:  sealBroadcaster,
-		sealPool:         isaac.NewDefaultSealPool(),
-		proposerSelector: isaac.NewTProposerSelector(),
-		blockStorage:     blockStorage,
-	}
-	_ = node.sealBroadcaster.SetSender(node.nt.Send)
-	node.sealPool.SetLogContext("node", home.Name())
-
-	votingBox := isaac.NewDefaultVotingBox(home, policy)
-
-	blocker := isaac.NewConsensusBlocker(
-		policy,
-		node.state,
-		votingBox,
-		node.sealBroadcaster,
-		node.sealPool,
-		node.proposerSelector,
-		isaac.NewDefaultProposalValidator(node.blockStorage, state),
-	)
-	consensus, err := isaac.NewConsensus(home, state, blocker)
-	if err != nil {
-		return nil, err
+	for _, l := range loggers {
+		l.SetHandler(handler)
 	}
 
-	node.blocker = blocker
-	node.consensus = consensus
-
-	/* NOTE instead of registering channel, validator channel will be used
-	if err := node.nt.AddReceiver(consensus.Receiver()); err != nil {
-		return nil, err
-	}
+	/*
+		{
+			syncer, err := common.NewTimeSyncer("zero.bora.net", time.Second*10)
+			if err != nil {
+				panic(err)
+			}
+			_ = syncer.Start()
+			common.SetTimeSyncer(syncer)
+		}
 	*/
-	node.nt.AddValidatorChan(home.AsValidator(), consensus.Receiver())
-
-	node.consensus.SetContext(
-		nil, // nolint
-		"policy", policy,
-		"state", node.state,
-		"sealPool", node.sealPool,
-		"proposerSelector", node.proposerSelector,
-	)
-
-	node.log = log.New(log15.Ctx{
-		"node": node.Name(),
-	})
-	node.blockStorage.SetLogContext("node", home.Name())
-
-	return node, nil
-}
-
-type Node struct {
-	home             common.HomeNode
-	log              log15.Logger
-	state            *isaac.ConsensusState
-	nt               *network.NodeTestNetwork
-	sealBroadcaster  *isaac.DefaultSealBroadcaster
-	blocker          *isaac.ConsensusBlocker
-	sealPool         *isaac.DefaultSealPool
-	proposerSelector *isaac.TProposerSelector
-	blockStorage     *isaac.DefaultBlockStorage
-	consensus        *isaac.Consensus
-}
-
-func (n *Node) Name() string {
-	return n.home.Name()
-}
-
-func (n *Node) Start() error {
-	if err := n.nt.Start(); err != nil {
-		return err
-	}
-
-	if err := n.blocker.Start(); err != nil {
-		return err
-	}
-
-	if err := n.consensus.Start(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (n *Node) Stop() error {
-	if err := n.nt.Stop(); err != nil {
-		return err
-	}
-
-	if err := n.blocker.Stop(); err != nil {
-		return err
-	}
-
-	if err := n.consensus.Stop(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func main() {
 	log.Debug("starting", "policy", policy)
 
-	var nodes []*Node
-	for _, seed := range seeds {
-		node, err := createNode(seed)
+	var nodes []*lib.Node
+	for _, seedString := range seeds {
+		seed, err := common.SeedFromString(seedString)
+		if err != nil {
+			log.Error("failed to parse seedString", "error", err)
+			return
+		}
+
+		home := common.NewHome(seed, common.NetAddr{})
+		state := isaac.NewConsensusState(home)
+		state.SetLogContext("node", home.Name())
+		_ = state.SetHeight(height)
+		_ = state.SetBlock(block)
+		_ = state.SetState(blockState)
+
+		sealBroadcaster, _ := lib.NewWrongSealBroadcaster(policy, state, nil)
+		node, err := lib.CreateNode(
+			seed,
+			height,
+			block,
+			blockState,
+			policy,
+			state,
+			sealBroadcaster,
+		)
 		if err != nil {
 			panic(err)
 		}
-		node.log.Debug("node created")
+		node.Log().Debug("node created")
 		nodes = append(nodes, node)
 	}
 
-	// proposer is 1st node
-	for _, node := range nodes {
-		node.proposerSelector.SetProposer(nodes[0].home)
-	}
-
-	// connecting each others
-	var validators []common.Validator
-	for _, node := range nodes {
-		validators = append(validators, node.home.AsValidator())
-	}
-
-	for _, node := range nodes {
-		_ = node.state.AddValidators(validators...)
-
-		for _, other := range nodes {
-			if node.home.Equal(other.home) {
-				continue
-			}
-
-			node.nt.AddValidatorChan(other.home.AsValidator(), other.consensus.Receiver())
+	// proposer does not send proposal
+	nodes[0].SealBroadcaster.SetManipulateFunc(func(seal common.Seal) (common.Seal, bool, error) {
+		if seal.Type() != isaac.ProposalSealType {
+			return seal, true, nil
 		}
+
+		return seal, false, nil
+	})
+
+	if err := lib.PrepareNodePool(nodes); err != nil {
+		panic(err)
 	}
 
-	defer func(nodes []*Node) {
-		for _, node := range nodes {
-			if err := node.Stop(); err != nil {
-				node.log.Error("failed to stop", "error", err)
-				return
-			}
-			node.log.Debug("stopped")
-		}
-	}(nodes)
-
-	// node state
-	for _, node := range nodes {
-		node.log.Info("node state", "node-state", node.state.NodeState())
+	if err := lib.StartNodes(nodes); err != nil {
+		panic(err)
 	}
 
-	// starting node
-	for _, node := range nodes {
-		if err := node.Start(); err != nil {
-			node.log.Error("failed to start", "error", err)
-			return
-		}
-		node.log.Debug("started")
-	}
-
-	for _, node := range nodes {
-		_ = node.blocker.Join()
-	}
-
-	// node state
-	for _, node := range nodes {
-		node.log.Info("node state", "node-state", node.state.NodeState())
-	}
+	defer lib.StopNodes(nodes)
 
 	select {}
 }

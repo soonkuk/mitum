@@ -38,7 +38,7 @@ func (n NodeState) String() string {
 	case NodeStateStopped:
 		return "stopped"
 	default:
-		return "<wrong node state>"
+		return "<empty node state>"
 	}
 }
 

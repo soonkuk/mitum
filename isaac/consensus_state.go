@@ -9,6 +9,7 @@ import (
 
 type ConsensusState struct {
 	sync.RWMutex
+	*common.Logger
 	home       common.HomeNode
 	height     common.Big  // last Block.Height
 	block      common.Hash // Block.Hash()
@@ -18,11 +19,14 @@ type ConsensusState struct {
 }
 
 func NewConsensusState(home common.HomeNode) *ConsensusState {
-	return &ConsensusState{
+	s := &ConsensusState{
+		Logger:     common.NewLogger(log, "module", "consensus-state", "node", home.Name()),
 		home:       home,
-		nodeState:  NodeStateBooting,
 		validators: map[common.Address]common.Validator{},
 	}
+
+	s.SetNodeState(NodeStateBooting)
+	return s
 }
 
 func (c *ConsensusState) MarshalJSON() ([]byte, error) {
@@ -34,6 +38,7 @@ func (c *ConsensusState) MarshalJSON() ([]byte, error) {
 		"height":     c.height,
 		"block":      c.block,
 		"state":      c.state,
+		"node-state": c.nodeState,
 		"validators": c.Validators(),
 	})
 }
@@ -114,9 +119,13 @@ func (c *ConsensusState) SetNodeState(state NodeState) error {
 
 	if err := state.IsValid(); err != nil {
 		return err
+	} else if c.nodeState == state {
+		return nil
 	}
 
+	stateFrom := c.nodeState
 	c.nodeState = state
+	c.Log().Debug("node state transitted", "from", stateFrom, "to", c.nodeState)
 
 	return nil
 }
