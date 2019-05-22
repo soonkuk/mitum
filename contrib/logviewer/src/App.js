@@ -231,7 +231,7 @@ class CenteredGrid extends React.Component {
     })
     stringifier.on('readable', function(){
       let row;
-      while(row = stringifier.read()){
+      while(row = stringifier.read()){ // eslint-disable-line
         data.push(row)
       }
     })
@@ -262,9 +262,11 @@ class CenteredGrid extends React.Component {
         } else {
           row.push('')
         }
+        return null
       })
 
       stringifier.write(row)
+      return null
     })
 
     stringifier.end()
