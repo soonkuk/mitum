@@ -160,10 +160,11 @@ func SetTimeSyncer(syncer *TimeSyncer) {
 }
 
 func (s *TimeSyncer) Start() error {
-	s.Log().Debug("started")
+	s.Log().Debug("trying to start time-syncer")
 
 	go s.schedule()
 
+	s.Log().Debug("time-syncer started")
 	return nil
 }
 
@@ -171,13 +172,13 @@ func (s *TimeSyncer) Stop() error {
 	s.Lock()
 	defer s.Unlock()
 
+	s.Log().Debug("trying to stop time-syncer")
 	if s.stopChan != nil {
 		s.stopChan <- true
 		close(s.stopChan)
 		s.stopChan = nil
 	}
 
-	s.Log().Debug("stopped")
 	return nil
 }
 
@@ -189,6 +190,7 @@ end:
 		select {
 		case <-s.stopChan:
 			ticker.Stop()
+			s.Log().Debug("time-syncer stopped")
 			break end
 		case <-ticker.C:
 			s.check()
