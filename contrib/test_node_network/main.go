@@ -112,6 +112,7 @@ func main() {
 
 	// proposer does not send proposal
 	nodes[0].SealBroadcaster.SetManipulateFunc(func(seal common.Seal) (common.Seal, bool, error) {
+		return seal, true, nil
 		if seal.Type() != isaac.ProposalSealType {
 			return seal, true, nil
 		}

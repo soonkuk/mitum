@@ -128,6 +128,13 @@ func TerminalLogString(s string) string {
 	return strings.TrimSpace(strings.Replace(s, "\"", "'", -1))
 }
 
+type Loggerable interface {
+	Log() log15.Logger
+	SetLogger(log15.Logger)
+	LogContext() []interface{}
+	SetLogContext(...interface{})
+}
+
 type Logger struct {
 	sync.RWMutex
 	logCtx log15.Ctx

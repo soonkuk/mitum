@@ -19,7 +19,7 @@ type ConsensusBlocker struct {
 	*common.Logger
 	stopBlockingChan       chan bool
 	blockingChan           chan ConsensusBlockerBlockingChanFunc
-	timer                  *common.CallbackTimer
+	timer                  common.TimerCallback
 	lastVotingResult       VoteResultInfo
 	lastFinishedProposalAt common.Time
 
@@ -142,7 +142,7 @@ end:
 	}
 }
 
-func (c *ConsensusBlocker) startTimer(
+func (c *ConsensusBlocker) startTimerWithFunc(
 	name string,
 	timeout time.Duration,
 	keepRunning bool,
@@ -157,16 +157,30 @@ func (c *ConsensusBlocker) startTimer(
 	}
 
 	// TODO timer initial timeout
-	c.timer = common.NewCallbackTimer(
-		timeout,
-		callback,
-		keepRunning,
-	)
-	c.timer.SetLogger(log)
-	c.timer.SetLogContext(
-		"module", fmt.Sprintf("%s-%s", name, common.RandomUUID()[:8]),
+	timer := common.NewDefaultTimerCallback(timeout, callback)
+	timer.SetKeepRunning(keepRunning)
+	timer.SetLogger(log)
+	timer.SetLogContext(
+		"module", name,
+		"timer-id", common.RandomUUID(),
 		"node", c.state.Home().Name(),
 	)
+
+	c.timer = timer
+
+	return c.timer.Start()
+}
+
+func (c *ConsensusBlocker) startTimerWithTimer(timer common.TimerCallback) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.timer != nil {
+		_ = c.timer.Stop()
+		c.timer = nil
+	}
+
+	c.timer = timer
 
 	return c.timer.Start()
 }
@@ -392,7 +406,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 // - latest known height block
 // - round 0
 func (c *ConsensusBlocker) joinConsensus(height common.Big) error {
-	err := c.startTimer("join-consensus-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+	err := c.startTimerWithFunc("join-consensus-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, Round(0))
 	})
 	if err != nil {
@@ -414,7 +428,7 @@ func (c *ConsensusBlocker) doProposeAccepted(seal common.Seal, votingResult Vote
 		return err
 	}
 
-	err := c.startTimer("proposal-accepted-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+	err := c.startTimerWithFunc("proposal-accepted-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(votingResult.Height, votingResult.Round+1)
 	})
 	if err != nil {
@@ -460,7 +474,7 @@ func (c *ConsensusBlocker) goToNextStage(
 	// - current Height is same
 	// - current Height is same
 
-	err := c.startTimer("next-stage-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+	err := c.startTimerWithFunc("next-stage-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -563,7 +577,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 	c.Unlock()
 
 	// propose or wait new proposal
-	err = c.startTimer("finish-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+	err = c.startTimerWithFunc("finish-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(p.Block.Height.Inc(), Round(0))
 	})
 	if err != nil {
@@ -577,7 +591,7 @@ func (c *ConsensusBlocker) finishRound(proposal common.Hash) error {
 func (c *ConsensusBlocker) startNewRound(height common.Big, round Round) error {
 	c.Log().Debug("start new round", "height", height, "round", round)
 
-	err := c.startTimer("new-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
+	err := c.startTimerWithFunc("new-round-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
 		return c.broadcastINIT(height, round+1)
 	})
 	if err != nil {
@@ -592,7 +606,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 	log_ := c.Log().New(log15.Ctx{"height": height, "round": round})
 	log_.Debug("run new round")
 
-	err := c.startTimer(
+	err := c.startTimerWithFunc(
 		"run-round-broadcast-init",
 		c.policy.TimeoutWaitSeal,
 		true,
@@ -698,12 +712,20 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 		}
 	}
 
-	err = c.startTimer("propose-new-proposal", delay, false, func() error {
-		return c.broadcastProposal(proposal)
-	})
-	if err != nil {
-		return err
-	}
+	go func() {
+		tm := common.NewDefaultTimerCallback(delay, func() error {
+			return c.broadcastProposal(proposal)
+		})
+		tm.SetLogger(c.Log())
+		tm.SetLogContext(
+			"module", "propose-new-proposal",
+			"timer-id", common.RandomUUID(),
+		)
+
+		if err := tm.Start(); err != nil {
+			c.Log().Error("callback timer failed; propose-new-proposal", "error", err)
+		}
+	}()
 
 	return nil
 }
@@ -715,18 +737,6 @@ func (c *ConsensusBlocker) broadcastProposal(proposal Proposal) error {
 	}
 
 	c.Log().Debug("proposal broadcasted", "proposal", proposal.Hash())
-
-	/*
-		go func() {
-			<-time.After(time.Millisecond * 300)
-				err := c.startTimer("propose-but-timeout-broadcast-init", c.policy.TimeoutWaitSeal, true, func() error {
-					return c.broadcastINIT(proposal.Block.Height, proposal.Round+1)
-				})
-				if err != nil {
-					c.Log().Error("failed to start timer")
-				}
-		}()
-	*/
 
 	return nil
 }
