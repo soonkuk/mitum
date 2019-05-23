@@ -2,8 +2,10 @@ package isaac
 
 import (
 	"crypto/sha256"
+	"errors"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/spikeekips/mitum/common"
 )
@@ -65,4 +67,31 @@ func (d *DefaultProposerSelector) Select(block common.Hash, height common.Big, r
 	}
 
 	return d.candidates[d.addresses[int(s)%len(d.addresses)]], nil
+}
+
+type FixedProposerSelector struct {
+	sync.RWMutex
+	proposer common.Node
+}
+
+func NewFixedProposerSelector() *FixedProposerSelector {
+	return &FixedProposerSelector{}
+}
+
+func (t *FixedProposerSelector) SetProposer(proposer common.Node) {
+	t.Lock()
+	defer t.Unlock()
+
+	t.proposer = proposer
+}
+
+func (t *FixedProposerSelector) Select(block common.Hash, height common.Big, round Round) (common.Node, error) {
+	t.RLock()
+	defer t.RUnlock()
+
+	if t.proposer == nil {
+		return nil, errors.New("empty proposer; `SetProposer()` first")
+	}
+
+	return t.proposer, nil
 }

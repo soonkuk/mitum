@@ -151,7 +151,7 @@ func (c *Consensus) receiverFunc(seal common.Seal) error {
 	)
 	checker.SetLogContext("node", c.home.Name())
 	if err := checker.Check(); err != nil {
-		checker.Log().Error("failed to check", "error", err)
+		c.Log().Error("failed to receive seal", "seal", seal.Hash(), "error", err)
 		return err
 	}
 

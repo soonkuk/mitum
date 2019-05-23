@@ -20,6 +20,7 @@ type ConsensusBlocker struct {
 	stopBlockingChan       chan bool
 	blockingChan           chan ConsensusBlockerBlockingChanFunc
 	timer                  common.TimerCallback
+	proposalTimer          common.TimerCallback
 	lastVotingResult       VoteResultInfo
 	lastFinishedProposalAt common.Time
 
@@ -183,6 +184,29 @@ func (c *ConsensusBlocker) startTimerWithTimer(timer common.TimerCallback) error
 	c.timer = timer
 
 	return c.timer.Start()
+}
+
+func (c *ConsensusBlocker) startProposalTimer(proposal Proposal, delay time.Duration) error {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.proposalTimer != nil {
+		_ = c.proposalTimer.Stop()
+		c.proposalTimer = nil
+	}
+
+	timer := common.NewDefaultTimerCallback(delay, func() error {
+		return c.broadcastProposal(proposal)
+	})
+	timer.SetLogger(c.Log())
+	timer.SetLogContext(
+		"module", "propose-new-proposal",
+		"timer-id", common.RandomUUID(),
+	)
+
+	c.proposalTimer = timer
+
+	return c.proposalTimer.Start()
 }
 
 func (c *ConsensusBlocker) stopTimer() error { // nolint
@@ -712,20 +736,9 @@ func (c *ConsensusBlocker) propose(height common.Big, round Round) error {
 		}
 	}
 
-	go func() {
-		tm := common.NewDefaultTimerCallback(delay, func() error {
-			return c.broadcastProposal(proposal)
-		})
-		tm.SetLogger(c.Log())
-		tm.SetLogContext(
-			"module", "propose-new-proposal",
-			"timer-id", common.RandomUUID(),
-		)
-
-		if err := tm.Start(); err != nil {
-			c.Log().Error("callback timer failed; propose-new-proposal", "error", err)
-		}
-	}()
+	if err := c.startProposalTimer(proposal, delay); err != nil {
+		c.Log().Error("failed to start proposal timer", "error", err)
+	}
 
 	return nil
 }

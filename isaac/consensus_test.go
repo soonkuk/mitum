@@ -25,7 +25,7 @@ type testConsensus struct {
 	sealPool         *DefaultSealPool
 	consensus        *Consensus
 	cstate           *ConsensusState
-	proposerSelector *TProposerSelector
+	proposerSelector *FixedProposerSelector
 	blockStorage     *TBlockStorage
 }
 
@@ -60,7 +60,7 @@ func (t *testConsensus) SetupTest() {
 	t.sealPool = NewDefaultSealPool()
 	t.sealPool.SetLogContext("node", t.home.Name())
 
-	t.proposerSelector = NewTProposerSelector()
+	t.proposerSelector = NewFixedProposerSelector()
 	t.proposerSelector.SetProposer(t.home)
 
 	t.blockStorage = NewTBlockStorage()

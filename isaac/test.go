@@ -144,29 +144,6 @@ func (t *TestMockVotingBox) Clear() error {
 	return nil
 }
 
-type TProposerSelector struct {
-	sync.RWMutex
-	proposer common.Node
-}
-
-func NewTProposerSelector() *TProposerSelector {
-	return &TProposerSelector{}
-}
-
-func (t *TProposerSelector) SetProposer(proposer common.Node) {
-	t.Lock()
-	defer t.Unlock()
-
-	t.proposer = proposer
-}
-
-func (t *TProposerSelector) Select(block common.Hash, height common.Big, round Round) (common.Node, error) {
-	t.RLock()
-	defer t.RUnlock()
-
-	return t.proposer, nil
-}
-
 type TBlockStorage struct {
 	sync.RWMutex
 	*common.Logger

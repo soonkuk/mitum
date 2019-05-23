@@ -52,7 +52,8 @@ func CheckerBallotHasValidProposal(c *common.ChainChecker) error {
 	// check Height
 	if !ballot.Height().Equal(proposal.Block.Height) {
 		return BallotNotWellformedError.SetMessage(
-			"ballot has problem; height is not matched; ballot=%v proposal=%v",
+			"ballot has problem; height is not matched; ballot=%v in_ballot=%v proposal=%v",
+			ballot.Hash(),
 			ballot.Height(),
 			proposal.Block.Height,
 		)
@@ -61,7 +62,8 @@ func CheckerBallotHasValidProposal(c *common.ChainChecker) error {
 	// check Round
 	if ballot.Round() != proposal.Round {
 		return BallotNotWellformedError.SetMessage(
-			"ballot has problem; round is not matched; ballot=%v proposal=%v",
+			"ballot has problem; round is not matched; ballot=%v in_ballot=%v proposal=%v",
+			ballot.Hash(),
 			ballot.Round(),
 			proposal.Round,
 		)
