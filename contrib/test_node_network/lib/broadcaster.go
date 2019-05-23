@@ -10,27 +10,27 @@ import (
 	"github.com/spikeekips/mitum/network"
 )
 
-type ManipulateFuncType func(common.Seal) (common.Seal, bool /* send or not */, error)
+type ManipulateBeforeFuncType func(*WrongSealBroadcaster, common.Seal) (common.Seal, bool /* send or not */, error)
+type ManipulateAfterFuncType func(*WrongSealBroadcaster, common.Seal) error
 
 type WrongSealBroadcaster struct {
 	sync.RWMutex
 	*common.Logger
-	policy         isaac.ConsensusPolicy
-	state          *isaac.ConsensusState
-	sender         network.SenderFunc
-	manipulateFunc ManipulateFuncType
+	policy               isaac.ConsensusPolicy
+	state                *isaac.ConsensusState
+	sender               network.SenderFunc
+	manipulateBeforeFunc ManipulateBeforeFuncType
+	manipulateAfterFunc  ManipulateAfterFuncType
 }
 
 func NewWrongSealBroadcaster(
 	policy isaac.ConsensusPolicy,
 	state *isaac.ConsensusState,
-	manipulateFunc ManipulateFuncType,
 ) (*WrongSealBroadcaster, error) {
 	return &WrongSealBroadcaster{
-		Logger:         common.NewLogger(log, "module", "wrong-broadcaster", "node", state.Home().Name()),
-		policy:         policy,
-		state:          state,
-		manipulateFunc: manipulateFunc,
+		Logger: common.NewLogger(log, "module", "wrong-broadcaster", "node", state.Home().Name()),
+		policy: policy,
+		state:  state,
 	}, nil
 }
 
@@ -45,22 +45,21 @@ func (i *WrongSealBroadcaster) Send(
 		seal = s
 	}
 
-	if i.manipulateFunc != nil {
-		manipulated, keepGoding, err := i.manipulateFunc(seal)
+	if err := message.Sign(i.policy.NetworkID, i.state.Home().Seed()); err != nil {
+		return err
+	}
+
+	if i.manipulateBeforeFunc != nil {
+		manipulated, keepGoing, err := i.manipulateBeforeFunc(i, message.(common.Seal))
 		if err != nil {
-			i.Log().Error("failed to manipulate seal", "error", err)
+			i.Log().Error("failed to before-manipulate seal", "error", err)
 			// NOTE just keep going
-		} else if !keepGoding {
+		} else if !keepGoing {
 			i.Log().Warn("seal manipulated, but does not keep going")
 			return nil
 		} else {
-			message = manipulated.(common.Signer)
 			seal = manipulated
 		}
-	}
-
-	if err := message.Sign(i.policy.NetworkID, i.state.Home().Seed()); err != nil {
-		return err
 	}
 
 	log_ := i.Log().New(log15.Ctx{"seal": seal.Hash()})
@@ -93,6 +92,12 @@ func (i *WrongSealBroadcaster) Send(
 		log_.Debug("seal broadcasted", "target-node", node.Name(), "seal-original", seal)
 	}
 
+	if i.manipulateAfterFunc != nil {
+		if err := i.manipulateAfterFunc(i, seal); err != nil {
+			i.Log().Error("failed to after-manipulate seal", "error", err)
+		}
+	}
+
 	return nil
 }
 
@@ -105,9 +110,10 @@ func (i *WrongSealBroadcaster) SetSender(sender network.SenderFunc) error {
 	return nil
 }
 
-func (i *WrongSealBroadcaster) SetManipulateFunc(manipulateFunc ManipulateFuncType) {
+func (i *WrongSealBroadcaster) SetManipulateFuncs(before ManipulateBeforeFuncType, after ManipulateAfterFuncType) {
 	i.Lock()
 	defer i.Unlock()
 
-	i.manipulateFunc = manipulateFunc
+	i.manipulateBeforeFunc = before
+	i.manipulateAfterFunc = after
 }

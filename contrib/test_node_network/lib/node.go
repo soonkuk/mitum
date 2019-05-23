@@ -16,7 +16,7 @@ type Node struct {
 	SealBroadcaster  *WrongSealBroadcaster
 	Blocker          *isaac.ConsensusBlocker
 	sealPool         *isaac.DefaultSealPool
-	ProposerSelector *isaac.TProposerSelector
+	ProposerSelector isaac.ProposerSelector
 	blockStorage     *isaac.DefaultBlockStorage
 	Consensus        *isaac.Consensus
 }
@@ -58,64 +58,38 @@ func (n *Node) Stop() error {
 }
 
 func CreateNode(
-	seed common.Seed,
+	seedString string,
 	height common.Big,
 	block common.Hash,
 	blockState []byte,
 	policy isaac.ConsensusPolicy,
-	state *isaac.ConsensusState,
-	sealBroadcaster *WrongSealBroadcaster,
 ) (*Node, error) {
 	blockStorage, _ := isaac.NewDefaultBlockStorage(leveldbstorage.NewMemStorage())
-	node := &Node{
-		Logger:           common.NewLogger(log),
-		Home:             state.Home(),
-		Policy:           policy,
-		State:            state,
-		NT:               network.NewNodeTestNetwork(),
-		SealBroadcaster:  sealBroadcaster,
-		sealPool:         isaac.NewDefaultSealPool(),
-		ProposerSelector: isaac.NewTProposerSelector(),
-		blockStorage:     blockStorage,
-	}
-	node.NT.SetLogContext("node", state.Home().Name())
-	node.sealPool.SetLogContext("node", state.Home().Name())
-
-	votingBox := isaac.NewDefaultVotingBox(state.Home(), policy)
-
-	blocker := isaac.NewConsensusBlocker(
-		policy,
-		node.State,
-		votingBox,
-		node.SealBroadcaster,
-		node.sealPool,
-		node.ProposerSelector,
-		isaac.NewDefaultProposalValidator(node.blockStorage, state),
-	)
-	consensus, err := isaac.NewConsensus(state.Home(), state, blocker)
+	seed, err := common.SeedFromString(seedString)
 	if err != nil {
+		log.Error("failed to parse seedString", "error", err)
 		return nil, err
 	}
 
-	node.Blocker = blocker
-	node.Consensus = consensus
+	home := common.NewHome(seed, common.NetAddr{})
+	state := isaac.NewConsensusState(home)
+	state.SetLogContext("node", home.Name())
+	_ = state.SetHeight(height)
+	_ = state.SetBlock(block)
+	_ = state.SetState(blockState)
 
-	/* NOTE instead of registering channel, validator channel will be used
-	if err := node.NT.AddReceiver(consensus.Receiver()); err != nil {
-		return nil, err
+	sealBroadcaster, _ := NewWrongSealBroadcaster(policy, state)
+
+	node := &Node{
+		Logger:          common.NewLogger(log),
+		Home:            state.Home(),
+		Policy:          policy,
+		State:           state,
+		NT:              network.NewNodeTestNetwork(),
+		SealBroadcaster: sealBroadcaster,
+		sealPool:        isaac.NewDefaultSealPool(),
+		//ProposerSelector: isaac.NewTProposerSelector(),
+		blockStorage: blockStorage,
 	}
-	*/
-	node.NT.AddValidatorChan(state.Home().AsValidator(), consensus.Receiver())
-
-	node.Consensus.SetContext(
-		nil, // nolint
-		"policy", policy,
-		"state", node.State,
-		"sealPool", node.sealPool,
-		"proposerSelector", node.ProposerSelector,
-	)
-
-	node.blockStorage.SetLogContext("node", state.Home().Name())
-
 	return node, nil
 }
