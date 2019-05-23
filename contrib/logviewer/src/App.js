@@ -8,7 +8,6 @@ import Dropzone from 'react-dropzone'
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
-import TableHead from '@material-ui/core/TableHead';
 import Grid from '@material-ui/core/Grid';
 import TableRow from '@material-ui/core/TableRow';
 import { SnackbarProvider, withSnackbar } from 'notistack';
@@ -272,35 +271,6 @@ class CenteredGrid extends React.Component {
     stringifier.end()
   }
 
-  headerResized = false
-  componentDidUpdate() {
-    if (!this.headerResized) {
-      setTimeout(e => {
-        var tds = null
-        try {
-          tds = document.getElementsByTagName('table')[1].getElementsByTagName('tbody')[0].getElementsByTagName('tr')[0].getElementsByTagName('td')
-        } catch {
-          return
-        }
-
-        var fixed_ths = document.getElementsByTagName('table')[0].getElementsByTagName('thead')[0].getElementsByTagName('tr')[0].getElementsByTagName('th')
-
-        Array.from(tds).map((e, i) => {
-          if (fixed_ths[i] === undefined) {
-            return null
-          }
-
-          fixed_ths[i].style.width = e.offsetWidth + 'px'
-          e.style.width = fixed_ths[i].style.width
-          return null
-        })
-
-      }, 1000)
-
-      this.headerResized = true
-    }
-  }
-
   componentDidMount() {
     window.addEventListener('scroll', this.onScroll, false);
   }
@@ -424,45 +394,23 @@ class CenteredGrid extends React.Component {
   renderRecords(records, nodes) {
     const { classes } = this.props;
 
-    if (this.state.records.length < 1) {
-      return <React.Fragment>
-        <Table className={' fixed'}>
-          <TableHead>
-            <TableRow>
-              <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
-                <TableCell key={'tc-0'}></TableCell>
-                <TableCell key={'tc-1'}></TableCell>
-                <TableCell key={'tc-2'}></TableCell>
-                <TableCell key={'tc-3'}></TableCell>
-            </TableRow>
-          </TableHead>
-        </Table>
-      </React.Fragment>
-    }
-
     return <React.Fragment>
-      <Table className={' fixed'}>
-        <TableHead>
-          <TableRow>
-            <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
-            {this.state.nodes.map(node => (
-              <TableCell align='left' key={node}><div>{node}</div></TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-      </Table>
-
       <Box height='100%'>
         <Table id='inner-root' className={' scrollable'}>
           <TableBody>
-            <TableRow>
-                <TableCell key={'h'}>.</TableCell>
-              {this.state.nodes.map((node, index) => (
-                <TableCell key={node + 'h'}></TableCell>
-              ))}
-            </TableRow>
+            {this.state.records.map((record, index) => {
+              if (index % 30 === 0) {
+                return <React.Fragment key={record.id + 'r' + index}>
+                  <TableRow className='header' key={record.id + 'h' + index}>
+                    <TableCell className={classes.listTableT} key={'t'}><div>T</div></TableCell>
+                    {this.state.nodes.map(node => (
+                      <TableCell align='left' key={node}><div>{node}</div></TableCell>
+                    ))}
+                  </TableRow>
+                  {this.renderRecord(records[0], record, nodes)}
+                </React.Fragment>
+              }
 
-            {this.state.records.map(record => {
               return this.renderRecord(records[0], record, nodes)
             })}
           </TableBody>

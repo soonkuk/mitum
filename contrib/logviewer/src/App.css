@@ -67,35 +67,27 @@ body {
   height: 100%;
 }
 
-table.scrollable,
-table.fixed {
+table.scrollable {
   z-index: 1000;
-}
-
-table.fixed {
-  background-color: transparent;
-  width: 99%;
-  position: fixed;
-}
-
-table.fixed * {
-  font-weight: 600;
 }
 
 table * {
   font-size: 13px !important;
 }
 
-table.scrollable {
-  position: absolute;
+table.scrollable tr.header,
+table.scrollable tr.header * {
+  background-color: #999 !important;
+  color: #fff !important;
+  cursor: default !important;
 }
 
-table.fixed thead th > div {
+table.scrollable tr.header td > div {
   background-color: white;
   margin: 0 1px 0 1px;
 }
 
-table.fixed thead th > div {
+table.scrollable tr.header td > div {
   padding-left: 0.6em;
 }
 
@@ -134,13 +126,13 @@ table.scrollable td > button,
   box-shadow: none !important;
 }
 
-.MuiTableRow-root-8 {
+table.scrollable tr {
   height: auto !important;
 }
 
-.MuiTableCell-root-13,
+table.scrollable td,
 .MuiTableCell-body-15 {
-    padding: 3px 0 3px 0 !important;
+    padding: 0.3rem !important;
 }
 
 .MuiCollapse-container-158 {
