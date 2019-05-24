@@ -21,6 +21,7 @@ const (
 	InvalidSealTypeErrorCode
 	InvalidSignatureErrorCode
 	InvalidSeedErrorCode
+	SealIgnoredErrorCode
 )
 
 var (
@@ -43,4 +44,5 @@ var (
 	InvalidSealTypeError             Error = NewError("common", InvalidSealTypeErrorCode, "invalid SealType")
 	InvalidSignatureError            Error = NewError("common", InvalidSignatureErrorCode, "invalid Signature found")
 	InvalidSeedError                 Error = NewError("common", InvalidSeedErrorCode, "invalid seed")
+	SealIgnoredError                 Error = NewError("common", SealIgnoredErrorCode, "seal ignored")
 )

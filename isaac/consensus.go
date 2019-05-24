@@ -185,7 +185,7 @@ func (c *Consensus) receiveSeal(seal common.Seal) {
 	log_ := c.Log().New(log15.Ctx{"seal": seal.Hash(), "seal-type": seal.Type()})
 
 	if !c.state.NodeState().CanVote() {
-		log_.Error("node cannot vote", "state", c.state.NodeState())
+		log_.Debug("node cannot vote", "state", c.state.NodeState())
 		return
 	}
 

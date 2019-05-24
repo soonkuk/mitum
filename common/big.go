@@ -83,6 +83,11 @@ func (a Big) SubOK(n Big) (Big, bool) {
 	return Big{Int: b}, true
 }
 
+func (a Big) Dec() Big {
+	b, _ := a.SubOK(NewBig(1))
+	return b
+}
+
 func (a Big) MulOK(n Big) (Big, bool) {
 	var b big.Int
 	b.Mul(&a.Int, &n.Int)

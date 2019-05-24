@@ -410,6 +410,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 				"state", c.state,
 			),
 			CheckerBlockerBallotVotingResult,
+			CheckerBlockerVotingBallotResult,
 		)
 		resultChecker.SetLogContext(ballotChecker.LogContext()...)
 		c.RUnlock()

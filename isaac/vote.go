@@ -44,7 +44,7 @@ type VoteResultInfo struct {
 	Stage       VoteStage                             `json:"stage"`
 	Proposed    bool                                  `json:"proposed"`
 	LastVotedAt common.Time                           `json:"last_voted_at"`
-	Voted       map[common.Address]VotingBoxStageNode `json:"voted"`
+	Voted       map[common.Address]VotingBoxStageNode `json:"voted"` // NOTE for helping to check
 }
 
 func NewVoteResultInfo() VoteResultInfo {

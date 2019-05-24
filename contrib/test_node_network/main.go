@@ -18,9 +18,9 @@ var log log15.Logger = log15.New("module", "test-node-network")
 var (
 	seeds []string = []string{
 		"SACCEWPT5O5RW67F53M6TMVELMJ34DC5EDWQPSG4RRTQ72BJBSASJTWY", // GAEU.6BSA
-		"SB4NCVQZQDX6NYVVQPIAJJGES3GOK5PUJI7DP6ZTJV62N3K7CS6JN5XN",
-		"SAPIKULLJIWWSR3O3RKW3ZGIRAMJWFPDIR7B6H54ADSNWKMGHGU4HBQO",
-		"SCVEZIL32YTRJBFQYJSZZDNAE2CZBRABMKG524LZPBQXHFLBP3OPYFLK",
+		"SCVEZIL32YTRJBFQYJSZZDNAE2CZBRABMKG524LZPBQXHFLBP3OPYFLK", // GCHI.OEDQ
+		"SB4NCVQZQDX6NYVVQPIAJJGES3GOK5PUJI7DP6ZTJV62N3K7CS6JN5XN", // GDJ7.M4FG
+		"SAPIKULLJIWWSR3O3RKW3ZGIRAMJWFPDIR7B6H54ADSNWKMGHGU4HBQO", // GDZH.X5S3
 		//"SAUR7Z7SPYCMAILQYMFWMGNFLPFQKI3DRPLNNEUBCHT23N2GSSHWW7QS",
 		//"SDHMHAPZ3HCHK54MDTPYGTBN5YISVZNQP6U2ZYIXQNQINH7FLWU7IK3S",
 		//"SAAMSDCC5WX6H3EMKN5FK2FRCMN5GA2HULXVBKJDPQZN4ZKHUZWSPQQM",
@@ -107,7 +107,7 @@ func stopProposal(nodes []*lib.Node) {
 		node.ProposerSelector = ps
 	}
 
-	// proposer does not send proposal
+	// NOTE proposer does not send proposal
 	nodes[0].SealBroadcaster.SetManipulateFuncs(lib.StopProposal, nil)
 }
 
@@ -117,10 +117,25 @@ func highHeightACCEPTBallot(nodes []*lib.Node) {
 	}
 }
 
+func higherHeight(nodes []*lib.Node, higherNodes []*lib.Node) {
+	// TODO needs to consider the proposer selection
+	ps := isaac.NewFixedProposerSelector()
+	ps.SetProposer(nodes[0].Home)
+
+	for _, node := range nodes {
+		node.ProposerSelector = ps
+	}
+
+	for _, node := range higherNodes {
+		node.State.SetHeight(node.State.Height().Inc().Inc())
+	}
+}
+
 func main() {
 	nodes := createNodes()
 
-	stopProposal(nodes)
+	//stopProposal(nodes)
+	higherHeight(nodes, nodes[:3])
 
 	if err := lib.PrepareNodePool(nodes); err != nil {
 		panic(err)
