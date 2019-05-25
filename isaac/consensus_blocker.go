@@ -399,6 +399,8 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 		return votingResult, nil
 	}
 
+	ballotChecker.Log().Debug("got votingResult of ballot", "votingResult", votingResult)
+
 	{
 		c.RLock()
 		resultChecker := common.NewChainChecker(

@@ -2,6 +2,7 @@ package isaac
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -151,6 +152,13 @@ func (r *DefaultVotingBox) afterMajority(result VoteResultInfo) error {
 }
 
 func (r *DefaultVotingBox) Vote(ballot Ballot) (VoteResultInfo, error) {
+	r.Log().Debug(
+		"vote ballot",
+		"ballot", ballot.Hash(),
+		"ballot-type", ballot.Type(),
+		"ballot-soure", ballot.Source(),
+	)
+
 	result, err := r.vote(
 		ballot.Proposal(),
 		ballot.Proposer(),
@@ -685,7 +693,7 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 	r := NewVoteResultInfo()
 	r.Result = result
 
-	if result == VoteResultNotYet {
+	if r.NotYet() {
 		return r
 	}
 
@@ -922,9 +930,11 @@ func (v *VotingBoxUnknown) Majority(total, threshold uint) VoteResultInfo {
 
 	r := v.MajorityProposal(total, threshold)
 	if !r.NotYet() {
+		log.Debug("majority proposal", r)
 		return r
 	}
 
+	log.Debug("majority init", r)
 	return v.MajorityINIT(total, threshold)
 }
 
@@ -936,6 +946,9 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	byProposal := map[common.Hash][]VotingBoxUnknownVote{}
 	for _, u := range v.voted {
 		if u.Expired(v.policy.ExpireDurationVote) {
+			continue
+		}
+		if u.proposal.Empty() {
 			continue
 		}
 
@@ -994,7 +1007,7 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	r := NewVoteResultInfo()
 	r.Result = result
 
-	if result == VoteResultNotYet {
+	if r.NotYet() {
 		return r
 	}
 
@@ -1052,7 +1065,7 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 // MajorityINIT checks INIT stage votes which have same height and same round
 func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 	v.RLock()
-	byRound := map[Round][]VotingBoxUnknownVote{}
+	byHeightRound := map[string][]VotingBoxUnknownVote{}
 	for _, u := range v.voted {
 		if u.stage != VoteStageINIT {
 			continue
@@ -1062,18 +1075,19 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 			continue
 		}
 
-		byRound[u.round] = append(byRound[u.round], u)
+		key := fmt.Sprintf("%s-%d", u.height.String(), u.round)
+		byHeightRound[key] = append(byHeightRound[key], u)
 	}
 	v.RUnlock()
 
-	if len(byRound) < 1 {
+	if len(byHeightRound) < 1 {
 		return NewVoteResultInfo()
 	}
 
 	th := int(threshold)
 
 	var found []VotingBoxUnknownVote
-	for _, l := range byRound {
+	for _, l := range byHeightRound {
 		if len(l) < th {
 			continue
 		}
@@ -1083,19 +1097,22 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 	}
 
 	result := majority(total, threshold, len(found), 0)
-	if result == VoteResultNotYet {
-		return NewVoteResultInfo()
-	}
 
 	r := NewVoteResultInfo()
+	r.Result = result
+
+	if r.NotYet() {
+		return r
+	}
+
 	r.Result = VoteResultYES
 	r.Height = found[0].height
 	r.Round = found[0].round
 	r.Stage = VoteStageINIT
 
 	votedMap := map[common.Address]VotingBoxStageNode{}
-	for k, v := range v.voted {
-		votedMap[k] = v.VotingBoxStageNode
+	for _, v := range found {
+		votedMap[v.source] = v.VotingBoxStageNode
 	}
 
 	r.Voted = votedMap

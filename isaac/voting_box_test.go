@@ -592,6 +592,53 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 	}
 }
 
+func (t *testVotingBox) TestCanCountUnknownINITDifferentHeight() {
+	// In unknown,
+	// all votes has,
+	// - same different height
+
+	var total uint = 4
+	var threshold uint = 3
+	nodes := t.newNodes(total)
+
+	vo := NewVotingBoxUnknown(t.policy)
+	t.Equal(0, vo.Len())
+
+	height := common.NewBig(200)
+	round := Round(99)
+	proposer := t.home.Address()
+	block := common.NewRandomHash("bk")
+
+	for i, n := range nodes {
+		var h common.Big
+		if i >= len(nodes)-2 {
+			h = height.Inc()
+		} else {
+			h = height
+		}
+		_, err := vo.Vote(
+			common.NewRandomHash("sl"), // different proposal
+			proposer,
+			block,
+			n.Address(),
+			h,
+			round,
+			VoteStageINIT,
+			VoteYES, // NOTE should be yes
+			common.NewRandomHash("sl"),
+		)
+		t.NoError(err)
+		_, voted := vo.Voted(n.Address())
+		t.True(voted)
+	}
+
+	canCount := vo.CanCount(total, threshold)
+	t.True(canCount)
+
+	r := vo.MajorityINIT(total, threshold)
+	t.True(r.NotYet())
+}
+
 func (t *testVotingBox) TestCloseVotingBoxStage() {
 	block := common.NewRandomHash("bk")
 	st := NewVotingBoxStage(

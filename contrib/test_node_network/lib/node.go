@@ -81,7 +81,7 @@ func CreateNode(
 	sealBroadcaster, _ := NewWrongSealBroadcaster(policy, state)
 
 	node := &Node{
-		Logger:          common.NewLogger(log),
+		Logger:          common.NewLogger(log, "node", state.Home().Name()),
 		Home:            state.Home(),
 		Policy:          policy,
 		State:           state,

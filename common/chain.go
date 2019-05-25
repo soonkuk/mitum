@@ -152,3 +152,20 @@ end:
 
 	return err
 }
+
+func (c *ChainChecker) SetLogContext(args ...interface{}) {
+	var touched []interface{}
+	for i := 0; i < len(args); i += 2 {
+		k, ok := args[i].(string)
+		if !ok {
+			panic(fmt.Errorf("key should be string: %T found", args[i]))
+		}
+		if k == "module" {
+			continue
+		}
+
+		touched = append(touched, args[i], args[i+1])
+	}
+
+	c.Logger.SetLogContext(touched...)
+}
