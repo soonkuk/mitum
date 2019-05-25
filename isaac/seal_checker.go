@@ -95,8 +95,7 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 			"proposal-checker",
 			c.Context(),
 			CheckerProposalIsValid,
-			CheckerProposalBlock,
-			CheckerProposalState,
+			CheckerProposalCurrent,
 		)
 	case INITBallotSealType, SIGNBallotSealType, ACCEPTBallotSealType:
 		// TODO check separately
@@ -105,9 +104,10 @@ func CheckerSealTypes(c *common.ChainChecker) error {
 		return common.NewChainChecker(
 			"ballot-checker",
 			c.Context(),
+			CheckerBallotHasValidState,
 			CheckerBallotProposal,
 			CheckerBallotHasValidProposal,
-			CheckerBallotHasValidProposr,
+			CheckerBallotHasValidProposer,
 		)
 	case TransactionSealType:
 		// TODO handle transaction

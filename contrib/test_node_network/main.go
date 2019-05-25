@@ -135,7 +135,7 @@ func main() {
 	nodes := createNodes()
 
 	//stopProposal(nodes)
-	higherHeight(nodes, nodes[:3])
+	//higherHeight(nodes, nodes[:3])
 
 	if err := lib.PrepareNodePool(nodes); err != nil {
 		panic(err)

@@ -1,6 +1,8 @@
 package isaac
 
 import (
+	"bytes"
+
 	"github.com/spikeekips/mitum/common"
 )
 
@@ -63,7 +65,7 @@ func CheckerProposalIsValid(c *common.ChainChecker) error {
 // CheckerProposalBlock checks `Proposal.Block` is correct,
 // - Proposal.Block.Height is same
 // - Proposal.Block.Current is same
-func CheckerProposalBlock(c *common.ChainChecker) error {
+func CheckerProposalCurrent(c *common.ChainChecker) error {
 	// TODO test
 	var state *ConsensusState
 	if err := c.ContextValue("state", &state); err != nil {
@@ -76,26 +78,28 @@ func CheckerProposalBlock(c *common.ChainChecker) error {
 	}
 
 	if !proposal.Block.Height.Equal(state.Height()) {
-		return common.NewChainCheckerStop(
-			"proposal has different height",
-			"proposal", proposal.Block.Height,
-			"current", state.Height(),
+		return common.SealIgnoredError.AppendMessage(
+			"proposal has different height: proposal=%v current=%v",
+			proposal.Block.Height,
+			state.Height(),
 		)
 	}
 
 	if !proposal.Block.Current.Equal(state.Block()) {
-		return common.NewChainCheckerStop(
-			"proposal has different block",
-			"proposal", proposal.Block.Current,
-			"current", state.Block(),
+		return common.SealIgnoredError.AppendMessage(
+			"proposal has different block; proposal=%v current=%v",
+			proposal.Block.Current,
+			state.Block(),
 		)
 	}
 
-	return nil
-}
+	if bytes.Compare(proposal.State.Current, state.State()) != 0 {
+		return common.SealIgnoredError.AppendMessage(
+			"proposal has different state; proposal=%v current=%v",
+			proposal.State.Current,
+			state.State(),
+		)
+	}
 
-// CheckerProposalState checks `Proposal.State` is correct
-func CheckerProposalState(c *common.ChainChecker) error {
-	// TODO test
 	return nil
 }

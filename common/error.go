@@ -6,8 +6,8 @@ import (
 
 type Error struct {
 	code    string
-	message string
-	err     error
+	message string // TODO should be slice
+	err     error  // TODO shoudl be slice to contain multiple error by called frame
 }
 
 func (e Error) MarshalJSON() ([]byte, error) {
