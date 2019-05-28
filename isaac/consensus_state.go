@@ -25,7 +25,7 @@ func NewConsensusState(home common.HomeNode) *ConsensusState {
 		validators: map[common.Address]common.Validator{},
 	}
 
-	s.SetNodeState(NodeStateBooting)
+	_ = s.SetNodeState(NodeStateBooting)
 	return s
 }
 

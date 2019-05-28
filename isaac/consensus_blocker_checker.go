@@ -177,7 +177,6 @@ func CheckerBlockerBallotVotingResult(c *common.ChainChecker) error {
 				result.Stage,
 				last.Stage,
 			)
-			return nil
 		}
 
 		if !last.Block.Empty() && !result.Block.Equal(last.Block) {

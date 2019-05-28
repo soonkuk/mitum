@@ -84,16 +84,11 @@ func (t *testTimerCallback) TestKeepRunning() {
 	defer tm.Stop()
 	defer close(ch)
 
-end:
-	for {
-		select {
-		case <-ch:
-			if count == limit {
-				break end
-			}
-
-			count++
+	for range ch {
+		if count == limit {
+			break
 		}
+		count++
 	}
 
 	t.Equal(limit, count)

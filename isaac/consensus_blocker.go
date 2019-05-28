@@ -159,27 +159,13 @@ func (c *ConsensusBlocker) startTimerWithFunc(
 
 	// TODO timer initial timeout
 	timer := common.NewDefaultTimerCallback(timeout, callback)
-	timer.SetKeepRunning(keepRunning)
+	_ = timer.SetKeepRunning(keepRunning)
 	timer.SetLogger(log)
 	timer.SetLogContext(
 		"module", name,
 		"timer-id", common.RandomUUID(),
 		"node", c.state.Home().Name(),
 	)
-
-	c.timer = timer
-
-	return c.timer.Start()
-}
-
-func (c *ConsensusBlocker) startTimerWithTimer(timer common.TimerCallback) error {
-	c.Lock()
-	defer c.Unlock()
-
-	if c.timer != nil {
-		_ = c.timer.Stop()
-		c.timer = nil
-	}
 
 	c.timer = timer
 

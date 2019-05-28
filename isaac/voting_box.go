@@ -1064,6 +1064,8 @@ func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
 	// same height and round
 	ri.Round = Round(0)
 	ri.Result = VoteResultNotYet
+
+	var found []VotingBoxUnknownVote
 end:
 	for _, nl := range byHeight {
 		if len(nl) < th {
@@ -1076,17 +1078,21 @@ end:
 		}
 
 		// NOTE same round
-		for round, nl := range byRound {
-			if len(nl) < th {
+		for round, rnl := range byRound {
+			if len(rnl) < th {
 				continue
 			}
 			ri.Result = VoteResultYES
-			ri.Height = nl[0].height
+			ri.Height = rnl[0].height
 			ri.Round = round
 			ri.Stage = VoteStageINIT
 
+			found = rnl
+
 			break end
 		}
+
+		found = nl
 
 		// NOTE same round not found, draw
 		ri.Result = majority(total, threshold, len(nl), 0)
@@ -1094,12 +1100,14 @@ end:
 		ri.Round = Round(0)
 		ri.Stage = VoteStageINIT
 
-		sort.Slice(nl, func(i, j int) bool {
-			return nl[i].votedAt.After(nl[j].votedAt)
-		})
-		ri.LastVotedAt = nl[0].votedAt
-
 		break end
+	}
+
+	if len(found) > 0 {
+		sort.Slice(found, func(i, j int) bool {
+			return found[i].votedAt.After(found[j].votedAt)
+		})
+		ri.LastVotedAt = found[0].votedAt
 	}
 
 	return ri

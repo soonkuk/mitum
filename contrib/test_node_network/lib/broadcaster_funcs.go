@@ -26,7 +26,6 @@ func HighHeightACCEPTBallot(b *WrongSealBroadcaster, seal common.Seal) (common.S
 
 	var ballot isaac.ACCEPTBallot
 	if err := common.CheckSeal(seal, &ballot); err != nil {
-		panic(err)
 		return seal, false, err
 	}
 
@@ -40,7 +39,6 @@ func HighHeightACCEPTBallot(b *WrongSealBroadcaster, seal common.Seal) (common.S
 	)
 
 	if err := newBallot.Sign(b.policy.NetworkID, b.state.Home().Seed()); err != nil {
-		panic(err)
 		return seal, false, err
 	}
 

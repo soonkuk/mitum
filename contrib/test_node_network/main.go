@@ -99,7 +99,7 @@ func createNodes() []*lib.Node {
 	return nodes
 }
 
-func stopProposal(nodes []*lib.Node) {
+func stopProposal(nodes []*lib.Node) { // nolint
 	ps := isaac.NewFixedProposerSelector()
 	ps.SetProposer(nodes[0].Home)
 
@@ -111,13 +111,13 @@ func stopProposal(nodes []*lib.Node) {
 	nodes[0].SealBroadcaster.SetManipulateFuncs(lib.StopProposal, nil)
 }
 
-func highHeightACCEPTBallot(nodes []*lib.Node) {
+func highHeightACCEPTBallot(nodes []*lib.Node) { // nolint
 	for _, node := range nodes {
 		node.SealBroadcaster.SetManipulateFuncs(lib.HighHeightACCEPTBallot, nil)
 	}
 }
 
-func higherHeight(nodes []*lib.Node, higherNodes []*lib.Node) {
+func higherHeight(nodes []*lib.Node, higherNodes []*lib.Node) { // nolint
 	// TODO needs to consider the proposer selection
 	ps := isaac.NewFixedProposerSelector()
 	ps.SetProposer(nodes[0].Home)
@@ -127,11 +127,11 @@ func higherHeight(nodes []*lib.Node, higherNodes []*lib.Node) {
 	}
 
 	for _, node := range higherNodes {
-		node.State.SetHeight(node.State.Height().Inc().Inc())
+		_ = node.State.SetHeight(node.State.Height().Inc().Inc())
 	}
 }
 
-func runStopProposal() {
+func runStopProposal() { // nolint
 	nodes := createNodes()
 
 	stopProposal(nodes)
@@ -144,12 +144,14 @@ func runStopProposal() {
 		panic(err)
 	}
 
-	defer lib.StopNodes(nodes)
+	defer func() {
+		_ = lib.StopNodes(nodes)
+	}()
 
 	select {}
 }
 
-func runHigherHeight() {
+func runHigherHeight() { // nolint
 	nodes := createNodes()
 
 	higherHeight(nodes, nodes[:3])
@@ -162,12 +164,14 @@ func runHigherHeight() {
 		panic(err)
 	}
 
-	defer lib.StopNodes(nodes)
+	defer func() {
+		_ = lib.StopNodes(nodes)
+	}()
 
 	select {}
 }
 
-func runStartDelay() {
+func runStartDelay() { // nolint
 	nodes := createNodes()
 
 	ps := isaac.NewFunctionalProposerSelector()
@@ -194,7 +198,9 @@ func runStartDelay() {
 		}
 	}
 
-	defer lib.StopNodes(nodes)
+	defer func() {
+		_ = lib.StopNodes(nodes)
+	}()
 
 	select {}
 }

@@ -93,7 +93,7 @@ func CheckerProposalCurrent(c *common.ChainChecker) error {
 		)
 	}
 
-	if bytes.Compare(proposal.State.Current, state.State()) != 0 {
+	if !bytes.Equal(proposal.State.Current, state.State()) {
 		return common.SealIgnoredError.AppendMessage(
 			"proposal has different state; proposal=%v current=%v",
 			proposal.State.Current,

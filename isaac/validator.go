@@ -107,7 +107,6 @@ func (v *DefaultProposalValidator) Store(proposal Proposal) error {
 type TransactionValidation struct {
 	sync.RWMutex
 	*common.Logger
-	st storage.Storage
 }
 
 func NewTransactionValidation() *TransactionValidation {

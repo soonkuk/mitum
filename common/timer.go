@@ -85,13 +85,18 @@ func (c *DefaultTimerCallback) Start() error {
 	c.Log().Debug("timer callback started")
 
 	if c.synchronous {
-		defer c.Stop()
+		defer func() {
+			_ = c.Stop()
+		}()
+
 		return c.run()
 	}
 
 	go func() {
-		defer c.Stop()
-		c.run()
+		defer func() {
+			_ = c.Stop()
+		}()
+		_ = c.run()
 	}()
 
 	return nil
@@ -217,10 +222,15 @@ func (c *DefaultTimerCallback) run() error {
 		limit = 1
 	}
 
-	for i := 0; i < limit; i++ {
+end0:
+	for {
+		if c.count >= limit {
+			break end0
+		}
+
 		select {
 		case <-c.stopChan:
-			break
+			break end0
 		case <-time.After(c.initialTimeout):
 			c.Log().Debug("timeout expired")
 			if err := c.runCallback(); err != nil && c.errorStop {
@@ -233,11 +243,11 @@ func (c *DefaultTimerCallback) run() error {
 		return nil
 	}
 
-end:
+end1:
 	for {
 		select {
 		case <-c.stopChan:
-			break end
+			break end1
 		case <-time.After(c.timeout):
 			c.Log().Debug("timout expired in keeprunning")
 			if err := c.runCallback(); err != nil && c.errorStop {
@@ -245,7 +255,7 @@ end:
 			}
 
 			if c.limit > 0 && c.count >= c.limit {
-				break end
+				break end1
 			}
 		}
 	}
@@ -316,11 +326,15 @@ func (c *TimerCallbackChain) Start() error {
 	c.Log().Debug("timer callback chain started")
 
 	if c.synchronous {
-		defer c.Stop()
+		defer func() {
+			_ = c.Stop()
+		}()
 		return c.runTimers()
 	}
 
-	go c.runTimers()
+	go func() {
+		_ = c.runTimers()
+	}()
 
 	return nil
 }
@@ -390,7 +404,7 @@ func (c *TimerCallbackChain) runTimers() error {
 			c.stopChan = nil
 		}
 		c.Unlock()
-		c.Stop()
+		_ = c.Stop()
 	}()
 
 	for {
@@ -409,16 +423,16 @@ func (c *TimerCallbackChain) runTimers() error {
 		}
 		c.current++
 	}
-
-	return nil
 }
 
 func (c *TimerCallbackChain) runTimer(timer TimerCallback) error {
 	c.Lock()
 	defer c.Unlock()
 
-	timer.SetSynchronous(true)
-	defer timer.Stop()
+	_ = timer.SetSynchronous(true)
+	defer func() {
+		_ = timer.Stop()
+	}()
 
 	err := timer.Start()
 	if err != nil && c.errorStop {
@@ -514,11 +528,15 @@ func (m *MultiCallbackChain) Start() error {
 	m.Log().Debug("multiple timer callback chain started")
 
 	if m.synchronous {
-		defer m.Stop()
+		defer func() {
+			_ = m.Stop()
+		}()
 		return m.run()
 	}
 
-	go m.run()
+	go func() {
+		_ = m.run()
+	}()
 
 	return nil
 }
@@ -602,8 +620,8 @@ func (m *MultiCallbackChain) run() error {
 
 	if m.synchronous {
 		for _, timer := range m.timers {
-			timer.SetSynchronous(true)
-			timer.SetErrorStop(m.errorStop)
+			_ = timer.SetSynchronous(true)
+			_ = timer.SetErrorStop(m.errorStop)
 			if err := timer.Start(); err != nil {
 				return err
 			}
@@ -613,7 +631,7 @@ func (m *MultiCallbackChain) run() error {
 	}
 
 	for _, timer := range m.timers {
-		timer.SetErrorStop(m.errorStop)
+		_ = timer.SetErrorStop(m.errorStop)
 		if err := timer.Start(); err != nil {
 			return err
 		}
