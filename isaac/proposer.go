@@ -95,3 +95,28 @@ func (t *FixedProposerSelector) Select(block common.Hash, height common.Big, rou
 
 	return t.proposer, nil
 }
+
+type FunctionalProposerSelectorSelectFunc func(block common.Hash, height common.Big, round Round) (common.Node, error)
+
+type FunctionalProposerSelector struct {
+	sync.RWMutex
+	f FunctionalProposerSelectorSelectFunc
+}
+
+func NewFunctionalProposerSelector() *FunctionalProposerSelector {
+	return &FunctionalProposerSelector{}
+}
+
+func (t *FunctionalProposerSelector) SetSelectFunc(f FunctionalProposerSelectorSelectFunc) {
+	t.Lock()
+	defer t.Unlock()
+
+	t.f = f
+}
+
+func (t *FunctionalProposerSelector) Select(block common.Hash, height common.Big, round Round) (common.Node, error) {
+	t.RLock()
+	defer t.RUnlock()
+
+	return t.f(block, height, round)
+}

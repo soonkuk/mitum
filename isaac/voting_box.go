@@ -2,10 +2,8 @@ package isaac
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
@@ -85,7 +83,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 	}
 
 	// NOTE result will be used to broadcast sign ballot
-	result := VoteResultInfo{
+	ri := VoteResultInfo{
 		Result:      VoteResultYES,
 		Proposal:    proposal.Hash(),
 		Proposer:    proposal.Source(),
@@ -96,7 +94,7 @@ func (r *DefaultVotingBox) Open(proposal Proposal) (VoteResultInfo, error) {
 		LastVotedAt: common.Now(),
 	}
 
-	return result, nil
+	return ri, nil
 }
 
 // Close finishes current running proposal; it's proposal reaches to ALLCONFIRM,
@@ -358,12 +356,12 @@ func (r *DefaultVotingBox) voteUnknown(
 	return result, nil
 }
 
-func (r *DefaultVotingBox) Voted(source common.Address) (
+func (r *DefaultVotingBox) IsVoted(source common.Address) (
 	/* current */ map[VoteStage]*VotingBoxStage,
 	/* unknown */ VotingBoxUnknownVote,
 ) {
-	current := r.current.Voted(source)
-	unknown, _ := r.unknown.Voted(source)
+	current := r.current.IsVoted(source)
+	unknown, _ := r.unknown.IsVoted(source)
 
 	return current, unknown
 }
@@ -494,7 +492,7 @@ func (v *VotingBoxProposal) Close(stage VoteStage) error {
 	return nil
 }
 
-func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBoxStage {
+func (v *VotingBoxProposal) IsVoted(source common.Address) map[VoteStage]*VotingBoxStage {
 	allStages := []*VotingBoxStage{
 		v.stageACCEPT,
 		v.stageSIGN,
@@ -502,7 +500,7 @@ func (v *VotingBoxProposal) Voted(source common.Address) map[VoteStage]*VotingBo
 
 	voted := map[VoteStage]*VotingBoxStage{}
 	for _, s := range allStages {
-		if _, found := s.Voted(source); !found {
+		if _, found := s.IsVoted(source); !found {
 			continue
 		}
 		voted[s.stage] = s
@@ -589,7 +587,16 @@ func NewVotingBoxStage(
 	}
 }
 
-func (v *VotingBoxStage) Voted(source common.Address) (VotingBoxStageNode, bool) {
+func (v *VotingBoxStage) Voted() map[common.Address]VotingBoxVoted {
+	m := map[common.Address]VotingBoxVoted{}
+	for k, n := range v.voted {
+		m[k] = NewVotingBoxVoted(n, v.height, v.round, v.proposal, v.stage)
+	}
+
+	return m
+}
+
+func (v *VotingBoxStage) IsVoted(source common.Address) (VotingBoxStageNode, bool) {
 	v.RLock()
 	defer v.RUnlock()
 
@@ -682,19 +689,21 @@ func (v *VotingBoxStage) CanCount(total, threshold uint) bool {
 }
 
 func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
+	ri := NewVoteResultInfo()
+	ri.Voted = v.Voted()
+
 	if v.closed {
-		return NewVoteResultInfo()
+		return ri
 	}
 
 	yes, nop := v.VoteCount()
 
 	result := majority(total, threshold, yes, nop)
 
-	r := NewVoteResultInfo()
-	r.Result = result
+	ri.Result = result
 
-	if r.NotYet() {
-		return r
+	if ri.NotYet() {
+		return ri
 	}
 
 	// NOTE if VoteYES, but Blocks are different
@@ -717,25 +726,18 @@ func (v *VotingBoxStage) Majority(total, threshold uint) VoteResultInfo {
 		}
 
 		if blocks[majorBlock] < threshold {
-			r.Result = VoteResultDRAW
+			ri.Result = VoteResultDRAW
 		}
 	}
 
-	r.Proposal = v.proposal
-	r.Proposer = v.proposer
-	r.Block = majorBlock
-	r.Height = v.height
-	r.Round = v.round
-	r.Stage = v.stage
+	ri.Proposal = v.proposal
+	ri.Proposer = v.proposer
+	ri.Block = majorBlock
+	ri.Height = v.height
+	ri.Round = v.round
+	ri.Stage = v.stage
 
-	votedMap := map[common.Address]VotingBoxStageNode{}
-	for k, v := range v.voted {
-		votedMap[k] = v
-	}
-
-	r.Voted = votedMap
-
-	return r
+	return ri
 }
 
 func (v *VotingBoxStage) MarshalJSON() ([]byte, error) {
@@ -751,47 +753,6 @@ func (v *VotingBoxStage) MarshalJSON() ([]byte, error) {
 }
 
 func (v *VotingBoxStage) String() string {
-	b, _ := json.Marshal(v)
-	return common.TerminalLogString(string(b))
-}
-
-type VotingBoxStageNode struct {
-	vote    Vote
-	block   common.Hash
-	seal    common.Hash
-	votedAt common.Time
-}
-
-func NewVotingBoxStageNode(vote Vote, hash common.Hash, block common.Hash) VotingBoxStageNode {
-	return VotingBoxStageNode{
-		vote:    vote,
-		block:   block,
-		seal:    hash,
-		votedAt: common.Now(),
-	}
-}
-
-func (v VotingBoxStageNode) Expired(d time.Duration) bool {
-	if d == 0 {
-		return false
-	}
-
-	if d > 0 {
-		d = d * -1
-	}
-
-	return v.votedAt.Before(common.Now().Add(d))
-}
-
-func (v VotingBoxStageNode) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"vote":  v.vote,
-		"block": v.block,
-		"seal":  v.seal,
-	})
-}
-
-func (v VotingBoxStageNode) String() string {
 	b, _ := json.Marshal(v)
 	return common.TerminalLogString(string(b))
 }
@@ -863,6 +824,18 @@ func (v *VotingBoxUnknown) Cancel(source common.Address) bool {
 	return true
 }
 
+func (v *VotingBoxUnknown) Voted() map[common.Address]VotingBoxVoted {
+	v.RLock()
+	defer v.RUnlock()
+
+	m := map[common.Address]VotingBoxVoted{}
+	for _, n := range v.voted {
+		m[n.source] = NewVotingBoxVoted(n.VotingBoxStageNode, n.height, n.round, n.proposal, n.stage)
+	}
+
+	return m
+}
+
 func (v *VotingBoxUnknown) SealVoted(seal common.Hash) bool {
 	for _, n := range v.voted {
 		if seal.Equal(n.seal) {
@@ -883,7 +856,7 @@ func (v *VotingBoxUnknown) ProposalVoted(proposal common.Hash) bool {
 	return false
 }
 
-func (v *VotingBoxUnknown) Voted(source common.Address) (VotingBoxUnknownVote, bool) {
+func (v *VotingBoxUnknown) IsVoted(source common.Address) (VotingBoxUnknownVote, bool) {
 	vu, found := v.voted[source]
 	return vu, found
 }
@@ -925,20 +898,28 @@ func (v *VotingBoxUnknown) CanCount(total, threshold uint) bool {
 
 func (v *VotingBoxUnknown) Majority(total, threshold uint) VoteResultInfo {
 	if !v.CanCount(total, threshold) {
-		return NewVoteResultInfo()
+		ri := NewVoteResultInfo()
+		ri.Voted = v.Voted()
+
+		return ri
 	}
 
-	r := v.MajorityProposal(total, threshold)
-	if !r.NotYet() {
-		log.Debug("majority proposal", r)
-		return r
+	ri := v.MajorityProposal(total, threshold)
+	log.Debug("got majority proposal", "result", ri)
+	if !ri.NotYet() {
+		return ri
 	}
 
-	log.Debug("majority init", r)
-	return v.MajorityINIT(total, threshold)
+	ri = v.MajorityINIT(total, threshold)
+	log.Debug("majority init", "result", ri)
+
+	return ri
 }
 
 func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInfo {
+	ri := NewVoteResultInfo()
+	ri.Voted = v.Voted()
+
 	th := int(threshold)
 
 	// within same proposal and same stage
@@ -966,7 +947,7 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	}
 
 	if len(found) < th {
-		return NewVoteResultInfo()
+		return ri
 	}
 
 	// check stage
@@ -984,7 +965,7 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 	}
 
 	if len(found) < 1 {
-		return NewVoteResultInfo()
+		return ri
 	}
 
 	// collect Vote
@@ -1004,11 +985,10 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 
 	result := majority(total, threshold, yes, nop)
 
-	r := NewVoteResultInfo()
-	r.Result = result
+	ri.Result = result
 
-	if r.NotYet() {
-		return r
+	if ri.NotYet() {
+		return ri
 	}
 
 	var majorBlock common.Hash
@@ -1030,8 +1010,8 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 		}
 
 		if blocks[majorBlock] < threshold {
-			r.Result = VoteResultDRAW
-			return r
+			ri.Result = VoteResultDRAW
+			return ri
 		}
 	}
 
@@ -1044,80 +1024,85 @@ func (v *VotingBoxUnknown) MajorityProposal(total, threshold uint) VoteResultInf
 		return voted[i].votedAt.After(voted[j].votedAt)
 	})
 
-	r.LastVotedAt = voted[0].votedAt
+	ri.LastVotedAt = voted[0].votedAt
 
-	r.Block = majorBlock
-	r.Proposal = found[0].proposal
-	r.Height = found[0].height
-	r.Round = found[0].round
-	r.Stage = found[0].stage
+	ri.Block = majorBlock
+	ri.Proposal = found[0].proposal
+	ri.Height = found[0].height
+	ri.Round = found[0].round
+	ri.Stage = found[0].stage
 
-	votedMap := map[common.Address]VotingBoxStageNode{}
-	for k, v := range v.voted {
-		votedMap[k] = v.VotingBoxStageNode
-	}
-
-	r.Voted = votedMap
-
-	return r
+	return ri
 }
 
 // MajorityINIT checks INIT stage votes which have same height and same round
+// - if same height and same round: VoteResultYES and height and round
+// - if same height and different round: VoteResultDRAW and height and 0 round
 func (v *VotingBoxUnknown) MajorityINIT(total, threshold uint) VoteResultInfo {
-	v.RLock()
-	byHeightRound := map[string][]VotingBoxUnknownVote{}
-	for _, u := range v.voted {
-		if u.stage != VoteStageINIT {
+	ri := NewVoteResultInfo()
+	ri.Voted = v.Voted()
+
+	byHeight := map[string][]VotingBoxUnknownVote{}
+	for _, n := range v.voted {
+		if n.stage != VoteStageINIT {
 			continue
 		}
 
-		if u.Expired(v.policy.ExpireDurationVote) {
+		if n.Expired(v.policy.ExpireDurationVote) {
 			continue
 		}
 
-		key := fmt.Sprintf("%s-%d", u.height.String(), u.round)
-		byHeightRound[key] = append(byHeightRound[key], u)
+		byHeight[n.height.String()] = append(byHeight[n.height.String()], n)
 	}
-	v.RUnlock()
 
-	if len(byHeightRound) < 1 {
-		return NewVoteResultInfo()
+	if len(byHeight) < 1 {
+		return ri
 	}
 
 	th := int(threshold)
 
-	var found []VotingBoxUnknownVote
-	for _, l := range byHeightRound {
-		if len(l) < th {
+	// same height and round
+	ri.Round = Round(0)
+	ri.Result = VoteResultNotYet
+end:
+	for _, nl := range byHeight {
+		if len(nl) < th {
 			continue
 		}
 
-		found = l
-		break
+		byRound := map[Round][]VotingBoxUnknownVote{}
+		for _, n := range nl {
+			byRound[n.round] = append(byRound[n.round], n)
+		}
+
+		// NOTE same round
+		for round, nl := range byRound {
+			if len(nl) < th {
+				continue
+			}
+			ri.Result = VoteResultYES
+			ri.Height = nl[0].height
+			ri.Round = round
+			ri.Stage = VoteStageINIT
+
+			break end
+		}
+
+		// NOTE same round not found, draw
+		ri.Result = majority(total, threshold, len(nl), 0)
+		ri.Height = nl[0].height
+		ri.Round = Round(0)
+		ri.Stage = VoteStageINIT
+
+		sort.Slice(nl, func(i, j int) bool {
+			return nl[i].votedAt.After(nl[j].votedAt)
+		})
+		ri.LastVotedAt = nl[0].votedAt
+
+		break end
 	}
 
-	result := majority(total, threshold, len(found), 0)
-
-	r := NewVoteResultInfo()
-	r.Result = result
-
-	if r.NotYet() {
-		return r
-	}
-
-	r.Result = VoteResultYES
-	r.Height = found[0].height
-	r.Round = found[0].round
-	r.Stage = VoteStageINIT
-
-	votedMap := map[common.Address]VotingBoxStageNode{}
-	for _, v := range found {
-		votedMap[v.source] = v.VotingBoxStageNode
-	}
-
-	r.Voted = votedMap
-
-	return r
+	return ri
 }
 
 func (v *VotingBoxUnknown) MarshalJSON() ([]byte, error) {

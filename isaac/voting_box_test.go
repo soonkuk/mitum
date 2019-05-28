@@ -194,10 +194,10 @@ func (t *testVotingBox) TestVoteCurrent() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v0.Address())
+		voted := votingBox.current.IsVoted(v0.Address())
 		t.NotNil(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v0.Address())
 		t.True(found)
 		t.Equal(v0Vote, sn.vote)
 	}
@@ -219,10 +219,10 @@ func (t *testVotingBox) TestVoteCurrent() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v1.Address())
+		voted := votingBox.current.IsVoted(v1.Address())
 		t.NotNil(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v1.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v1.Address())
 		t.True(found)
 		t.Equal(v1Vote, sn.vote)
 	}
@@ -244,10 +244,10 @@ func (t *testVotingBox) TestVoteCurrent() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v2.Address())
+		voted := votingBox.current.IsVoted(v2.Address())
 		t.NotNil(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v2.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v2.Address())
 		t.True(found)
 		t.Equal(v2Vote, sn.vote)
 	}
@@ -284,10 +284,10 @@ func (t *testVotingBox) TestVoteUnknown() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v0.Address())
+		voted := votingBox.current.IsVoted(v0.Address())
 		t.NotNil(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v0.Address())
 		t.True(found)
 		t.Equal(v0Vote, sn.vote)
 	}
@@ -311,10 +311,10 @@ func (t *testVotingBox) TestVoteUnknown() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v1.Address())
+		voted := votingBox.current.IsVoted(v1.Address())
 		t.Equal(0, len(voted))
 
-		current, unknown := votingBox.Voted(v1.Address())
+		current, unknown := votingBox.IsVoted(v1.Address())
 		t.Equal(0, len(current))
 		t.False(unknown.Empty())
 
@@ -357,10 +357,10 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v0.Address())
+		voted := votingBox.current.IsVoted(v0.Address())
 		t.NotNil(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v0.Address())
 		t.True(found)
 		t.Equal(v0Vote, sn.vote)
 	}
@@ -384,10 +384,10 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v1.Address())
+		voted := votingBox.current.IsVoted(v1.Address())
 		t.Equal(0, len(voted))
 
-		current, unknown := votingBox.Voted(v1.Address())
+		current, unknown := votingBox.IsVoted(v1.Address())
 		t.Equal(0, len(current)) // not voted in current
 		t.False(unknown.Empty()) // voted in unknown
 
@@ -420,7 +420,7 @@ func (t *testVotingBox) TestVoteUnknownCancel() {
 		)
 		t.NoError(err)
 
-		current, unknown := votingBox.Voted(v1.Address())
+		current, unknown := votingBox.IsVoted(v1.Address())
 		t.Equal(1, len(current)) // voted in current
 		t.True(unknown.Empty())  // voted in unknown
 	}
@@ -464,7 +464,7 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 				common.NewRandomHash("sl"),
 			)
 			t.NoError(err)
-			_, voted := vo.Voted(n.Address())
+			_, voted := vo.IsVoted(n.Address())
 			t.True(voted)
 		}
 
@@ -492,7 +492,7 @@ func (t *testVotingBox) TestCanCountUnknownSameProposalAndStage() {
 				common.NewRandomHash("sl"),
 			)
 			t.NoError(err)
-			_, voted := vo.Voted(n.Address())
+			_, voted := vo.IsVoted(n.Address())
 			t.True(voted)
 		}
 
@@ -541,7 +541,7 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 				common.NewRandomHash("sl"),
 			)
 			t.NoError(err)
-			_, voted := vo.Voted(n.Address())
+			_, voted := vo.IsVoted(n.Address())
 			t.True(voted)
 		}
 
@@ -578,7 +578,7 @@ func (t *testVotingBox) TestCanCountUnknownINITSameHeightAndRound() {
 				common.NewRandomHash("sl"),
 			)
 			t.NoError(err)
-			_, voted := vo.Voted(n.Address())
+			_, voted := vo.IsVoted(n.Address())
 			t.True(voted)
 		}
 
@@ -628,7 +628,7 @@ func (t *testVotingBox) TestCanCountUnknownINITDifferentHeight() {
 			common.NewRandomHash("sl"),
 		)
 		t.NoError(err)
-		_, voted := vo.Voted(n.Address())
+		_, voted := vo.IsVoted(n.Address())
 		t.True(voted)
 	}
 
@@ -679,7 +679,7 @@ func (t *testVotingBox) TestCloseUnknown() {
 		)
 		t.NoError(err)
 
-		unv, _ := un.Voted(address)
+		unv, _ := un.IsVoted(address)
 		created = append(created, unv.votedAt)
 	}
 
@@ -720,10 +720,10 @@ func (t *testVotingBox) TestAlreadyVotedCurrent() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v0.Address())
+		voted := votingBox.current.IsVoted(v0.Address())
 		t.NotEmpty(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v0.Address())
 		t.True(found)
 		t.Equal(v0Vote, sn.vote)
 
@@ -771,10 +771,10 @@ func (t *testVotingBox) TestAlreadyVotedCurrentButExpired() {
 		t.NoError(err)
 
 		// check
-		voted := votingBox.current.Voted(v0.Address())
+		voted := votingBox.current.IsVoted(v0.Address())
 		t.NotEmpty(voted[VoteStageSIGN])
 
-		sn, found := voted[VoteStageSIGN].Voted(v0.Address())
+		sn, found := voted[VoteStageSIGN].IsVoted(v0.Address())
 		t.True(found)
 		t.Equal(VoteYES, sn.vote)
 	}
@@ -815,7 +815,7 @@ func (t *testVotingBox) TestAlreadyVotedUnknown() {
 		t.NoError(err)
 
 		// check
-		_, voted := votingBox.unknown.Voted(v0.Address())
+		_, voted := votingBox.unknown.IsVoted(v0.Address())
 		t.True(voted)
 
 		votedSeal = t.seals[ballot.Hash()]
@@ -920,7 +920,7 @@ func (t *testVotingBox) TestNewRoundSignVote() {
 	t.False(votingBox.current.SealVoted(proposal.Hash()))
 	t.False(votingBox.current.Stage(VoteStageSIGN).SealVoted(proposal.Hash()))
 
-	_, found := votingBox.current.Stage(VoteStageSIGN).Voted(t.home.Address())
+	_, found := votingBox.current.Stage(VoteStageSIGN).IsVoted(t.home.Address())
 	t.False(found)
 }
 
@@ -1125,4 +1125,47 @@ func (t *testVotingBoxStage) TestSIGNYesButDifferentBlock() {
 
 func TestVotingBoxStage(t *testing.T) {
 	suite.Run(t, new(testVotingBoxStage))
+}
+
+type testVotingBoxUnknown struct {
+	suite.Suite
+}
+
+// TestAllVotedButNotResult checks all validators voted, but can not get
+// result, the result should be draw
+func (t *testVotingBoxUnknown) TestAllVotedButNotResult() {
+	var total uint = 4
+	threshold := uint(math.Round(float64(4) * float64(0.67)))
+
+	proposer := common.RandomSeed().Address()
+	height := common.NewBig(33)
+
+	un := NewVotingBoxUnknown(DefaultConsensusPolicy())
+
+	for i := 0; i < int(total); i++ { // different round
+		un.Vote(
+			common.Hash{},
+			proposer,
+			common.Hash{},
+			common.RandomSeed().Address(),
+			height,
+			Round(i),
+			VoteStageINIT,
+			VoteYES,
+			common.NewRandomHash("ib"),
+		)
+	}
+
+	t.True(un.CanCount(total, threshold))
+
+	ri := un.Majority(total, threshold)
+	t.Equal(VoteResultYES, ri.Result)
+	t.Equal(VoteStageINIT, ri.Stage)
+	t.Equal(Round(0), ri.Round)
+	t.Equal(height, ri.Height)
+	t.Equal(int(total), len(ri.Voted))
+}
+
+func TestVotingBoxUnknown(t *testing.T) {
+	suite.Run(t, new(testVotingBoxUnknown))
 }

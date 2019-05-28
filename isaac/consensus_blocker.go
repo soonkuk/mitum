@@ -312,6 +312,8 @@ func (c *ConsensusBlocker) vote(seal common.Seal) error {
 		return err
 	}
 
+	log_.Debug("vote finished", "votingResult", votingResult)
+
 	if votingResult.NotYet() {
 		return nil
 	}
@@ -354,10 +356,12 @@ func (c *ConsensusBlocker) voteProposal(proposal Proposal) (VoteResultInfo, erro
 		"blocker-vote-proposal-checker",
 		common.ContextWithValues(
 			context.Background(),
+			"lastVotingResult", c.lastVotingResult,
 			"proposal", proposal,
 			"state", c.state,
 		),
 		CheckerBlockerProposalBlock,
+		CheckerBlockerProposalLastVotingResult,
 	)
 	checker.SetLogContext(
 		"node", c.state.Home().Name(),
@@ -392,7 +396,7 @@ func (c *ConsensusBlocker) voteBallot(ballot Ballot) (VoteResultInfo, error) {
 
 	votingResult, err := c.votingBox.Vote(ballot)
 	if err != nil {
-		return VoteResultInfo{}, err
+		return votingResult, err
 	}
 
 	if votingResult.NotYet() {
@@ -634,7 +638,7 @@ func (c *ConsensusBlocker) runNewRound(height common.Big, round Round) error {
 	log_.Debug("run new round")
 
 	err := c.startTimerWithFunc(
-		"run-round-broadcast-init",
+		"run-next-round-broadcast-init",
 		c.policy.TimeoutWaitSeal,
 		true,
 		func() error {

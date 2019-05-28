@@ -48,6 +48,52 @@ func CheckerBlockerProposalBlock(c *common.ChainChecker) error {
 	return nil
 }
 
+// CheckerBlockerProposalLastVotingResult checks proposal is from last voting result
+func CheckerBlockerProposalLastVotingResult(c *common.ChainChecker) error {
+	// TODO test
+	var last VoteResultInfo
+	if err := c.ContextValue("lastVotingResult", &last); err != nil {
+		return err
+	}
+
+	if last.NotYet() {
+		return nil
+	}
+
+	var proposal Proposal
+	if err := c.ContextValue("proposal", &proposal); err != nil {
+		return err
+	}
+
+	// NOTE check last voting result is INIT
+	if last.Stage != VoteStageINIT {
+		return common.SealIgnoredError.AppendMessage(
+			"last voting result is not INIT; last=%v",
+			last.Stage,
+		)
+	}
+
+	// NOTE check height
+	if !proposal.Block.Height.Equal(last.Height) {
+		return common.SealIgnoredError.AppendMessage(
+			"height is different from last voting result; proposal=%v last=%v",
+			proposal.Block.Height,
+			last.Height,
+		)
+	}
+
+	// NOTE check round
+	if proposal.Round != last.Round {
+		return common.SealIgnoredError.AppendMessage(
+			"round is different from last voting result; proposal=%v last=%v",
+			proposal.Round,
+			last.Round,
+		)
+	}
+
+	return nil
+}
+
 func CheckerBlockerBallot(c *common.ChainChecker) error {
 	var ballot Ballot
 	if err := c.ContextValue("ballot", &ballot); err != nil {

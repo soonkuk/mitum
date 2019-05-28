@@ -26,7 +26,7 @@ func canCountVoting(total, threshold uint, yes, nop int) bool {
 		return true
 	}
 
-	// draw
+	// check draw
 	var voted = []int{yes, nop}
 	sort.Ints(voted)
 

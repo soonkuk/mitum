@@ -74,6 +74,25 @@ func PrepareNodePool(nodes []*Node) error {
 	return nil
 }
 
+func StartNode(node *Node) error {
+	node.Log().Info("node info", "state", node.State, "policy", node.Policy)
+
+	// starting node
+	if err := node.Start(); err != nil {
+		node.Log().Error("failed to start", "error", err)
+		return err
+	}
+	node.Log().Debug("started")
+
+	// join
+	_ = node.Blocker.Join()
+
+	// node state
+	node.Log().Info("node state", "node-state", node.State.NodeState())
+
+	return nil
+}
+
 func StartNodes(nodes []*Node) error {
 	// node state
 	for _, node := range nodes {

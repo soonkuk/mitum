@@ -131,10 +131,27 @@ func higherHeight(nodes []*lib.Node, higherNodes []*lib.Node) {
 	}
 }
 
-func main() {
+func runStopProposal() {
 	nodes := createNodes()
 
-	//stopProposal(nodes)
+	stopProposal(nodes)
+
+	if err := lib.PrepareNodePool(nodes); err != nil {
+		panic(err)
+	}
+
+	if err := lib.StartNodes(nodes); err != nil {
+		panic(err)
+	}
+
+	defer lib.StopNodes(nodes)
+
+	select {}
+}
+
+func runHigherHeight() {
+	nodes := createNodes()
+
 	higherHeight(nodes, nodes[:3])
 
 	if err := lib.PrepareNodePool(nodes); err != nil {
@@ -148,4 +165,40 @@ func main() {
 	defer lib.StopNodes(nodes)
 
 	select {}
+}
+
+func runStartDelay() {
+	nodes := createNodes()
+
+	ps := isaac.NewFunctionalProposerSelector()
+	ps.SetSelectFunc(func(_ common.Hash, h common.Big, round isaac.Round) (common.Node, error) {
+		if h.Equal(height) && round == 0 {
+			return nodes[len(nodes)-1].State.Home(), nil
+		}
+
+		return nodes[:3][round%3].State.Home(), nil
+	})
+
+	for _, node := range nodes {
+		node.ProposerSelector = ps
+	}
+
+	if err := lib.PrepareNodePool(nodes); err != nil {
+		panic(err)
+	}
+
+	for _, node := range nodes {
+		time.Sleep(time.Second * 4)
+		if err := lib.StartNode(node); err != nil {
+			panic(err)
+		}
+	}
+
+	defer lib.StopNodes(nodes)
+
+	select {}
+}
+
+func main() {
+	runStartDelay()
 }

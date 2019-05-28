@@ -398,3 +398,145 @@ end:
 func TestTimerCallbackChain(t *testing.T) {
 	suite.Run(t, new(testTimerCallbackChain))
 }
+
+type testMultiTimerCallback struct {
+	suite.Suite
+}
+
+func (t *testMultiTimerCallback) TestNew() {
+	limit := 3
+	countTimer := 4
+	ch := make(chan int)
+
+	var timers []TimerCallback
+	for i := 0; i < countTimer; i++ {
+		id := i
+		timer := NewDefaultTimerCallback(time.Millisecond*3, func() error {
+			ch <- id
+			return nil
+		})
+		timer.SetLimit(limit)
+
+		timers = append(timers, timer)
+	}
+
+	m := NewMultiCallbackChain(timers...)
+	err := m.Start()
+	t.NoError(err)
+	defer m.Stop()
+
+	collected := map[int]int{}
+
+end:
+	for {
+		select {
+		case <-time.After(time.Millisecond * 100):
+			break end
+		case id := <-ch:
+			collected[id]++
+		}
+	}
+
+	t.Equal(countTimer, len(collected))
+	for _, v := range collected {
+		t.Equal(limit, v)
+	}
+}
+
+func (t *testMultiTimerCallback) TestSynchronous() {
+	limit := 3
+	ch := make(chan int)
+
+	var timers []TimerCallback
+
+	var counter0 int = 100
+	timer0 := NewDefaultTimerCallback(time.Millisecond*3, func() error {
+		ch <- counter0
+		counter0++
+		return nil
+	})
+	timer0.SetLimit(limit)
+
+	var counter1 int
+	timer1 := NewDefaultTimerCallback(time.Millisecond*3, func() error {
+		ch <- counter1
+		counter1++
+		return nil
+	})
+	timer1.SetLimit(limit)
+
+	timers = append(timers, timer0, timer1)
+
+	m := NewMultiCallbackChain(timers...)
+	m.SetSynchronous(true)
+
+	go func() {
+		err := m.Start()
+		t.NoError(err)
+		defer m.Stop()
+	}()
+
+	var collected []int
+
+end:
+	for {
+		select {
+		case <-time.After(time.Millisecond * 100):
+			break end
+		case id := <-ch:
+			collected = append(collected, id)
+		}
+	}
+
+	t.Equal(limit*2, len(collected))
+	t.Equal(
+		[]int{100, 101, 102, 0, 1, 2},
+		collected,
+	)
+}
+
+func (t *testMultiTimerCallback) TestStop() {
+	ch := make(chan string)
+
+	var timers []TimerCallback
+
+	timer0 := NewDefaultTimerCallback(time.Millisecond*3, func() error {
+		ch <- RandomUUID()
+		return nil
+	})
+	timer0.SetKeepRunning(true)
+
+	timer1 := NewDefaultTimerCallback(time.Millisecond*3, func() error {
+		ch <- RandomUUID()
+		return nil
+	})
+	timer1.SetKeepRunning(true)
+
+	timers = append(timers, timer0, timer1)
+
+	m := NewMultiCallbackChain(timers...)
+
+	err := m.Start()
+	t.NoError(err)
+
+	var collected []string
+
+	after := time.After(time.Millisecond * 20)
+end:
+	for {
+		select {
+		case <-after:
+			err = m.Stop()
+			t.NoError(err)
+			break end
+		case id := <-ch:
+			collected = append(collected, id)
+		}
+	}
+
+	t.True(len(collected) >= 6)
+}
+
+func TestMultiTimerCallback(t *testing.T) {
+	suite.Run(t, new(testMultiTimerCallback))
+}

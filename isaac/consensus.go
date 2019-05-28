@@ -43,6 +43,13 @@ func (c *Consensus) Name() string {
 	return "isaac"
 }
 
+func (c *Consensus) started() bool {
+	c.RLock()
+	defer c.RUnlock()
+
+	return c.stop != nil
+}
+
 func (c *Consensus) Start() error {
 	c.Log().Debug("trying to start consensus")
 	if c.stop != nil {
@@ -138,6 +145,11 @@ func (c *Consensus) Receiver() network.ReceiverFunc {
 }
 
 func (c *Consensus) receiverFunc(seal common.Seal) error {
+	if !c.started() {
+		// NOTE only transactions will be added to sealpool
+		return nil
+	}
+
 	checker := common.NewChainChecker(
 		"receive-seal-checker",
 		common.ContextWithValues(
