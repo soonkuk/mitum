@@ -8,3 +8,13 @@ Prepare for winter.
 [![](https://tokei.rs/b1/github/spikeekips/mitum?category=lines)](https://github.com/spikeekips/mitum)
 
 This is the second prototype for MITUM. The previous prototype, `proto` can be found at [`proto0` branch](https://github.com/spikeekips/mitum/tree/proto0). The detailed operations of this prototype is writing at [MITUM Documentation](https://app.gitbook.com/@mitum/s/doc/v/proto/how-mitum-works/isaac+-nodenetwork/isaac+-consnsus-group).
+
+## Test
+
+```
+$ go test -race -tags test ./... -v
+```
+
+```
+$ golangci-lint run
+```
