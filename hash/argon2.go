@@ -1,14 +1,15 @@
 package hash
 
 import (
+	"github.com/spikeekips/mitum/common"
 	"golang.org/x/crypto/argon2"
 )
 
 var (
 	emptyArgon2HashValue = [32]byte{}
 	// TODO Argon2Sault should be changed at start time
-	Argon2Sault    []byte            = []byte("argon2-default-sault; please set manually")
-	Argon2HashType HashAlgorithmType = NewHashAlgorithmType(2, "argon2")
+	Argon2Sault    []byte          = []byte("argon2-default-sault; please set manually")
+	Argon2HashType common.DataType = common.NewDataType(2, "argon2")
 )
 
 type Argon2Hash struct {
@@ -18,12 +19,12 @@ func NewArgon2Hash() Argon2Hash {
 	return Argon2Hash{}
 }
 
-func (a Argon2Hash) Type() HashAlgorithmType {
+func (a Argon2Hash) Type() common.DataType {
 	return Argon2HashType
 }
 
-func (a Argon2Hash) GenerateHash(b []byte) ([]byte, error) {
-	return argon2.IDKey(b, Argon2Sault, 2, 64*1024, 2, 32), nil
+func (a Argon2Hash) GenerateHash(b []byte) []byte {
+	return argon2.IDKey(b, Argon2Sault, 2, 64*1024, 2, 32)
 }
 
 func (a Argon2Hash) IsValid(b []byte) error {

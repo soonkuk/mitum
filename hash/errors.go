@@ -11,15 +11,15 @@ const (
 )
 
 var (
-	HashFailedError                     = common.NewErrorType("hash", HashFailedErrorCode, "failed to make hash")
-	EmptyHashError                      = common.NewErrorType("hash", EmptyHashErrorCode, "hash is empty")
-	InvalidHashInputError               = common.NewErrorType("hash", InvalidHashInputErrorCode, "invalid hash input value")
-	HashAlgorithmAlreadyRegisteredError = common.NewErrorType(
+	HashFailedError                     = common.NewError("hash", HashFailedErrorCode, "failed to make hash")
+	EmptyHashError                      = common.NewError("hash", EmptyHashErrorCode, "hash is empty")
+	InvalidHashInputError               = common.NewError("hash", InvalidHashInputErrorCode, "invalid hash input value")
+	HashAlgorithmAlreadyRegisteredError = common.NewError(
 		"hash",
 		HashAlgorithmAlreadyRegisteredErrorCode,
 		"HashAlgorithm is already resitered in Hashes",
 	)
-	HashAlgorithmNotRegisteredError = common.NewErrorType(
+	HashAlgorithmNotRegisteredError = common.NewError(
 		"hash",
 		HashAlgorithmNotRegisteredErrorCode,
 		"HashAlgorithm is not resitered in Hashes",

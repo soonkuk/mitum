@@ -22,7 +22,7 @@ func (t *testDoubleSHA256Hash) TestNew() {
 	_, ok := interface{}(hash).(Hash)
 	t.True(ok)
 
-	t.Equal(`{"algorithm":"double-sha256","body":"5NfGRdg6ex","hint":"block"}`, hash.String())
+	t.Equal(`block:5NfGRdg6ex:double-sha256`, hash.String())
 }
 
 func (t *testDoubleSHA256Hash) TestEqual() {
@@ -96,7 +96,7 @@ func (t *testArgon2Hash) TestNew() {
 	_, ok := interface{}(hash).(Hash)
 	t.True(ok)
 
-	t.Equal(`{"algorithm":"argon2","body":"5NfGRdg6ex","hint":"block"}`, hash.String())
+	t.Equal(`block:5NfGRdg6ex:argon2`, hash.String())
 }
 
 func (t *testArgon2Hash) TestEqual() {

@@ -11,27 +11,27 @@ const (
 )
 
 var (
-	KeypairAlreadyRegisteredError = common.NewErrorType(
+	KeypairAlreadyRegisteredError = common.NewError(
 		"keypair",
 		KeypairAlreadyRegisteredErrorCode,
 		"Keypair is already resitered in Keypairs",
 	)
-	KeypairNotRegisteredError = common.NewErrorType(
+	KeypairNotRegisteredError = common.NewError(
 		"keypair",
 		KeypairNotRegisteredErrorCode,
 		"Keypair is not resitered in Keypairs",
 	)
-	FailedToUnmarshalKeypairError = common.NewErrorType(
+	FailedToUnmarshalKeypairError = common.NewError(
 		"keypair",
 		FailedToUnmarshalKeypairErrorCode,
 		"Failed to unmarshal keypair",
 	)
-	UnknownKeyKindError = common.NewErrorType(
+	UnknownKeyKindError = common.NewError(
 		"keypair",
 		UnknownKeyKindErrorCode,
 		"unknown key kind found",
 	)
-	SignatureVerificationFailedError = common.NewErrorType(
+	SignatureVerificationFailedError = common.NewError(
 		"keypair",
 		SignatureVerificationFailedErrorCode,
 		"signature verification failed",

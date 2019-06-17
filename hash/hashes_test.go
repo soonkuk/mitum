@@ -1,6 +1,7 @@
 package hash
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -68,6 +69,51 @@ func (t *testHashes) TestUnmarshal() {
 	t.NoError(err)
 
 	t.True(hash.Equal(uhash))
+}
+
+func (t *testHashes) TestMerge() {
+	hs := NewHashes()
+	_ = hs.Register(NewArgon2Hash())
+	err := hs.SetDefault(Argon2HashType)
+	t.NoError(err)
+	_ = hs.Register(NewDoubleSHA256Hash())
+
+	base, _ := hs.NewHash("test-hash", []byte("base"))
+
+	var hashes []Hash
+	for i := 0; i < 3; i++ {
+		hash, _ := hs.NewHashByType(DoubleSHA256HashType, fmt.Sprintf("%d", i), []byte("others"))
+		hashes = append(hashes, hash)
+	}
+
+	merged, err := hs.Merge(base, hashes...)
+	t.NoError(err)
+	t.NoError(merged.IsValid())
+
+	t.Equal(base.Hint(), merged.Hint())
+	t.True(base.Algorithm().Equal(merged.Algorithm()))
+}
+
+func (t *testHashes) TestMergeWithEmptyHash() {
+	hs := NewHashes()
+	_ = hs.Register(NewArgon2Hash())
+	err := hs.SetDefault(Argon2HashType)
+	t.NoError(err)
+	_ = hs.Register(NewDoubleSHA256Hash())
+
+	base, _ := hs.NewHash("test-hash", []byte("base"))
+
+	var hashes []Hash
+	for i := 0; i < 3; i++ {
+		hash, _ := hs.NewHashByType(DoubleSHA256HashType, fmt.Sprintf("%d", i), []byte("others"))
+		hashes = append(hashes, hash)
+	}
+	hashes = append(hashes, Hash{})
+
+	merged, err := hs.Merge(base, hashes...)
+
+	t.True(xerrors.Is(err, EmptyHashError))
+	t.True(merged.Empty())
 }
 
 func TestHashes(t *testing.T) {

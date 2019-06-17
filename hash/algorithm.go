@@ -1,7 +1,9 @@
 package hash
 
+import "github.com/spikeekips/mitum/common"
+
 type HashAlgorithm interface {
-	Type() HashAlgorithmType
-	GenerateHash([]byte) ([]byte, error)
+	Type() common.DataType
+	GenerateHash([]byte) []byte
 	IsValid([]byte) error
 }

@@ -31,18 +31,23 @@ func ParseBig(s string) (Big, error) {
 	return Big{Int: a}, nil
 }
 
-func (a Big) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&a.Int)
+func (a Big) MarshalBinary() ([]byte, error) {
+	return []byte(a.String()), nil
 }
 
-func (a *Big) UnmarshalJSON(b []byte) error {
-	var n big.Int
-	if err := json.Unmarshal(b, &n); err != nil {
+func (a *Big) UnmarshalBinary(b []byte) error {
+	p, err := ParseBig(string(b))
+	if err != nil {
 		return err
 	}
 
-	*a = Big{Int: n}
+	*a = p
+
 	return nil
+}
+
+func (a Big) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&a.Int)
 }
 
 func (a Big) String() string {

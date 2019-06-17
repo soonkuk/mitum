@@ -22,6 +22,7 @@ type Key interface {
 	Equal(Key) bool
 	NewFromBinary([]byte) (Key, error)
 	NewFromText([]byte) (Key, error)
+	NativePublicKey() []byte
 	String() string
 }
 
@@ -34,4 +35,5 @@ type PrivateKey interface {
 	Key
 	Sign([]byte) (Signature, error)
 	PublicKey() PublicKey
+	NativePrivateKey() []byte
 }

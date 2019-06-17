@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spikeekips/mitum/common"
 	stellarHash "github.com/stellar/go/hash"
 	stellarKeypair "github.com/stellar/go/keypair"
+
+	"github.com/spikeekips/mitum/common"
 )
 
 var (
@@ -306,7 +307,10 @@ func (s StellarPublicKey) Equal(k Key) bool {
 	}
 
 	return s.kp.Address() == ks.kp.Address()
+}
 
+func (s StellarPublicKey) NativePublicKey() []byte {
+	return []byte(s.kp.Address())
 }
 
 type StellarPrivateKey struct {
@@ -483,4 +487,12 @@ func (s StellarPrivateKey) Equal(k Key) bool {
 
 func (s StellarPrivateKey) PublicKey() PublicKey {
 	return StellarPublicKey{kp: s.kp}
+}
+
+func (s StellarPrivateKey) NativePublicKey() []byte {
+	return []byte(s.kp.Address())
+}
+
+func (s StellarPrivateKey) NativePrivateKey() []byte {
+	return []byte(s.kp.Seed())
 }

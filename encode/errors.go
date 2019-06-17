@@ -9,15 +9,15 @@ const (
 )
 
 var (
-	EncoderAlreadyRegisteredError = common.NewErrorType(
+	EncoderAlreadyRegisteredError = common.NewError(
 		"encode",
 		EncoderAlreadyRegisteredErrorCode,
 		"Encoder is already resitered in Encoders",
 	)
-	EncoderNotRegisteredError = common.NewErrorType(
+	EncoderNotRegisteredError = common.NewError(
 		"encode",
 		EncoderNotRegisteredErrorCode,
 		"Encoder is not resitered in Encoders",
 	)
-	DecodeFailedError = common.NewErrorType("encode", DecodeFailedErrorCode, "failed to decode")
+	DecodeFailedError = common.NewError("encode", DecodeFailedErrorCode, "failed to decode")
 )

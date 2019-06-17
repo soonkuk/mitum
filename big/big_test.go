@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/spikeekips/mitum/common"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -127,6 +127,21 @@ func (t *testBig) TestDiv() {
 	}
 }
 
+func (t *testBig) TestMarshalBinary() {
+	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+
+	var b []byte
+	b, err := a.MarshalBinary()
+	t.NoError(err)
+	t.Equal("340282366920938463426481119284349108225", string(b))
+
+	var n Big
+	err = n.UnmarshalBinary(b)
+	t.NoError(err)
+
+	t.Equal(0, a.Cmp(n))
+}
+
 func (t *testBig) TestJson() {
 	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
 
@@ -148,11 +163,11 @@ func (t *testBig) TestEncodeDecode() {
 	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
 
 	var b []byte
-	b, err := RLPEncode(a)
+	b, err := common.RLPEncode(a)
 	t.NoError(err)
 
 	var n Big
-	err = RLPDecode(b, &n)
+	err = common.RLPDecode(b, &n)
 	t.NoError(err)
 
 	t.Equal(0, a.Cmp(n))
@@ -160,12 +175,4 @@ func (t *testBig) TestEncodeDecode() {
 
 func TestBig(t *testing.T) {
 	suite.Run(t, new(testBig))
-}
-
-func RLPEncode(i interface{}) ([]byte, error) {
-	return rlp.EncodeToBytes(i)
-}
-
-func RLPDecode(b []byte, i interface{}) error {
-	return rlp.DecodeBytes(b, i)
 }
