@@ -13,8 +13,12 @@ type Height struct {
 	big.Big
 }
 
-func NewBlockHash(hashes *hash.Hashes, b []byte) (hash.Hash, error) {
-	return hashes.NewHash(BlockHashHint, b)
+func NewBlockHeight(height uint64) Height {
+	return Height{Big: big.NewBig(height)}
+}
+
+func NewBlockHash(b []byte) (hash.Hash, error) {
+	return hash.NewArgon2Hash(BlockHashHint, b)
 }
 
 // TODO create func to check block hash

@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/xerrors"
 )
@@ -29,15 +30,16 @@ func (t *testStellarKeypair) TestPublicKey() {
 	t.Regexp(regexp.MustCompile(`"key":[\s]*"G`), pk.String())
 }
 
-func (t *testStellarKeypair) TestMarshalBinary() {
+func (t *testStellarKeypair) TestEncodeRLP() {
 	pr, _ := Stellar{}.New()
 
 	{
-		b, err := pr.MarshalBinary()
+		b, err := rlp.EncodeToBytes(pr)
 		t.NoError(err)
 		t.NotEmpty(b)
 
-		key, err := Stellar{}.NewFromBinary(b)
+		var key StellarPrivateKey
+		err = rlp.DecodeBytes(b, &key)
 		t.NoError(err)
 		t.NotEmpty(key)
 
@@ -48,11 +50,12 @@ func (t *testStellarKeypair) TestMarshalBinary() {
 	{
 		pk := pr.PublicKey()
 
-		b, err := pk.MarshalBinary()
+		b, err := rlp.EncodeToBytes(pk)
 		t.NoError(err)
 		t.NotEmpty(b)
 
-		key, err := Stellar{}.NewFromBinary(b)
+		var key StellarPublicKey
+		err = rlp.DecodeBytes(b, &key)
 		t.NoError(err)
 		t.NotEmpty(key)
 
@@ -61,124 +64,40 @@ func (t *testStellarKeypair) TestMarshalBinary() {
 	}
 }
 
-func (t *testStellarKeypair) TestMarshalText() {
-	pr, _ := Stellar{}.New()
-
-	{
-		b, err := pr.MarshalText()
-		t.NoError(err)
-		t.NotEmpty(b)
-
-		key, err := Stellar{}.NewFromText(b)
-		t.NoError(err)
-		t.NotEmpty(key)
-
-		t.Equal(PrivateKeyKind, key.Kind())
-		t.True(pr.Equal(key))
-	}
-
-	{
-		pk := pr.PublicKey()
-
-		b, err := pk.MarshalText()
-		t.NoError(err)
-		t.NotEmpty(b)
-
-		key, err := Stellar{}.NewFromText(b)
-		t.NoError(err)
-		t.NotEmpty(key)
-
-		t.Equal(PublicKeyKind, key.Kind())
-		t.True(pk.Equal(key))
-	}
-}
-
-func (t *testStellarKeypair) TestMarshalBinaryPublicKey() {
+func (t *testStellarKeypair) TestEncodeRLPPublicKey() {
 	st, _ := Stellar{}.New()
 	pk := st.PublicKey()
 
-	b, err := pk.MarshalBinary()
+	b, err := rlp.EncodeToBytes(pk)
 	t.NoError(err)
 	t.NotEmpty(b)
 
 	var upk StellarPublicKey
-	err = upk.UnmarshalBinary(b)
+	err = rlp.DecodeBytes(b, &upk)
 	t.NoError(err)
 
 	var upr StellarPrivateKey
-	err = upr.UnmarshalBinary(b)
-	t.True(xerrors.Is(err, FailedToUnmarshalKeypairError))
-	t.Contains(err.Error(), "is not private key")
+	err = rlp.DecodeBytes(b, &upr)
+	t.True(xerrors.Is(err, FailedToEncodeKeypairError))
+	t.Contains(err.Error(), "not private")
 }
 
-func (t *testStellarKeypair) TestMarshalBinaryPrivateKey() {
+func (t *testStellarKeypair) TestEncodeRLPPrivateKey() {
 	st := Stellar{}
 	pr, _ := st.New()
 
-	b, err := pr.MarshalBinary()
+	b, err := rlp.EncodeToBytes(pr)
 	t.NoError(err)
 	t.NotEmpty(b)
 
 	var upr StellarPrivateKey
-	err = upr.UnmarshalBinary(b)
+	err = rlp.DecodeBytes(b, &upr)
 	t.NoError(err)
 
 	var upk StellarPublicKey
-	err = upk.UnmarshalBinary(b)
-	t.True(xerrors.Is(err, FailedToUnmarshalKeypairError))
-	t.Contains(err.Error(), "is not public key")
-}
-
-func (t *testStellarKeypair) TestMarshalTextPublicKey() {
-	st := Stellar{}
-	pr, _ := st.New()
-	pk := pr.PublicKey()
-
-	b, err := pk.MarshalText()
-	t.NoError(err)
-	t.NotEmpty(b)
-
-	var upk StellarPublicKey
-	err = upk.UnmarshalText(b)
-	t.NoError(err)
-
-	t.True(pk.Equal(upk))
-
-	{ // with private key
-		b, err := pr.MarshalText()
-		t.NoError(err)
-
-		var upr StellarPublicKey
-		err = upr.UnmarshalText(b)
-		t.True(xerrors.Is(err, FailedToUnmarshalKeypairError))
-		t.Contains(err.Error(), "is not public key")
-	}
-}
-
-func (t *testStellarKeypair) TestMarshalTextPrivateKey() {
-	st := Stellar{}
-	pr, _ := st.New()
-
-	b, err := pr.MarshalText()
-	t.NoError(err)
-	t.NotEmpty(b)
-
-	var upr StellarPrivateKey
-	err = upr.UnmarshalText(b)
-	t.NoError(err)
-
-	t.True(pr.Equal(upr))
-
-	{ // with public key
-		pk := pr.PublicKey()
-		b, err := pk.MarshalText()
-		t.NoError(err)
-
-		var upr StellarPrivateKey
-		err = upr.UnmarshalText(b)
-		t.True(xerrors.Is(err, FailedToUnmarshalKeypairError))
-		t.Contains(err.Error(), "is not private key")
-	}
+	err = rlp.DecodeBytes(b, &upk)
+	t.True(xerrors.Is(err, FailedToEncodeKeypairError))
+	t.Contains(err.Error(), "not public")
 }
 
 func (t *testStellarKeypair) TestSigning() {

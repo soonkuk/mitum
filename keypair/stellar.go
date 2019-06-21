@@ -1,10 +1,10 @@
 package keypair
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
+	"io"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	stellarHash "github.com/stellar/go/hash"
 	stellarKeypair "github.com/stellar/go/keypair"
 
@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	StellarType Type = NewType(1, "stellar")
+	StellarType common.DataType = common.NewDataType(1, "stellar")
 )
 
 type Stellar struct {
 }
 
-func (s Stellar) Type() Type {
+func (s Stellar) Type() common.DataType {
 	return StellarType
 }
 
@@ -47,104 +47,11 @@ func (s Stellar) String() string {
 	return string(b)
 }
 
-func (s Stellar) Equal(k Keypair) bool {
-	return s.Type().Equal(k.Type())
-}
-
-func (s Stellar) NewFromBinary(b []byte) (Key, error) {
-	e, o := common.ExtractBinary(b)
-	if o < 0 {
-		return nil, FailedToUnmarshalKeypairError.Newf("stellar key; failed to parse Type")
-	}
-
-	var kt Type
-	if err := kt.UnmarshalBinary(e); err != nil {
-		return nil, FailedToUnmarshalKeypairError.New(err)
-	} else if !kt.Equal(StellarType) {
-		return nil, FailedToUnmarshalKeypairError.Newf(
-			"stellar key; not stellar keypair; type=%q",
-			kt.String(),
-		)
-	}
-
-	offset := o
-
-	e, o = common.ExtractBinary(b[offset:])
-	if o < 0 {
-		return nil, FailedToUnmarshalKeypairError.Newf("stellar key; failed to parse Kind")
-	}
-
-	var kind Kind
-	if err := kind.UnmarshalBinary(e); err != nil {
-		return nil, FailedToUnmarshalKeypairError.New(err)
-	}
-
-	switch kind {
-	case PublicKeyKind:
-		var pk StellarPublicKey
-		if err := pk.UnmarshalBinary(b); err != nil {
-			return nil, err
-		}
-
-		return pk, nil
-	case PrivateKeyKind:
-		var pr StellarPrivateKey
-		if err := pr.UnmarshalBinary(b); err != nil {
-			return nil, err
-		}
-
-		return pr, nil
-	default:
-		return nil, FailedToUnmarshalKeypairError.Newf("stellar key; unknown Kind")
-	}
-}
-
-func (s Stellar) NewFromText(b []byte) (Key, error) {
-	n := bytes.SplitN(b, []byte(":"), 3)
-	if len(n) < 3 {
-		return nil, FailedToUnmarshalKeypairError.Newf("stellar key; wrong format; length=%d", len(n))
-	}
-
-	var kt Type
-	if err := kt.UnmarshalText(n[0]); err != nil {
-		return nil, FailedToUnmarshalKeypairError.New(err)
-	} else if string(n[0]) != StellarType.Name() {
-		return nil, FailedToUnmarshalKeypairError.Newf(
-			"stellar key; not stellar keypair; type=%q",
-			kt.String(),
-		)
-	}
-
-	var kind Kind
-	if err := kind.UnmarshalText(n[1]); err != nil {
-		return nil, FailedToUnmarshalKeypairError.New(err)
-	}
-
-	switch kind {
-	case PublicKeyKind:
-		var pk StellarPublicKey
-		if err := pk.UnmarshalText(b); err != nil {
-			return nil, err
-		}
-
-		return pk, nil
-	case PrivateKeyKind:
-		var pr StellarPrivateKey
-		if err := pr.UnmarshalText(b); err != nil {
-			return nil, err
-		}
-
-		return pr, nil
-	default:
-		return nil, FailedToUnmarshalKeypairError.Newf("stellar key; unknown Kind")
-	}
-}
-
 type StellarPublicKey struct {
 	kp stellarKeypair.KP
 }
 
-func (s StellarPublicKey) Type() Type {
+func (s StellarPublicKey) Type() common.DataType {
 	return StellarType
 }
 
@@ -173,123 +80,44 @@ func (s StellarPublicKey) String() string {
 	return string(b)
 }
 
-func (s StellarPublicKey) MarshalBinary() ([]byte, error) {
-	kt, err := StellarType.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	b := common.AppendBinary(kt)
-
-	pt, err := PublicKeyKind.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	b = append(b, common.AppendBinary(pt)...)
-	b = append(b, common.AppendBinary([]byte(s.kp.Address()))...)
-
-	return b, nil
+func (s StellarPublicKey) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, struct {
+		Type common.DataType
+		Kind Kind
+		Key  string
+	}{
+		Type: s.Type(),
+		Kind: s.Kind(),
+		Key:  s.kp.Address(),
+	})
 }
 
-func (s *StellarPublicKey) UnmarshalBinary(b []byte) error {
-	e, o := common.ExtractBinary(b)
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; failed to parse Type")
+func (s *StellarPublicKey) DecodeRLP(st *rlp.Stream) error {
+	var d struct {
+		Type common.DataType
+		Kind Kind
+		Key  string
+	}
+	if err := st.Decode(&d); err != nil {
+		return err
 	}
 
-	var kt Type
-	if err := kt.UnmarshalBinary(e); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	} else if !kt.Equal(StellarType) {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; is not stellar keypair")
+	if !s.Type().Equal(d.Type) {
+		return FailedToEncodeKeypairError.Newf("not stellar keypair type; type=%q", d.Type)
 	}
 
-	offset := o
-
-	e, o = common.ExtractBinary(b[offset:])
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; failed to parse Kind")
+	if s.Kind() != d.Kind {
+		return FailedToEncodeKeypairError.Newf("not public type; kind=%q", d.Kind)
 	}
 
-	offset += o
-
-	var kind Kind
-	if err := kind.UnmarshalBinary(e); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	}
-
-	if kind != PublicKeyKind {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; is not public key")
-	}
-
-	e, o = common.ExtractBinary(b[offset:])
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; failed to parse Kind")
-	}
-
-	kp, err := stellarKeypair.Parse(string(e))
+	kp, err := stellarKeypair.Parse(d.Key)
 	if err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
+		return err
 	}
 
 	s.kp = kp
 
 	return nil
-}
-
-func (s StellarPublicKey) NewFromBinary(b []byte) (Key, error) {
-	var pk StellarPublicKey
-	if err := pk.UnmarshalBinary(b); err != nil {
-		return nil, err
-	}
-
-	return pk, nil
-}
-
-func (s StellarPublicKey) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf(
-		"%s:%s:%s",
-		s.Type().Name(),
-		s.Kind().String(),
-		s.kp.Address(),
-	)), nil
-}
-
-func (s *StellarPublicKey) UnmarshalText(b []byte) error {
-	n := bytes.SplitN(b, []byte(":"), 3)
-	if len(n) < 3 {
-		return FailedToUnmarshalKeypairError.Newf("stellar key; wrong format; length=%d", len(n))
-	}
-
-	var kt Type
-	if err := kt.UnmarshalText(n[0]); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	}
-
-	var kind Kind
-	if err := kind.UnmarshalText(n[1]); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	} else if kind != PublicKeyKind {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; is not public key")
-	}
-
-	kp, err := stellarKeypair.Parse(string(bytes.Join(n[2:], []byte(":"))))
-	if err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	}
-
-	s.kp = kp
-
-	return nil
-}
-
-func (s StellarPublicKey) NewFromText(b []byte) (Key, error) {
-	var pk StellarPublicKey
-	if err := pk.UnmarshalText(b); err != nil {
-		return nil, err
-	}
-
-	return pk, nil
 }
 
 func (s StellarPublicKey) Equal(k Key) bool {
@@ -317,7 +145,7 @@ type StellarPrivateKey struct {
 	kp *stellarKeypair.Full
 }
 
-func (s StellarPrivateKey) Type() Type {
+func (s StellarPrivateKey) Type() common.DataType {
 	return StellarType
 }
 
@@ -347,125 +175,46 @@ func (s StellarPrivateKey) Sign(b []byte) (Signature, error) {
 	return Signature(sig), nil
 }
 
-func (s StellarPrivateKey) MarshalBinary() ([]byte, error) {
-	kt, err := StellarType.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	b := common.AppendBinary(kt)
-
-	pt, err := PrivateKeyKind.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	b = append(b, common.AppendBinary(pt)...)
-	b = append(b, common.AppendBinary([]byte(s.kp.Seed()))...)
-
-	return b, nil
+func (s StellarPrivateKey) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, struct {
+		Type common.DataType
+		Kind Kind
+		Key  string
+	}{
+		Type: s.Type(),
+		Kind: s.Kind(),
+		Key:  s.kp.Seed(),
+	})
 }
 
-func (s *StellarPrivateKey) UnmarshalBinary(b []byte) error {
-	e, o := common.ExtractBinary(b)
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key; failed to parse Type")
+func (s *StellarPrivateKey) DecodeRLP(st *rlp.Stream) error {
+	var d struct {
+		Type common.DataType
+		Kind Kind
+		Key  string
+	}
+	if err := st.Decode(&d); err != nil {
+		return err
 	}
 
-	var kt Type
-	if err := kt.UnmarshalBinary(e); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	} else if !kt.Equal(StellarType) {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; is not stellar keypair")
+	if !s.Type().Equal(d.Type) {
+		return FailedToEncodeKeypairError.Newf("not stellar keypair type; type=%q", d.Type)
 	}
 
-	offset := o
-
-	e, o = common.ExtractBinary(b[offset:])
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key key; failed to parse Kind")
+	if s.Kind() != d.Kind {
+		return FailedToEncodeKeypairError.Newf("not private; kind=%q", d.Kind)
 	}
 
-	offset += o
-
-	var kind Kind
-	if err := kind.UnmarshalBinary(e); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	}
-
-	if kind != PrivateKeyKind {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key; is not private key")
-	}
-
-	e, o = common.ExtractBinary(b[offset:])
-	if o < 0 {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key; failed to parse Kind")
-	}
-
-	if kp, err := stellarKeypair.Parse(string(e)); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
+	kp, err := stellarKeypair.Parse(d.Key)
+	if err != nil {
+		return err
 	} else if full, ok := kp.(*stellarKeypair.Full); !ok {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key; is not *keypair.Full")
+		return FailedToEncodeKeypairError.Newf("not private key; type=%T", kp)
 	} else {
 		s.kp = full
 	}
 
 	return nil
-}
-
-func (s StellarPrivateKey) NewFromBinary(b []byte) (Key, error) {
-	var pk StellarPrivateKey
-	if err := pk.UnmarshalBinary(b); err != nil {
-		return nil, err
-	}
-
-	return pk, nil
-}
-
-func (s StellarPrivateKey) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf(
-		"%s:%s:%s",
-		s.Type().Name(),
-		s.Kind().String(),
-		s.kp.Seed(),
-	)), nil
-}
-
-func (s *StellarPrivateKey) UnmarshalText(b []byte) error {
-	n := bytes.SplitN(b, []byte(":"), 3)
-	if len(n) < 3 {
-		return FailedToUnmarshalKeypairError.Newf("stellar key; wrong format; length=%d", len(n))
-	}
-
-	var kt Type
-	if err := kt.UnmarshalText(n[0]); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	}
-
-	var kind Kind
-	if err := kind.UnmarshalText(n[1]); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	} else if kind != PrivateKeyKind {
-		return FailedToUnmarshalKeypairError.Newf("stellar public key; is not private key")
-	}
-
-	if kp, err := stellarKeypair.Parse(string(bytes.Join(n[2:], []byte(":")))); err != nil {
-		return FailedToUnmarshalKeypairError.New(err)
-	} else if full, ok := kp.(*stellarKeypair.Full); !ok {
-		return FailedToUnmarshalKeypairError.Newf("stellar private key; is not *keypair.Full")
-	} else {
-		s.kp = full
-	}
-
-	return nil
-}
-
-func (s StellarPrivateKey) NewFromText(b []byte) (Key, error) {
-	var pr StellarPrivateKey
-	if err := pr.UnmarshalText(b); err != nil {
-		return nil, err
-	}
-
-	return pr, nil
 }
 
 func (s StellarPrivateKey) Equal(k Key) bool {

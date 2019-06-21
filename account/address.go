@@ -12,8 +12,8 @@ type Address struct {
 	hash.Hash
 }
 
-func NewAddress(hashes *hash.Hashes, b []byte) (Address, error) {
-	h, err := hashes.NewHash(AccountHashHint, b)
+func NewAddress(b []byte) (Address, error) {
+	h, err := hash.NewArgon2Hash(AccountHashHint, b)
 	if err != nil {
 		return Address{}, err
 	}

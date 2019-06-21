@@ -1,9 +1,11 @@
 package common
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
+
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type DataType struct {
@@ -35,25 +37,28 @@ func (i DataType) Equal(b DataType) bool {
 	return i.id == b.id
 }
 
-func (i DataType) MarshalBinary() ([]byte, error) {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, uint32(i.id))
-
-	return b, nil
+func (i DataType) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, struct {
+		ID   uint
+		Name string
+	}{
+		ID:   i.id,
+		Name: i.name,
+	})
 }
 
-func (i *DataType) UnmarshalBinary(b []byte) error {
-	i.id = uint(binary.LittleEndian.Uint32(b))
+func (i *DataType) DecodeRLP(s *rlp.Stream) error {
+	var d struct {
+		ID   uint
+		Name string
+	}
+	if err := s.Decode(&d); err != nil {
+		return err
+	}
 
-	return nil
-}
+	i.id = d.ID
+	i.name = d.Name
 
-func (i DataType) MarshalText() ([]byte, error) {
-	return json.Marshal(i)
-}
-
-func (i *DataType) UnmarshalText(b []byte) error {
-	i.name = string(b)
 	return nil
 }
 

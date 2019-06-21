@@ -1,8 +1,10 @@
 package keypair
 
 import (
-	"encoding/binary"
 	"encoding/json"
+	"io"
+
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type Kind uint
@@ -21,32 +23,6 @@ func (k Kind) String() string {
 	}
 
 	return ""
-}
-
-func (k Kind) MarshalBinary() ([]byte, error) {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, uint32(k))
-
-	return b, nil
-}
-
-func (k *Kind) UnmarshalBinary(b []byte) error {
-	*k = Kind(uint(binary.LittleEndian.Uint32(b)))
-
-	return nil
-}
-
-func (k *Kind) UnmarshalText(b []byte) error {
-	switch string(b) {
-	case PublicKeyKind.String():
-		*k = PublicKeyKind
-		return nil
-	case PrivateKeyKind.String():
-		*k = PrivateKeyKind
-		return nil
-	default:
-		return UnknownKeyKindError
-	}
 }
 
 func (k Kind) MarshalJSON() ([]byte, error) {
@@ -78,25 +54,18 @@ func (k Type) Equal(b Type) bool {
 	return k.id == b.id
 }
 
-func (k Type) MarshalBinary() ([]byte, error) {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, uint32(k.id))
-
-	return b, nil
+func (k Type) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, k.id)
 }
 
-func (k *Type) UnmarshalBinary(b []byte) error {
-	k.id = uint(binary.LittleEndian.Uint32(b))
+func (k *Type) DecodeRLP(s *rlp.Stream) error {
+	var id uint
+	if err := s.Decode(&id); err != nil {
+		return err
+	}
 
-	return nil
-}
+	k.id = id
 
-func (k Type) MarshalText() ([]byte, error) {
-	return []byte(k.String()), nil
-}
-
-func (k *Type) UnmarshalText(b []byte) error {
-	k.name = string(b)
 	return nil
 }
 

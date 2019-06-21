@@ -8,8 +8,8 @@ var (
 	ProposalHashHint string = "pp"
 )
 
-func NewProposalHash(hashes *hash.Hashes, b []byte) (hash.Hash, error) {
-	return hashes.NewHash(ProposalHashHint, b)
+func NewProposalHash(b []byte) (hash.Hash, error) {
+	return hash.NewArgon2Hash(ProposalHashHint, b)
 }
 
 // TODO create func to check proposal hash

@@ -5,7 +5,7 @@ import "github.com/spikeekips/mitum/common"
 const (
 	KeypairAlreadyRegisteredErrorCode common.ErrorCode = iota + 1
 	KeypairNotRegisteredErrorCode
-	FailedToUnmarshalKeypairErrorCode
+	FailedToEncodeKeypairErrorCode
 	UnknownKeyKindErrorCode
 	SignatureVerificationFailedErrorCode
 )
@@ -21,9 +21,9 @@ var (
 		KeypairNotRegisteredErrorCode,
 		"Keypair is not resitered in Keypairs",
 	)
-	FailedToUnmarshalKeypairError = common.NewError(
+	FailedToEncodeKeypairError = common.NewError(
 		"keypair",
-		FailedToUnmarshalKeypairErrorCode,
+		FailedToEncodeKeypairErrorCode,
 		"Failed to unmarshal keypair",
 	)
 	UnknownKeyKindError = common.NewError(
