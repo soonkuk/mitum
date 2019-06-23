@@ -39,7 +39,7 @@ func (t tEncoder) Decode(b []byte) (interface{}, error) {
 
 	// check type
 	seal := BaseSeal{
-		t:      decoded.T,
+		t:      decoded.Type,
 		hash:   decoded.Hash,
 		header: decoded.Header,
 		body:   nv.(Body),

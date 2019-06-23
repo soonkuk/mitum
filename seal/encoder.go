@@ -24,7 +24,7 @@ func (m *Encoders) Decode(b []byte) (Seal, error) {
 		return nil, err
 	}
 
-	raw, err := m.DecodeByType(decoded.T, b)
+	raw, err := m.DecodeByType(decoded.Type, b)
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +38,14 @@ func (m *Encoders) Decode(b []byte) (Seal, error) {
 }
 
 type RLPDecodeSealType struct {
-	T      common.DataType
+	Type   common.DataType
 	Hash   rlp.RawValue
 	Header rlp.RawValue
 	Body   rlp.RawValue
 }
 
 type RLPDecodeSeal struct {
-	T      common.DataType
+	Type   common.DataType
 	Hash   hash.Hash
 	Header Header
 	Body   rlp.RawValue

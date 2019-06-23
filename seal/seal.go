@@ -88,6 +88,12 @@ func (bs BaseSeal) Type() common.DataType {
 	return bs.t
 }
 
+func (bs *BaseSeal) SetType(t common.DataType) *BaseSeal {
+	bs.t = t
+
+	return bs
+}
+
 func (bs BaseSeal) Header() Header {
 	return bs.header
 }
@@ -173,14 +179,6 @@ func (bs BaseSeal) IsValid() error {
 
 	if err := bs.hash.IsValid(); err != nil {
 		return InvalidSealError.New(err)
-		/*
-			} else if hash, err := bs.makeHash(); err != nil {
-				return InvalidSealError.New(err)
-			} else {
-				if !bs.hash.Equal(hash) {
-					return InvalidSealError.Newf("invalid hash; (hash)%q != (generated)%q", bs.hash, hash)
-				}
-		*/
 	}
 
 	if err := bs.header.IsValid(); err != nil {

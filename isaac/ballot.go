@@ -12,7 +12,7 @@ type Ballot interface {
 	Height() Height
 	Round() Round
 	Stage() Stage
-	//Proposer() hash.Hash
+	//Proposer() hash.Hash // TODO should be included
 	Proposal() hash.Hash
 	NextBlock() hash.Hash
 }

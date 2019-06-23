@@ -7,6 +7,7 @@ const (
 	FailedToVoteErrorCode
 	AlreadyVotedErrorCode
 	InvalidPolicyValueErrorCode
+	InvalidBallotErrorCode
 )
 
 var (
@@ -14,4 +15,5 @@ var (
 	FailedToVoteError       = common.NewError("isaac", FailedToVoteErrorCode, "failed to vote")
 	AlreadyVotedError       = common.NewError("isaac", AlreadyVotedErrorCode, "node already voted")
 	InvalidPolicyValueError = common.NewError("isaac", InvalidPolicyValueErrorCode, "invalid policy value")
+	InvalidBallotError      = common.NewError("isaac", InvalidBallotErrorCode, "invalid ballot")
 )
