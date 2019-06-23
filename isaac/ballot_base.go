@@ -77,6 +77,10 @@ func (ib *BaseBallot) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
+func (ib BaseBallot) Body() BaseBallotBody {
+	return ib.body
+}
+
 func (ib BaseBallot) Type() common.DataType {
 	return BaseBallotType
 }
