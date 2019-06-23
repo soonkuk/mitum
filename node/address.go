@@ -20,3 +20,7 @@ func NewAddress(b []byte) (Address, error) {
 
 	return Address{Hash: h}, nil
 }
+
+func (ad Address) Equal(nad Address) bool {
+	return ad.Hash.Equal(nad.Hash)
+}

@@ -1,10 +1,11 @@
 package isaac
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/inconshreveable/log15"
+
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/node"
@@ -13,14 +14,39 @@ import (
 type BallotBox struct {
 	sync.RWMutex
 	*common.Logger
-	voted map[hash.Hash][]VoteRecord
+	voted map[ /* VoteRecord.BoxHash */ hash.Hash]*VoteRecords
 }
 
 func NewBallotBox() *BallotBox {
 	return &BallotBox{
 		Logger: common.NewLogger(log, "module", "ballotbox"),
-		voted:  map[ /* VoteRecord.boxHash */ hash.Hash][]VoteRecord{},
+		voted:  map[hash.Hash]*VoteRecords{},
 	}
+}
+
+func (bb *BallotBox) boxHash(height Height, round Round, stage Stage, proposal hash.Hash) (hash.Hash, error) {
+	var l []interface{}
+	if stage == StageINIT {
+		l = []interface{}{
+			height,
+			round,
+			stage,
+		}
+	} else {
+		l = []interface{}{
+			height,
+			round,
+			stage,
+			proposal,
+		}
+	}
+
+	b, err := rlp.EncodeToBytes(l)
+	if err != nil {
+		return hash.Hash{}, err
+	}
+
+	return hash.NewArgon2Hash("bbb", b)
 }
 
 func (bb *BallotBox) Vote(
@@ -30,7 +56,8 @@ func (bb *BallotBox) Vote(
 	stage Stage,
 	proposal hash.Hash,
 	nextBlock hash.Hash,
-) error {
+	seal hash.Hash,
+) (VoteRecords, error) {
 	log_ := bb.Log().New(log15.Ctx{
 		"node":      node,
 		"height":    height,
@@ -38,30 +65,48 @@ func (bb *BallotBox) Vote(
 		"stage":     stage,
 		"proposal":  proposal,
 		"nextBlock": nextBlock,
+		"seal":      seal,
 	})
 
 	log_.Debug("trying to vote")
 
 	// TODO checking CanVote should be done before Vote().
 	if !stage.CanVote() {
-		return FailedToVoteError.Newf("invalid stage; stage=%q", stage)
+		return VoteRecords{}, FailedToVoteError.Newf("invalid stage; stage=%q", stage)
 	}
 
-	vr, err := NewVoteRecord(node, height, round, stage, proposal, nextBlock)
+	boxHash, err := bb.boxHash(height, round, stage, proposal)
 	if err != nil {
-		return FailedToVoteError.New(err)
+		return VoteRecords{}, err
 	}
 
-	fmt.Println(vr)
+	nr, found := bb.voted[boxHash]
+	if !found {
+		nr = NewVoteRecords(boxHash, height, round, stage, proposal)
+		bb.voted[boxHash] = nr
+	}
+
+	vr, err := NewVoteRecord(node, nextBlock, seal)
+	if err != nil {
+		return VoteRecords{}, FailedToVoteError.New(err)
+	}
+
 	log_.Debug("VoteRecord created", "vote_record", vr)
 
 	bb.Lock()
-	bb.voted[vr.BoxHash()] = append(bb.voted[vr.BoxHash()], vr)
-	bb.Unlock()
+	defer bb.Unlock()
 
-	log_.Debug("voted", "vr", vr.Hash())
+	err = nr.Vote(vr)
 
-	// check agreement
+	return nr.Copy(), err
+}
+
+func (bb *BallotBox) CloseVoteRecords(boxHash hash.Hash) error {
+	nr, found := bb.voted[boxHash]
+	if !found {
+		return common.NotFoundError.Newf("VoteRecords not found; boxHash=%q", boxHash)
+	}
+	nr.Close()
 
 	return nil
 }

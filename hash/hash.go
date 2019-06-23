@@ -101,10 +101,13 @@ func (h Hash) Equal(a Hash) bool {
 }
 
 func (h Hash) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"hint": h.hint,
-		"body": base58.Encode(h.Body()),
-	})
+	/*
+		return json.Marshal(map[string]interface{}{
+			"hint": h.hint,
+			"body": base58.Encode(h.Body()),
+		})
+	*/
+	return json.Marshal(h.String())
 }
 
 func (h Hash) Hint() string {
@@ -113,6 +116,14 @@ func (h Hash) Hint() string {
 
 func (h Hash) Body() []byte {
 	return h.body[:h.length]
+}
+
+func (h Hash) Bytes() []byte {
+	var n []byte
+	n = append(n, []byte(h.hint)...)
+	n = append(n, h.body[:h.length]...)
+
+	return n
 }
 
 func (h Hash) String() string {

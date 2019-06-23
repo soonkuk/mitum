@@ -8,5 +8,6 @@ func NewRandomAddress() Address {
 	b := make([]byte, 4)
 	rand.Read(b)
 
-	return NewAddress(b)
+	a, _ := NewAddress(b)
+	return a
 }

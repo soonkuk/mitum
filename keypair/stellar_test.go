@@ -27,7 +27,7 @@ func (t *testStellarKeypair) TestPublicKey() {
 	t.Equal(StellarType, pk.Type())
 	t.NotEmpty(pk)
 	t.True(pk.Equal(pk))
-	t.Regexp(regexp.MustCompile(`"key":[\s]*"G`), pk.String())
+	t.Regexp(regexp.MustCompile(`^G`), pk.String())
 }
 
 func (t *testStellarKeypair) TestEncodeRLP() {

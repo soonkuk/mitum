@@ -38,7 +38,7 @@ func (l *Logger) LogContext() log15.Ctx {
 	return l.logCtx
 }
 
-func (l *Logger) SetLogContext(ctx log15.Ctx, args ...interface{}) {
+func (l *Logger) SetLogContext(ctx log15.Ctx, args ...interface{}) *Logger {
 	if len(args)%2 != 0 {
 		panic(fmt.Errorf("invalid number of args: %v", len(args)))
 	}
@@ -65,9 +65,11 @@ func (l *Logger) SetLogContext(ctx log15.Ctx, args ...interface{}) {
 	}
 
 	l.log = l.log.New(l.logCtx)
+
+	return l
 }
 
-func (l *Logger) SetLogger(log log15.Logger) {
+func (l *Logger) SetLogger(log log15.Logger) *Logger {
 	l.Lock()
 	defer l.Unlock()
 
@@ -76,6 +78,8 @@ func (l *Logger) SetLogger(log log15.Logger) {
 	if l.logCtx != nil {
 		l.log = l.log.New(l.logCtx)
 	}
+
+	return l
 }
 
 func (l *Logger) Log() log15.Logger {

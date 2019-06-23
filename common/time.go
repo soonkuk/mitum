@@ -2,7 +2,10 @@ package common
 
 import (
 	"encoding/json"
+	"io"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -42,17 +45,22 @@ func (t Time) String() string {
 	return FormatISO8601(t)
 }
 
-func (t Time) MarshalBinary() ([]byte, error) {
-	return t.Time.MarshalBinary()
+func (t Time) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, t.String())
 }
 
-func (t *Time) UnmarshalBinary(b []byte) error {
-	var ct time.Time
-	if err := ct.UnmarshalBinary(b); err != nil {
+func (t *Time) DecodeRLP(s *rlp.Stream) error {
+	var st string
+	if err := s.Decode(&st); err != nil {
 		return err
 	}
 
-	t.Time = ct
+	nt, err := ParseISO8601(st)
+	if err != nil {
+		return err
+	}
+
+	*t = nt
 
 	return nil
 }

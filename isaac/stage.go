@@ -8,7 +8,7 @@ import (
 type Stage uint
 
 const (
-	StageINIT Stage = iota
+	StageINIT Stage = iota + 33
 	StageSIGN
 	StageACCEPT
 	StageALLCONFIRM

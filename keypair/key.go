@@ -7,6 +7,7 @@ import (
 
 type Key interface {
 	rlp.Encoder
+	common.IsValid
 	Type() common.DataType
 	Kind() Kind
 	Equal(Key) bool
