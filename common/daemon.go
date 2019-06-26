@@ -6,11 +6,19 @@ import (
 
 const (
 	DaemonAleadyStartedErrorCode ErrorCode = iota + 1
+	DaemonAleadyStoppedErrorCode
 )
 
 var (
 	DaemonAleadyStartedError = NewError("daemon", DaemonAleadyStartedErrorCode, "daemon already started")
+	DaemonAleadyStoppedError = NewError("daemon", DaemonAleadyStoppedErrorCode, "daemon already stopped")
 )
+
+type Daemon interface {
+	Start() error
+	Stop() error
+	IsStopped() bool
+}
 
 type ReaderDaemon struct {
 	sync.RWMutex
@@ -24,29 +32,38 @@ type ReaderDaemon struct {
 	errCallback    func(error)
 }
 
-func NewReaderDaemon(synchronous bool) *ReaderDaemon {
+func NewReaderDaemon(synchronous bool, readerCallback func(interface{}) error) *ReaderDaemon {
 	return &ReaderDaemon{
-		Logger:      NewLogger(log, "module", "reader-daemon"),
-		synchronous: synchronous,
+		Logger:         NewLogger(log, "module", "reader-daemon"),
+		synchronous:    synchronous,
+		reader:         make(chan interface{}),
+		readerCallback: readerCallback,
 	}
 }
 
-func (d *ReaderDaemon) SetReader(reader chan interface{}) *ReaderDaemon {
-	d.Lock()
-	defer d.Unlock()
-
-	d.reader = reader
-
-	return d
+func (d *ReaderDaemon) Reader() chan interface{} {
+	return d.reader
 }
 
-func (d *ReaderDaemon) SetReaderCallback(readerCallback func(interface{}) error) *ReaderDaemon {
+func (d *ReaderDaemon) Write(v interface{}) {
+	if d.IsStopped() {
+		return
+	}
+
+	d.reader <- v
+}
+
+func (d *ReaderDaemon) Close() error {
+	if err := d.Stop(); err != nil {
+		return err
+	}
+
 	d.Lock()
 	defer d.Unlock()
 
-	d.readerCallback = readerCallback
+	close(d.reader)
 
-	return d
+	return nil
 }
 
 func (d *ReaderDaemon) SetErrCallback(errCallback func(error)) *ReaderDaemon {
@@ -66,7 +83,7 @@ func (d *ReaderDaemon) Start() error {
 		return DaemonAleadyStartedError
 	}
 
-	d.stop = make(chan struct{}, 10)
+	d.stop = make(chan struct{}, 2)
 	d.stopOnce = new(sync.Once)
 
 	go d.loop()
@@ -78,10 +95,6 @@ func (d *ReaderDaemon) Stop() error {
 	d.stopOnce.Do(func() {
 		d.Lock()
 		defer d.Unlock()
-
-		if d.stop == nil {
-			return
-		}
 
 		d.stop <- struct{}{}
 		close(d.stop)
@@ -120,13 +133,9 @@ end:
 	defer d.Unlock()
 
 	d.stop = nil
-	d.stopOnce = nil
 }
 
 func (d *ReaderDaemon) runCallback(v interface{}) {
-	d.RLock()
-	defer d.RUnlock()
-
 	if d.readerCallback == nil {
 		return
 	}

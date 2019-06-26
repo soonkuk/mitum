@@ -191,6 +191,11 @@ func (vnr VoteRecords) IsNodeVoted(n node.Address) bool {
 	return found
 }
 
+func (vnr VoteRecords) NodeVote(n node.Address) (VoteRecord, bool) {
+	vr, found := vnr.voted[n]
+	return vr, found
+}
+
 type VoteRecord struct {
 	hash      hash.Hash
 	node      node.Address

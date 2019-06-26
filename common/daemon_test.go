@@ -16,27 +16,23 @@ type testReaderDaemon struct {
 }
 
 func (t *testReaderDaemon) TestNew() {
-	ch := make(chan interface{})
-	defer close(ch)
-
-	d := NewReaderDaemon(true)
-	d.SetReader(ch)
-
 	count := 10
 	var wg sync.WaitGroup
 	wg.Add(count)
 
-	d.SetReaderCallback(func(v interface{}) error {
+	callback := func(v interface{}) error {
 		defer wg.Done()
 
 		return nil
-	})
+	}
+
+	d := NewReaderDaemon(true, callback)
 
 	err := d.Start()
 	t.NoError(err)
 
 	for i := 0; i < count; i++ {
-		ch <- 1
+		d.Write(1)
 	}
 
 	wg.Wait()
@@ -60,31 +56,26 @@ end:
 }
 
 func (t *testReaderDaemon) TestCount() {
-	ch := make(chan interface{})
-	defer close(ch)
-
-	d := NewReaderDaemon(true)
-	d.SetReader(ch)
-
 	limit := 10
-
 	var wg sync.WaitGroup
 	wg.Add(limit)
 
 	var sum uint64
-	d.SetReaderCallback(func(v interface{}) error {
+	callback := func(v interface{}) error {
 		defer wg.Done()
 
 		atomic.AddUint64(&sum, uint64(v.(int)))
 
 		return nil
-	})
+	}
+
+	d := NewReaderDaemon(true, callback)
 
 	err := d.Start()
 	t.NoError(err)
 
 	for i := 0; i < limit; i++ {
-		ch <- i
+		d.Reader() <- i
 	}
 
 	wg.Wait()
@@ -97,30 +88,25 @@ func (t *testReaderDaemon) TestCount() {
 }
 
 func (t *testReaderDaemon) TestAsynchronous() {
-	ch := make(chan interface{})
-	defer close(ch)
-
-	d := NewReaderDaemon(false)
-	d.SetReader(ch)
-
 	limit := 10
-
 	var wg sync.WaitGroup
 	wg.Add(limit)
 
 	var sum uint64
-	d.SetReaderCallback(func(v interface{}) error {
+	callback := func(v interface{}) error {
 		atomic.AddUint64(&sum, uint64(v.(int)))
 		defer wg.Done()
 
 		return nil
-	})
+	}
+
+	d := NewReaderDaemon(false, callback)
 
 	err := d.Start()
 	t.NoError(err)
 
 	for i := 0; i < limit; i++ {
-		ch <- i
+		d.Write(i)
 	}
 
 	wg.Wait()
@@ -134,25 +120,20 @@ func (t *testReaderDaemon) TestAsynchronous() {
 }
 
 func (t *testReaderDaemon) TestErrCallback() {
-	ch := make(chan interface{})
-	defer close(ch)
-
-	d := NewReaderDaemon(false)
-	d.SetReader(ch)
-
 	limit := 10
-
 	var wg sync.WaitGroup
 	wg.Add(4)
 
 	var sum uint64
-	d.SetReaderCallback(func(v interface{}) error {
+	callback := func(v interface{}) error {
 		if v.(int)%3 == 0 {
 			return xerrors.Errorf("%d", v)
 		}
 
 		return nil
-	})
+	}
+
+	d := NewReaderDaemon(false, callback)
 
 	d.SetErrCallback(func(err error) {
 		defer wg.Done()
@@ -165,7 +146,7 @@ func (t *testReaderDaemon) TestErrCallback() {
 	t.NoError(err)
 
 	for i := 0; i < limit; i++ {
-		ch <- i
+		d.Write(i)
 	}
 
 	wg.Wait()
