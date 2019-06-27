@@ -34,14 +34,16 @@ func (c CheckMajorityResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(c.String())
 }
 
+// VoteResult explains the result of voting
 type VoteResult struct {
-	height    Height
-	round     Round
-	stage     Stage
-	proposal  hash.Hash
-	nextBlock hash.Hash
-	records   VoteRecords
-	result    CheckMajorityResult
+	height       Height
+	round        Round
+	stage        Stage
+	proposal     hash.Hash
+	currentBlock hash.Hash
+	nextBlock    hash.Hash
+	records      VoteRecords
+	result       CheckMajorityResult
 }
 
 func NewVoteResult(
@@ -63,13 +65,14 @@ func NewVoteResult(
 
 func (vr VoteResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"height":    vr.height,
-		"round":     vr.round,
-		"stage":     vr.stage,
-		"proposal":  vr.proposal,
-		"nextBlock": vr.nextBlock,
-		"result":    vr.result,
-		"records":   vr.records,
+		"height":       vr.height,
+		"round":        vr.round,
+		"stage":        vr.stage,
+		"proposal":     vr.proposal,
+		"currentBlock": vr.currentBlock,
+		"nextBlock":    vr.nextBlock,
+		"result":       vr.result,
+		"records":      vr.records,
 	})
 }
 
@@ -95,6 +98,11 @@ func (vr VoteResult) Result() CheckMajorityResult {
 
 func (vr VoteResult) Records() VoteRecords {
 	return vr.records
+}
+
+// CurrentBlock should be set by one of majority
+func (vr VoteResult) CurrentBlock() hash.Hash {
+	return vr.currentBlock
 }
 
 // NextBlock should be set by one of majority

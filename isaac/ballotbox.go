@@ -55,17 +55,19 @@ func (bb *BallotBox) Vote(
 	round Round,
 	stage Stage,
 	proposal hash.Hash,
+	currentBlock hash.Hash,
 	nextBlock hash.Hash,
 	seal hash.Hash,
 ) (VoteRecords, error) {
 	log_ := bb.Log().New(log15.Ctx{
-		"node":      node,
-		"height":    height,
-		"round":     round,
-		"stage":     stage,
-		"proposal":  proposal,
-		"nextBlock": nextBlock,
-		"seal":      seal,
+		"node":         node,
+		"height":       height,
+		"round":        round,
+		"stage":        stage,
+		"proposal":     proposal,
+		"currentBlock": currentBlock,
+		"nextBlock":    nextBlock,
+		"seal":         seal,
 	})
 
 	log_.Debug("trying to vote")
@@ -86,7 +88,7 @@ func (bb *BallotBox) Vote(
 		bb.voted[boxHash] = nr
 	}
 
-	vr, err := NewVoteRecord(node, nextBlock, seal)
+	vr, err := NewVoteRecord(node, currentBlock, nextBlock, seal)
 	if err != nil {
 		return VoteRecords{}, FailedToVoteError.New(err)
 	}

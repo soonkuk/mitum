@@ -15,7 +15,7 @@ func init() {
 
 func NewRandomProposalHash() hash.Hash {
 	b := make([]byte, 4)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 
 	h, _ := NewProposalHash(b)
 	return h
@@ -23,7 +23,7 @@ func NewRandomProposalHash() hash.Hash {
 
 func NewRandomBlockHash() hash.Hash {
 	b := make([]byte, 4)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 
 	h, _ := NewBlockHash(b)
 	return h

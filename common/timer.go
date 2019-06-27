@@ -34,10 +34,8 @@ type CallbackTimer struct {
 	sync.RWMutex
 	*Logger
 	id           string
-	name         string
 	daemon       *ReaderDaemon
 	callbacks    []TimerCallback
-	receiver     chan interface{}
 	intervalFunc TimerCallbackIntervalFunc
 	startedAt    Time
 	runCount     uint

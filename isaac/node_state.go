@@ -3,6 +3,7 @@ package isaac
 import (
 	"sync"
 
+	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/node"
 )
 
@@ -10,13 +11,15 @@ type HomeState struct {
 	sync.RWMutex
 	home   node.Home
 	height Height
+	block  hash.Hash
 	state  node.State
 }
 
-func NewHomeState(home node.Home, height Height) *HomeState {
+func NewHomeState(home node.Home, height Height, block hash.Hash) *HomeState {
 	return &HomeState{
 		home:   home,
 		height: height,
+		block:  block,
 		state:  node.StateBooting, // by default, node state is booting
 	}
 }
@@ -41,6 +44,25 @@ func (hs *HomeState) SetHeight(height Height) *HomeState {
 	}
 
 	hs.height = height
+	return hs
+}
+
+func (hs *HomeState) Block() hash.Hash {
+	hs.RLock()
+	defer hs.RUnlock()
+
+	return hs.block
+}
+
+func (hs *HomeState) SetBlock(block hash.Hash) *HomeState {
+	hs.Lock()
+	defer hs.Unlock()
+
+	if hs.block.Equal(block) {
+		return hs
+	}
+
+	hs.block = block
 	return hs
 }
 

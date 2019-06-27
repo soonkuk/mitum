@@ -75,7 +75,7 @@ func (t *testReaderDaemon) TestCount() {
 	t.NoError(err)
 
 	for i := 0; i < limit; i++ {
-		d.Reader() <- i
+		d.Write(i)
 	}
 
 	wg.Wait()

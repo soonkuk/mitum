@@ -25,7 +25,7 @@ func (t *testBaseBallot) TestEncode() {
 
 	pk, _ := keypair.NewStellarPrivateKey()
 	{ // sign
-		err := ballot.Sign(pk, []byte{})
+		err = ballot.Sign(pk, []byte{})
 		t.NoError(err)
 	}
 
@@ -36,8 +36,8 @@ func (t *testBaseBallot) TestEncode() {
 	err = rlp.DecodeBytes(b, &decoded)
 	t.NoError(err)
 
-	t.Equal(BaseBallotType, decoded.Type())
-	t.Equal(BaseBallotType, decoded.Body().Type())
+	t.Equal(BallotType, decoded.Type())
+	t.Equal(BallotType, decoded.Body().Type())
 	t.Equal(n, decoded.Node())
 	t.Equal(height, decoded.Height())
 	t.Equal(round, decoded.Round())

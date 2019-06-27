@@ -31,10 +31,11 @@ func (t *testBallotBox) TestVote() {
 	round := Round(0)
 	stage := StageSIGN
 	proposal := NewRandomProposalHash()
+	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
-	seal := seal.NewRandomSealHash()
+	sl := seal.NewRandomSealHash()
 
-	vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+	vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 
 	t.NoError(err)
 	t.NotEmpty(vrs)
@@ -48,6 +49,7 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 	round := Round(0)
 	stage := StageSIGN
 	proposal := NewRandomProposalHash()
+	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
 
 	var total, threshold uint = 5, 3
@@ -55,9 +57,9 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 	// vote under threshold
 	for i := uint(0); i < threshold-1; i++ {
 		n := node.NewRandomAddress()
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 
 		vr, err := vrs.CheckMajority(total, threshold)
@@ -67,8 +69,8 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 
 	{ // vote one more; it should be at least reached to threshold
 		n := node.NewRandomAddress()
-		seal := seal.NewRandomSealHash()
-		vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		sl := seal.NewRandomSealHash()
+		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 		vr, err := vrs.CheckMajority(total, threshold)
 		t.NoError(err)
@@ -77,6 +79,7 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 		t.Equal(round, vr.Round())
 		t.Equal(stage, vr.Stage())
 		t.Equal(proposal, vr.Proposal())
+		t.Equal(currentBlock, vr.CurrentBlock())
 		t.Equal(nextBlock, vr.NextBlock())
 	}
 }
@@ -88,13 +91,14 @@ func (t *testBallotBox) TestClosedVoteRecords() {
 	round := Round(0)
 	stage := StageSIGN
 	proposal := NewRandomProposalHash()
+	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
 
 	{
 		n := node.NewRandomAddress()
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 
 		// close VoteRecords
@@ -104,9 +108,9 @@ func (t *testBallotBox) TestClosedVoteRecords() {
 
 	{ // vote again
 		n := node.NewRandomAddress()
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 
 		// check closed
@@ -117,9 +121,9 @@ func (t *testBallotBox) TestClosedVoteRecords() {
 
 	{ // vote again, but the closed VoteRecords will not decide result
 		n := node.NewRandomAddress()
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 
 		vr, err := vrs.CheckMajority(total, threshold)
@@ -135,24 +139,25 @@ func (t *testBallotBox) TestVoteAgain() {
 	round := Round(0)
 	stage := StageSIGN
 	proposal := NewRandomProposalHash()
+	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
 
 	n := node.NewRandomAddress()
 
 	{ // revoting with same seal; it will not be voted
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		_, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		_, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 
-		_, err = bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		_, err = bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.True(xerrors.Is(err, AlreadyVotedError))
 	}
 
 	{ // revoting with different seal; it will be voted
-		seal := seal.NewRandomSealHash()
+		sl := seal.NewRandomSealHash()
 
-		_, err := bb.Vote(n, height, round, stage, proposal, nextBlock, seal)
+		_, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
 		t.NoError(err)
 	}
 }

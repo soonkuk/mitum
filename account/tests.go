@@ -6,7 +6,7 @@ import "crypto/rand"
 
 func NewRandomAddress() Address {
 	b := make([]byte, 4)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 
 	a, _ := NewAddress(b)
 	return a

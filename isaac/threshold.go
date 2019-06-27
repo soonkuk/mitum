@@ -6,7 +6,6 @@ import (
 
 type Threshold struct {
 	sync.RWMutex
-	total     uint
 	base      [2]uint // [2]uint{total, threshold}
 	threshold map[Stage][2]uint
 }

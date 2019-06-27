@@ -15,7 +15,7 @@ func init() {
 
 func NewRandomSealHash() hash.Hash {
 	b := make([]byte, 4)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 
 	h, _ := hash.NewHash(SealHashHint, b)
 	return h

@@ -41,7 +41,7 @@ func NewReaderDaemon(synchronous bool, readerCallback func(interface{}) error) *
 	}
 }
 
-func (d *ReaderDaemon) Reader() chan interface{} {
+func (d *ReaderDaemon) Reader() <-chan interface{} {
 	return d.reader
 }
 
@@ -86,7 +86,9 @@ func (d *ReaderDaemon) Start() error {
 	d.stop = make(chan struct{}, 2)
 	d.stopOnce = new(sync.Once)
 
-	go d.loop()
+	if d.readerCallback != nil {
+		go d.loop()
+	}
 
 	return nil
 }

@@ -27,7 +27,7 @@ func (t *testBallotStages) TestINITBallot() {
 
 	pk, _ := keypair.NewStellarPrivateKey()
 	{ // sign
-		err := ballot.Sign(pk, []byte{})
+		err = ballot.Sign(pk, []byte{})
 		t.NoError(err)
 	}
 
@@ -40,8 +40,8 @@ func (t *testBallotStages) TestINITBallot() {
 	err = rlp.DecodeBytes(b, &decoded)
 	t.NoError(err)
 
-	t.Equal(BaseBallotType, decoded.Type())
-	t.Equal(BaseBallotType, decoded.Body().Type())
+	t.Equal(BallotType, decoded.Type())
+	t.Equal(BallotType, decoded.Body().Type())
 	t.Equal(n, decoded.Node())
 	t.Equal(height, decoded.Height())
 	t.Equal(round, decoded.Round())
@@ -68,7 +68,7 @@ func (t *testBallotStages) TestInvalidINITBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // sign
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 
@@ -92,7 +92,7 @@ func (t *testBallotStages) TestInvalidINITBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // sign
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 
@@ -124,7 +124,7 @@ func (t *testBallotStages) TestInvalidSIGNBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // sign
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 
@@ -148,7 +148,7 @@ func (t *testBallotStages) TestInvalidSIGNBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // sign
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 
@@ -180,7 +180,7 @@ func (t *testBallotStages) TestInvalidACCEPTBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // ACCEPT
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 
@@ -204,7 +204,7 @@ func (t *testBallotStages) TestInvalidACCEPTBallot() {
 
 		pk, _ := keypair.NewStellarPrivateKey()
 		{ // sign
-			err := ballot.Sign(pk, []byte{})
+			err = ballot.Sign(pk, []byte{})
 			t.NoError(err)
 		}
 

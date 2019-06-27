@@ -11,11 +11,6 @@ import (
 	"github.com/spikeekips/mitum/seal"
 )
 
-var (
-	BaseBallotType     common.DataType = common.NewDataType(uint(StageINIT), "ballot")
-	BaseBallotHashHint string          = "ballot"
-)
-
 type BaseBallot struct {
 	seal.BaseSeal
 	body BaseBallotBody
@@ -27,7 +22,7 @@ func NewBaseBallot(body BaseBallotBody) (BaseBallot, error) {
 		return BaseBallot{}, err
 	}
 
-	hash, err := hash.NewArgon2Hash(BaseBallotHashHint, b)
+	hash, err := hash.NewArgon2Hash(BallotHashHint, b)
 	if err != nil {
 		return BaseBallot{}, err
 	}
@@ -82,7 +77,7 @@ func (ib BaseBallot) Body() BaseBallotBody {
 }
 
 func (ib BaseBallot) Type() common.DataType {
-	return BaseBallotType
+	return BallotType
 }
 
 func (ib BaseBallot) Node() node.Address {
@@ -110,44 +105,48 @@ func (ib BaseBallot) NextBlock() hash.Hash {
 }
 
 type BaseBallotBody struct {
-	hash      hash.Hash
-	Node      node.Address
-	Height    Height
-	Round     Round
-	Stage     Stage
-	Proposal  hash.Hash
-	NextBlock hash.Hash
+	hash         hash.Hash
+	Node         node.Address
+	Height       Height
+	Round        Round
+	Stage        Stage
+	Proposal     hash.Hash
+	CurrentBlock hash.Hash
+	NextBlock    hash.Hash
 }
 
 func (ibb BaseBallotBody) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, struct {
-		Hash      hash.Hash
-		Node      node.Address
-		Height    Height
-		Round     Round
-		Stage     Stage
-		Proposal  hash.Hash
-		NextBlock hash.Hash
+		Hash         hash.Hash
+		Node         node.Address
+		Height       Height
+		Round        Round
+		Stage        Stage
+		Proposal     hash.Hash
+		CurrentBlock hash.Hash
+		NextBlock    hash.Hash
 	}{
-		Hash:      ibb.hash,
-		Node:      ibb.Node,
-		Height:    ibb.Height,
-		Round:     ibb.Round,
-		Stage:     ibb.Stage,
-		Proposal:  ibb.Proposal,
-		NextBlock: ibb.NextBlock,
+		Hash:         ibb.hash,
+		Node:         ibb.Node,
+		Height:       ibb.Height,
+		Round:        ibb.Round,
+		Stage:        ibb.Stage,
+		Proposal:     ibb.Proposal,
+		CurrentBlock: ibb.CurrentBlock,
+		NextBlock:    ibb.NextBlock,
 	})
 }
 
 func (ibb *BaseBallotBody) DecodeRLP(s *rlp.Stream) error {
 	var n struct {
-		Hash      hash.Hash
-		Node      node.Address
-		Height    Height
-		Round     Round
-		Stage     Stage
-		Proposal  hash.Hash
-		NextBlock hash.Hash
+		Hash         hash.Hash
+		Node         node.Address
+		Height       Height
+		Round        Round
+		Stage        Stage
+		Proposal     hash.Hash
+		CurrentBlock hash.Hash
+		NextBlock    hash.Hash
 	}
 
 	if err := s.Decode(&n); err != nil {
@@ -160,13 +159,14 @@ func (ibb *BaseBallotBody) DecodeRLP(s *rlp.Stream) error {
 	ibb.Round = n.Round
 	ibb.Stage = n.Stage
 	ibb.Proposal = n.Proposal
+	ibb.CurrentBlock = n.CurrentBlock
 	ibb.NextBlock = n.NextBlock
 
 	return nil
 }
 
 func (ibb BaseBallotBody) Type() common.DataType {
-	return BaseBallotType
+	return BallotType
 }
 
 func (ibb BaseBallotBody) Hash() hash.Hash {
@@ -174,7 +174,7 @@ func (ibb BaseBallotBody) Hash() hash.Hash {
 }
 
 func (ibb BaseBallotBody) IsValid() error {
-	if ibb.Type() != BaseBallotType {
+	if ibb.Type() != BallotType {
 		return InvalidBallotError.Newf("type=%q", ibb.Type())
 	}
 
@@ -192,17 +192,16 @@ func (ibb BaseBallotBody) IsValid() error {
 	default:
 		return InvalidStageError.Newf("stage=%q", ibb.Stage)
 	}
-
-	return nil
 }
 
 func (ibb BaseBallotBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"node":      ibb.Node,
-		"height":    ibb.Height,
-		"round":     ibb.Round,
-		"stage":     ibb.Stage,
-		"proposal":  ibb.Proposal,
-		"nextBlock": ibb.NextBlock,
+		"node":         ibb.Node,
+		"height":       ibb.Height,
+		"round":        ibb.Round,
+		"stage":        ibb.Stage,
+		"proposal":     ibb.Proposal,
+		"currentBlock": ibb.CurrentBlock,
+		"nextBlock":    ibb.NextBlock,
 	})
 }

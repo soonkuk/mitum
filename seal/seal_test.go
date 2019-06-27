@@ -102,12 +102,12 @@ func newSealBody(a string, b uint64) tSealBody {
 
 func newSealBodySigned(pk keypair.PrivateKey, a string, b uint64) (Seal, error) {
 	body := newSealBody(a, b)
-	seal := NewBaseSeal(body)
-	if err := seal.Sign(pk, []byte{}); err != nil {
+	sl := NewBaseSeal(body)
+	if err := sl.Sign(pk, []byte{}); err != nil {
 		return nil, err
 	}
 
-	return seal, nil
+	return sl, nil
 }
 
 type testSeal struct {
@@ -118,36 +118,36 @@ func (t *testSeal) TestIsValid() {
 	defer common.DebugPanic()
 
 	body := newSealBody("new", 33)
-	seal := NewBaseSeal(body)
+	sl := NewBaseSeal(body)
 
 	{ // before signing, seal is invalid
-		err := seal.IsValid()
+		err := sl.IsValid()
 		t.True(xerrors.Is(InvalidSealError, err))
 	}
 
 	// signing
 	pk, _ := keypair.NewStellarPrivateKey()
-	err := seal.Sign(pk, []byte{})
+	err := sl.Sign(pk, []byte{})
 	t.NoError(err)
 
-	err = seal.IsValid()
+	err = sl.IsValid()
 	t.NoError(err)
 }
 
 func (t *testSeal) TestSign() {
 	body := newSealBody("new", 33)
-	seal := NewBaseSeal(body)
+	sl := NewBaseSeal(body)
 
 	// signing
 	salt := []byte("salt")
 
 	pk, _ := keypair.NewStellarPrivateKey()
 
-	err := seal.Sign(pk, salt)
+	err := sl.Sign(pk, salt)
 	t.NoError(err)
-	t.NotEmpty(seal.Signature())
+	t.NotEmpty(sl.Signature())
 
-	err = seal.CheckSignature(salt)
+	err = sl.CheckSignature(salt)
 	t.NoError(err)
 }
 
@@ -155,23 +155,22 @@ func (t *testSeal) TestEncode() {
 	defer common.DebugPanic()
 
 	body := newSealBody("new", 33)
-	seal := NewBaseSeal(body)
+	sl := NewBaseSeal(body)
 
 	{ // before signing; encoding will be failed
-		_, err := rlp.EncodeToBytes(seal)
+		_, err := rlp.EncodeToBytes(sl)
 		t.True(xerrors.Is(InvalidSealError, err))
 	}
 
 	// signing
 	pk, _ := keypair.NewStellarPrivateKey()
-	err := seal.Sign(pk, []byte{})
-	t.NoError(err)
-	return
-
-	err = seal.IsValid()
+	err := sl.Sign(pk, []byte{})
 	t.NoError(err)
 
-	b, err := rlp.EncodeToBytes(seal)
+	err = sl.IsValid()
+	t.NoError(err)
+
+	b, err := rlp.EncodeToBytes(sl)
 	t.NoError(err)
 
 	var decoded BaseSeal

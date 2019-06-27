@@ -24,10 +24,9 @@ func (t *testBig) TestAdd() {
 	}
 
 	{
-		a := NewBig(10)
 		b := NewBig(math.MaxUint64)
 
-		c, ok := a.AddOK(b)
+		c, ok := b.AddOK(10)
 		t.True(ok)
 
 		t.Equal("10", c.Int.Sub(&c.Int, &b.Int).String())
@@ -79,10 +78,9 @@ func (t *testBig) TestSub() {
 
 func (t *testBig) TestMul() {
 	{
-		a := NewBig(10)
 		b := NewBig(math.MaxUint64)
 
-		c, ok := b.MulOK(a)
+		c, ok := b.MulOK(10)
 		t.True(ok)
 		t.Equal("184467440737095516150", c.Int.String())
 	}
@@ -171,6 +169,50 @@ func (t *testBig) TestEncodeDecode() {
 	t.NoError(err)
 
 	t.Equal(0, a.Cmp(n))
+}
+
+func (t *testBig) TestFromValue() {
+	cases := []struct {
+		name     string
+		v        interface{}
+		expected uint64
+		err      string
+	}{
+		{name: "int", v: int(33), expected: 33},
+		{name: "int8", v: int8(33), expected: 33},
+		{name: "int16", v: int16(33), expected: 33},
+		{name: "int32", v: int32(33), expected: 33},
+		{name: "int64", v: int64(33), expected: 33},
+		{name: "uint", v: uint(33), expected: 33},
+		{name: "uint8", v: uint8(33), expected: 33},
+		{name: "uint16", v: uint16(33), expected: 33},
+		{name: "uint32", v: uint32(33), expected: 33},
+		{name: "uint64", v: uint64(33), expected: 33},
+		{name: "negative int", v: int(-33), err: "lower than zero"},
+		{name: "negative int8", v: int8(-33), err: "lower than zero"},
+		{name: "negative int16", v: int16(-33), err: "lower than zero"},
+		{name: "negative int32", v: int32(-33), err: "lower than zero"},
+		{name: "negative int64", v: int64(-33), err: "lower than zero"},
+		{name: "not acceptable value", v: "showme", err: "invalid value"},
+		{name: "from Big", v: NewBig(33), expected: 33},
+	}
+
+	for i, c := range cases {
+		i := i
+		c := c
+		t.Run(
+			c.name,
+			func() {
+				result, err := FromValue(c.v)
+				if len(c.err) > 0 {
+					t.Contains(err.Error(), c.err)
+				} else {
+					t.NoError(err)
+					t.True(NewBig(c.expected).Equal(result), "%d: %v; %v != %v", i, c.name, c.expected, result)
+				}
+			},
+		)
+	}
 }
 
 func TestBig(t *testing.T) {

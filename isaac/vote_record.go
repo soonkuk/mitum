@@ -12,7 +12,7 @@ import (
 )
 
 type VoteRecords struct {
-	sync.RWMutex
+	lock *sync.RWMutex
 	*common.Logger
 	hash     hash.Hash
 	height   Height
@@ -39,6 +39,7 @@ func NewVoteRecords(
 			"stage", stage,
 			"proposal", proposal,
 		),
+		lock:     new(sync.RWMutex),
 		hash:     hash,
 		height:   height,
 		round:    round,
@@ -69,8 +70,8 @@ func (vrs VoteRecords) Proposal() hash.Hash {
 }
 
 func (vrs *VoteRecords) Vote(vr VoteRecord) error {
-	vrs.Lock()
-	defer vrs.Unlock()
+	vrs.lock.Lock()
+	defer vrs.lock.Unlock()
 
 	if evr, found := vrs.voted[vr.node]; found {
 		// NOTE revoting: same vote will be allowed , but same seal is not allowed
@@ -102,12 +103,15 @@ func (vrs VoteRecords) Len() int {
 }
 
 func (vrs VoteRecords) IsClosed() bool {
+	vrs.RLock()
+	defer vrs.RUnlock()
+
 	return vrs.closed
 }
 
 func (vrs *VoteRecords) Close() {
-	vrs.Lock()
-	defer vrs.Unlock()
+	vrs.lock.Lock()
+	defer vrs.lock.Unlock()
 
 	if vrs.closed {
 		return
@@ -121,27 +125,25 @@ func (vrs VoteRecords) Records() map[node.Address]VoteRecord {
 }
 
 func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) {
-	vr := NewVoteResult(vrs.height, vrs.round, vrs.stage, vrs.proposal, vrs)
+	vr := NewVoteResult(vrs.height, vrs.round, vrs.stage, vrs.proposal, vrs.Copy())
 
-	var nextBlocks []hash.Hash
+	if vrs.closed {
+		vr.result = FinishedGotMajority
+		return vr, nil
+	}
+
+	var blocks []hash.Hash
 	var counted []uint
-	if vrs.stage == StageINIT {
-		var c uint
-		for _ = range vrs.voted {
-			c++
-		}
-		nextBlocks = append(nextBlocks, hash.Hash{}) // INIT ballot should have empty block
-		counted = append(counted, c)
-	} else {
-		countByNextBlock := map[hash.Hash]uint{}
-		for _, vr := range vrs.voted {
-			countByNextBlock[vr.nextBlock]++
-		}
 
-		for nextBlock, c := range countByNextBlock {
-			nextBlocks = append(nextBlocks, nextBlock)
-			counted = append(counted, c)
-		}
+	// get majortiy of current block
+	countByCurrentBlock := map[hash.Hash]uint{}
+	for _, vr := range vrs.voted {
+		countByCurrentBlock[vr.currentBlock]++
+	}
+
+	for currentBlock, c := range countByCurrentBlock {
+		blocks = append(blocks, currentBlock)
+		counted = append(counted, c)
 	}
 
 	switch index := common.CheckMajority(total, threshold, counted...); index {
@@ -152,15 +154,38 @@ func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) 
 		vr.result = JustDraw
 		return vr, nil
 	default:
-		if vrs.closed {
-			vr.result = FinishedGotMajority
-		} else {
-			vr.result = GotMajority
-		}
-		vr.nextBlock = nextBlocks[index]
-
-		return vr, nil
+		vr.result = GotMajority
+		vr.currentBlock = blocks[index]
 	}
+
+	// get majortiy of next block
+	if vrs.stage != StageINIT {
+		blocks = blocks[:0]
+		counted = counted[:0]
+
+		countByNextBlock := map[hash.Hash]uint{}
+		for _, vr := range vrs.voted {
+			countByNextBlock[vr.nextBlock]++
+		}
+
+		for nextBlock, c := range countByNextBlock {
+			blocks = append(blocks, nextBlock)
+			counted = append(counted, c)
+		}
+
+		switch index := common.CheckMajority(total, threshold, counted...); index {
+		case -1:
+			vr.result = NotYetMajority
+		case -2:
+			vr.result = JustDraw
+		default:
+			vr.nextBlock = blocks[index]
+			vr.result = GotMajority
+
+		}
+	}
+
+	return vr, nil
 }
 
 func (vrs VoteRecords) MarshalJSON() ([]byte, error) {
@@ -197,23 +222,26 @@ func (vnr VoteRecords) NodeVote(n node.Address) (VoteRecord, bool) {
 }
 
 type VoteRecord struct {
-	hash      hash.Hash
-	node      node.Address
-	nextBlock hash.Hash
-	seal      hash.Hash
-	votedAt   common.Time
+	hash         hash.Hash
+	node         node.Address
+	currentBlock hash.Hash
+	nextBlock    hash.Hash
+	seal         hash.Hash
+	votedAt      common.Time
 }
 
 func NewVoteRecord(
 	node node.Address,
+	currentBlock hash.Hash,
 	nextBlock hash.Hash,
 	seal hash.Hash,
 ) (VoteRecord, error) {
 	vr := VoteRecord{
-		node:      node,
-		nextBlock: nextBlock,
-		seal:      seal,
-		votedAt:   common.Now(),
+		node:         node,
+		currentBlock: currentBlock,
+		nextBlock:    nextBlock,
+		seal:         seal,
+		votedAt:      common.Now(),
 	}
 
 	b, err := rlp.EncodeToBytes(vr)
@@ -237,15 +265,20 @@ func (vr VoteRecord) Hash() hash.Hash {
 
 func (vr VoteRecord) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"hash":      vr.hash.String(),
-		"node":      vr.node.String(),
-		"nextBlock": vr.nextBlock.String(),
-		"seal":      vr.seal.String(),
+		"hash":         vr.hash.String(),
+		"node":         vr.node.String(),
+		"currentBlock": vr.currentBlock.String(),
+		"nextBlock":    vr.nextBlock.String(),
+		"seal":         vr.seal.String(),
 	})
 }
 
 func (vr VoteRecord) Equal(nvr VoteRecord) bool {
 	if !vr.node.Equal(nvr.node) {
+		return false
+	}
+
+	if !vr.currentBlock.Equal(nvr.currentBlock) {
 		return false
 	}
 
@@ -268,6 +301,7 @@ func (vr VoteRecord) String() string {
 func (vr VoteRecord) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{
 		vr.node,
+		vr.currentBlock,
 		vr.nextBlock,
 		vr.votedAt,
 		vr.seal,
