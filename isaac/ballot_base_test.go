@@ -18,9 +18,10 @@ func (t *testBaseBallot) TestEncode() {
 	height := NewBlockHeight(33)
 	round := Round(0)
 	proposal := NewRandomProposalHash()
+	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
 
-	ballot, err := NewSIGNBallot(n, height, round, proposal, nextBlock)
+	ballot, err := NewBallot(n, height, round, StageSIGN, proposal, currentBlock, nextBlock)
 	t.NoError(err)
 
 	pk, _ := keypair.NewStellarPrivateKey()

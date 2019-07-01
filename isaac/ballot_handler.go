@@ -11,7 +11,7 @@ import (
 type BallotHandler struct {
 	sync.RWMutex
 	*common.Logger
-	ballotBox *BallotBox
+	ballotbox *Ballotbox
 	daemon    *common.ReaderDaemon
 	receiver  chan interface{}
 	threshold *Threshold
@@ -21,7 +21,7 @@ type BallotHandler struct {
 func NewBallotHandler(homeState *HomeState, threshold *Threshold) *BallotHandler {
 	bc := &BallotHandler{
 		Logger:    common.NewLogger(Log(), "module", "voting"),
-		ballotBox: NewBallotBox(),
+		ballotbox: NewBallotbox(),
 		threshold: threshold,
 		homeState: homeState,
 	}

@@ -1,5 +1,6 @@
 package isaac
 
+/*
 import (
 	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
@@ -9,14 +10,14 @@ import (
 // BallotCompiler manages voting process; it will block the vote one by one.
 type BallotCompiler struct {
 	*common.Logger
-	ballotBox *BallotBox
+	ballotbox *Ballotbox
 	threshold *Threshold
 }
 
 func NewBallotCompiler(threshold *Threshold) *BallotCompiler {
 	return &BallotCompiler{
 		Logger:    common.NewLogger(Log(), "module", "ballot_compiler"),
-		ballotBox: NewBallotBox(),
+		ballotbox: NewBallotbox(),
 		threshold: threshold,
 	}
 }
@@ -29,7 +30,7 @@ func (bc *BallotCompiler) Vote(ballot Ballot) (VoteResult, error) {
 	log_ := bc.Log().New(log15.Ctx{"ballot": ballot.Hash()})
 	log_.Debug("trying to vote", "ballot", ballot)
 
-	vrs, err := bc.ballotBox.Vote(
+	vrs, err := bc.ballotbox.Vote(
 		ballot.Node(),
 		ballot.Height(),
 		ballot.Round(),
@@ -53,7 +54,7 @@ func (bc *BallotCompiler) Vote(ballot Ballot) (VoteResult, error) {
 
 	switch vr.Result() {
 	case JustDraw, GotMajority:
-		if err := bc.ballotBox.CloseVoteRecords(vrs.Hash()); err != nil {
+		if err := bc.ballotbox.CloseVoteRecords(vrs.Hash()); err != nil {
 			bc.Log().Error("failed to close VoteRecords", "error", err)
 		}
 	default:
@@ -61,31 +62,5 @@ func (bc *BallotCompiler) Vote(ballot Ballot) (VoteResult, error) {
 	}
 
 	return vr, nil
-
-	/*
-		switch vr.Result() {
-		case NotYetMajority, FinishedGotMajority:
-			return nil
-		case JustDraw: // NOTE drawed, move to next round
-			if err := bc.ballotBox.CloseVoteRecords(vrs.Hash()); err != nil {
-				bc.Log().Error("failed to close VoteRecords", "error", err)
-			}
-
-			go bc.moveToNextRound(vr)
-		case GotMajority: // NOTE move to next stage
-			// NOTE if nextBlock is different from current node, go to sync
-			homeVote, isVoted := vr.records.NodeVote(bc.homeState.Home().Address())
-			if isVoted && !homeVote.nextBlock.Equal(vr.NextBlock()) {
-				bc.Log().Debug(
-					"nextblock of result is different from home vote",
-					"home", homeVote,
-					"result", vr,
-				)
-				go bc.moveToSync(vr)
-				return nil
-			}
-
-			go bc.moveToNextStage(vr)
-		}
-	*/
 }
+*/

@@ -72,7 +72,7 @@ func (ib *BaseBallot) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-func (ib BaseBallot) Body() BaseBallotBody {
+func (ib BaseBallot) Body() seal.Body {
 	return ib.body
 }
 
@@ -98,6 +98,10 @@ func (ib BaseBallot) Stage() Stage {
 
 func (ib BaseBallot) Proposal() hash.Hash {
 	return ib.body.Proposal
+}
+
+func (ib BaseBallot) CurrentBlock() hash.Hash {
+	return ib.body.CurrentBlock
 }
 
 func (ib BaseBallot) NextBlock() hash.Hash {

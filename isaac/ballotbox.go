@@ -1,44 +1,33 @@
 package isaac
 
 import (
-	"sync"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/inconshreveable/log15"
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/hash"
-	"github.com/spikeekips/mitum/node"
 )
 
-type BallotBox struct {
-	sync.RWMutex
+type Ballotbox struct {
 	*common.Logger
-	voted map[ /* VoteRecord.BoxHash */ hash.Hash]*VoteRecords
+	voted     map[ /* VoteRecord.BoxHash */ hash.Hash]*VoteRecords
+	threshold *Threshold
 }
 
-func NewBallotBox() *BallotBox {
-	return &BallotBox{
-		Logger: common.NewLogger(log, "module", "ballotbox"),
-		voted:  map[hash.Hash]*VoteRecords{},
+func NewBallotbox(threshold *Threshold) *Ballotbox {
+	return &Ballotbox{
+		Logger:    common.NewLogger(log, "module", "ballotbox"),
+		voted:     map[hash.Hash]*VoteRecords{},
+		threshold: threshold,
 	}
 }
 
-func (bb *BallotBox) boxHash(height Height, round Round, stage Stage, proposal hash.Hash) (hash.Hash, error) {
+func (bb *Ballotbox) boxHash(ballot Ballot) (hash.Hash, error) {
 	var l []interface{}
-	if stage == StageINIT {
-		l = []interface{}{
-			height,
-			round,
-			stage,
-		}
+	if ballot.Stage() == StageINIT {
+		l = []interface{}{ballot.Height(), ballot.Round(), ballot.Stage()}
 	} else {
-		l = []interface{}{
-			height,
-			round,
-			stage,
-			proposal,
-		}
+		l = []interface{}{ballot.Height(), ballot.Round(), ballot.Stage(), ballot.Proposal()}
 	}
 
 	b, err := rlp.EncodeToBytes(l)
@@ -49,66 +38,65 @@ func (bb *BallotBox) boxHash(height Height, round Round, stage Stage, proposal h
 	return hash.NewArgon2Hash("bbb", b)
 }
 
-func (bb *BallotBox) Vote(
-	node node.Address,
-	height Height,
-	round Round,
-	stage Stage,
-	proposal hash.Hash,
-	currentBlock hash.Hash,
-	nextBlock hash.Hash,
-	seal hash.Hash,
-) (VoteRecords, error) {
-	log_ := bb.Log().New(log15.Ctx{
-		"node":         node,
-		"height":       height,
-		"round":        round,
-		"stage":        stage,
-		"proposal":     proposal,
-		"currentBlock": currentBlock,
-		"nextBlock":    nextBlock,
-		"seal":         seal,
-	})
+func (bb *Ballotbox) Vote(ballot Ballot) (VoteResult, error) {
+	log_ := bb.Log().New(log15.Ctx{"ballot": ballot.Hash()})
 
 	log_.Debug("trying to vote")
 
 	// TODO checking CanVote should be done before Vote().
-	if !stage.CanVote() {
-		return VoteRecords{}, FailedToVoteError.Newf("invalid stage; stage=%q", stage)
+	if !ballot.Stage().CanVote() {
+		return VoteResult{}, FailedToVoteError.Newf("invalid stage; stage=%q", ballot.Stage())
 	}
 
-	boxHash, err := bb.boxHash(height, round, stage, proposal)
+	boxHash, err := bb.boxHash(ballot)
 	if err != nil {
-		return VoteRecords{}, err
+		return VoteResult{}, err
 	}
 
-	nr, found := bb.voted[boxHash]
+	vrs, found := bb.voted[boxHash]
 	if !found {
-		nr = NewVoteRecords(boxHash, height, round, stage, proposal)
-		bb.voted[boxHash] = nr
+		vrs = NewVoteRecords(boxHash, ballot.Height(), ballot.Round(), ballot.Stage(), ballot.Proposal())
+		bb.voted[boxHash] = vrs
 	}
 
-	vr, err := NewVoteRecord(node, currentBlock, nextBlock, seal)
+	vr, err := NewVoteRecord(ballot.Node(), ballot.CurrentBlock(), ballot.NextBlock(), ballot.Hash())
 	if err != nil {
-		return VoteRecords{}, FailedToVoteError.New(err)
+		return VoteResult{}, FailedToVoteError.New(err)
 	}
 
 	log_.Debug("VoteRecord created", "vote_record", vr)
 
-	bb.Lock()
-	defer bb.Unlock()
+	err = vrs.Vote(vr)
+	if err != nil {
+		return VoteResult{}, err
+	}
 
-	err = nr.Vote(vr)
-
-	return nr.Copy(), err
+	return bb.CheckMajority(*vrs)
 }
 
-func (bb *BallotBox) CloseVoteRecords(boxHash hash.Hash) error {
-	nr, found := bb.voted[boxHash]
-	if !found {
-		return common.NotFoundError.Newf("VoteRecords not found; boxHash=%q", boxHash)
-	}
-	nr.Close()
+func (bb *Ballotbox) CheckMajority(vrs VoteRecords) (VoteResult, error) {
+	log_ := bb.Log().New(log15.Ctx{"vrs": vrs})
+	log_.Debug("trying to check majority", "vrs", vrs)
 
-	return nil
+	var total, threshold uint = bb.threshold.Get(vrs.stage)
+	vr, err := vrs.CheckMajority(total, threshold)
+	if err != nil {
+		bb.Log().Error("failed to get vote result", "error", err)
+		return VoteResult{}, err
+	}
+
+	bb.Log().Debug("got vote result", "result", vr)
+
+	switch vr.Result() {
+	case JustDraw, GotMajority:
+		if vrs.IsClosed() {
+			log_.Debug("VoteRecords already closed")
+		} else {
+			vrs.Close()
+		}
+	default:
+		//
+	}
+
+	return vr, nil
 }

@@ -7,6 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+type Signer interface {
+	Sign(PrivateKey, []byte) error
+}
+
 type Kind uint
 
 const (

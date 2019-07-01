@@ -118,6 +118,8 @@ func (vrs *VoteRecords) Close() {
 	}
 
 	vrs.closed = true
+
+	return
 }
 
 func (vrs VoteRecords) Records() map[node.Address]VoteRecord {
@@ -181,7 +183,6 @@ func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) 
 		default:
 			vr.nextBlock = blocks[index]
 			vr.result = GotMajority
-
 		}
 	}
 

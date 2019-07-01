@@ -6,25 +6,35 @@ import (
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/xerrors"
 
+	"github.com/spikeekips/mitum/hash"
+	"github.com/spikeekips/mitum/keypair"
 	"github.com/spikeekips/mitum/node"
-	"github.com/spikeekips/mitum/seal"
 )
 
-type testBallotBox struct {
+type testBallotbox struct {
 	suite.Suite
 }
 
-func (t *testBallotBox) newBallotBox() *BallotBox {
-	return NewBallotBox()
+func (t *testBallotbox) newBallotbox(total, threshold uint) *Ballotbox {
+	return NewBallotbox(NewThreshold(total, threshold))
 }
 
-func (t *testBallotBox) TestNew() {
-	bb := t.newBallotBox()
+func (t *testBallotbox) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
+	ballot, _ := NewBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+
+	pk, _ := keypair.NewStellarPrivateKey()
+	_ = ballot.Sign(pk, []byte{})
+
+	return ballot
+}
+
+func (t *testBallotbox) TestNew() {
+	bb := t.newBallotbox(10, 7)
 	t.NotNil(bb)
 }
 
-func (t *testBallotBox) TestVote() {
-	bb := t.newBallotBox()
+func (t *testBallotbox) TestVote() {
+	bb := t.newBallotbox(10, 7)
 
 	n := node.NewRandomAddress()
 	height := NewBlockHeight(33)
@@ -33,17 +43,20 @@ func (t *testBallotBox) TestVote() {
 	proposal := NewRandomProposalHash()
 	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
-	sl := seal.NewRandomSealHash()
 
-	vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+	ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+
+	vr, err := bb.Vote(ballot)
 
 	t.NoError(err)
-	t.NotEmpty(vrs)
-	t.True(vrs.IsNodeVoted(n))
+	t.NotEmpty(vr)
+	t.True(vr.Records().IsNodeVoted(n))
 }
 
-func (t *testBallotBox) TestBasicVoteRecords() {
-	bb := t.newBallotBox()
+func (t *testBallotbox) TestBasicVoteRecords() {
+	var total, threshold uint = 5, 3
+
+	bb := t.newBallotbox(total, threshold)
 
 	height := NewBlockHeight(33)
 	round := Round(0)
@@ -52,27 +65,23 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
 
-	var total, threshold uint = 5, 3
-
 	// vote under threshold
 	for i := uint(0); i < threshold-1; i++ {
 		n := node.NewRandomAddress()
-		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
-		t.NoError(err)
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
 
-		vr, err := vrs.CheckMajority(total, threshold)
+		vr, err := bb.Vote(ballot)
 		t.NoError(err)
 		t.Equal(NotYetMajority, vr.Result())
 	}
 
 	{ // vote one more; it should be at least reached to threshold
 		n := node.NewRandomAddress()
-		sl := seal.NewRandomSealHash()
-		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
-		t.NoError(err)
-		vr, err := vrs.CheckMajority(total, threshold)
+
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+
+		vr, err := bb.Vote(ballot)
 		t.NoError(err)
 		t.Equal(GotMajority, vr.Result())
 		t.Equal(height, vr.Height())
@@ -84,8 +93,9 @@ func (t *testBallotBox) TestBasicVoteRecords() {
 	}
 }
 
-func (t *testBallotBox) TestClosedVoteRecords() {
-	bb := t.newBallotBox()
+func (t *testBallotbox) TestClosedVoteRecords() {
+	var total, threshold uint = 5, 3
+	bb := t.newBallotbox(total, threshold)
 
 	height := NewBlockHeight(33)
 	round := Round(0)
@@ -96,44 +106,46 @@ func (t *testBallotBox) TestClosedVoteRecords() {
 
 	{
 		n := node.NewRandomAddress()
-		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+
+		_, err := bb.Vote(ballot)
 		t.NoError(err)
 
 		// close VoteRecords
-		err = bb.CloseVoteRecords(vrs.Hash())
-		t.NoError(err)
+		bh, _ := bb.boxHash(ballot)
+		vrs, found := bb.voted[bh]
+		t.True(found)
+		vrs.Close()
 	}
 
 	{ // vote again
 		n := node.NewRandomAddress()
-		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+		_, err := bb.Vote(ballot)
 		t.NoError(err)
 
 		// check closed
+		bh, _ := bb.boxHash(ballot)
+		vrs, found := bb.voted[bh]
+		t.True(found)
 		t.True(vrs.IsClosed())
 	}
 
-	var total, threshold uint = 5, 3
-
 	{ // vote again, but the closed VoteRecords will not decide result
 		n := node.NewRandomAddress()
-		sl := seal.NewRandomSealHash()
 
-		vrs, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+		vr, err := bb.Vote(ballot)
 		t.NoError(err)
 
-		vr, err := vrs.CheckMajority(total, threshold)
-		t.NoError(err)
 		t.Equal(FinishedGotMajority, vr.Result())
 	}
 }
 
-func (t *testBallotBox) TestVoteAgain() {
-	bb := t.newBallotBox()
+func (t *testBallotbox) TestVoteAgain() {
+	bb := t.newBallotbox(10, 7)
 
 	height := NewBlockHeight(33)
 	round := Round(0)
@@ -145,23 +157,22 @@ func (t *testBallotBox) TestVoteAgain() {
 	n := node.NewRandomAddress()
 
 	{ // revoting with same seal; it will not be voted
-		sl := seal.NewRandomSealHash()
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
 
-		_, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		_, err := bb.Vote(ballot)
 		t.NoError(err)
 
-		_, err = bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		_, err = bb.Vote(ballot)
 		t.True(xerrors.Is(err, AlreadyVotedError))
 	}
 
 	{ // revoting with different seal; it will be voted
-		sl := seal.NewRandomSealHash()
-
-		_, err := bb.Vote(n, height, round, stage, proposal, currentBlock, nextBlock, sl)
+		ballot := t.newBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
+		_, err := bb.Vote(ballot)
 		t.NoError(err)
 	}
 }
 
-func TestBallotBox(t *testing.T) {
-	suite.Run(t, new(testBallotBox))
+func TestBallotbox(t *testing.T) {
+	suite.Run(t, new(testBallotbox))
 }
