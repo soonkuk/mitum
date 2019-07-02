@@ -5,8 +5,9 @@ import (
 	"github.com/spikeekips/mitum/node"
 )
 
-type Client interface {
+type NetworkClient interface {
 	Home() node.Home
+	Propose(*Proposal) error
 	Vote(Ballot) error
 	RequestNodeInfo(...node.Address) ([]NodeInfo, error)
 	RequestLatestBlockProof(...node.Address) error

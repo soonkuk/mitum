@@ -9,14 +9,21 @@ import (
 
 var (
 	ZeroBigInt *big.Int = new(big.Int).SetInt64(0)
-	ZeroBig    Big      = NewBig(0)
+	ZeroBig    Big      = NewBigFromInt64(0)
 )
 
 type Big struct {
 	big.Int
 }
 
-func NewBig(i uint64) Big {
+func NewBigFromInt64(i int64) Big {
+	var a big.Int
+	a.SetInt64(i)
+
+	return Big{Int: a}
+}
+
+func NewBigFromUint64(i uint64) Big {
 	var a big.Int
 	a.SetUint64(i)
 
@@ -57,7 +64,7 @@ func (a Big) String() string {
 }
 
 func (a Big) Inc() Big {
-	b, _ := a.AddOK(NewBig(1))
+	b, _ := a.AddOK(NewBigFromInt64(1))
 	return b
 }
 
@@ -101,7 +108,7 @@ func (a Big) SubOK(v interface{}) (Big, bool) {
 }
 
 func (a Big) Dec() Big {
-	b, _ := a.SubOK(NewBig(1))
+	b, _ := a.SubOK(NewBigFromInt64(1))
 	return b
 }
 
@@ -169,8 +176,22 @@ func (a Big) Cmp(b Big) int {
 	return a.Int.Cmp(&b.Int)
 }
 
-func (a Big) Equal(b Big) bool {
-	return a.Int.Cmp(&b.Int) == 0
+func (a Big) Equal(v interface{}) bool {
+	n, err := FromValue(v)
+	if err != nil {
+		return false
+	}
+
+	return a.Int.Cmp(&n.Int) == 0
+}
+
+func (a Big) Int64() int64 {
+	b, _ := a.Int64Ok()
+	return b
+}
+
+func (a Big) Int64Ok() (int64, bool) {
+	return (&(a.Int)).Int64(), (&(a.Int)).IsInt64()
 }
 
 func (a Big) Uint64() uint64 {
@@ -183,7 +204,6 @@ func (a Big) Uint64Ok() (uint64, bool) {
 }
 
 func FromValue(v interface{}) (Big, error) {
-	var i uint64
 	switch v.(type) {
 	default:
 		return Big{}, xerrors.Errorf("invalid value; type=%q", v)
@@ -204,22 +224,21 @@ func FromValue(v interface{}) (Big, error) {
 			a = v.(int64)
 		}
 
-		if a < 0 {
-			return Big{}, xerrors.Errorf("lower than zero; value=%v", a)
+		return NewBigFromInt64(a), nil
+	case uint, uint8, uint16, uint32, uint64:
+		var a uint64
+		switch v.(type) {
+		case uint:
+			a = uint64(v.(uint))
+		case uint8:
+			a = uint64(v.(uint8))
+		case uint16:
+			a = uint64(v.(uint16))
+		case uint32:
+			a = uint64(v.(uint32))
+		case uint64:
+			a = uint64(v.(uint64))
 		}
-
-		i = uint64(a)
-	case uint:
-		i = uint64(v.(uint))
-	case uint8:
-		i = uint64(v.(uint8))
-	case uint16:
-		i = uint64(v.(uint16))
-	case uint32:
-		i = uint64(v.(uint32))
-	case uint64:
-		i = v.(uint64)
+		return NewBigFromUint64(a), nil
 	}
-
-	return NewBig(i), nil
 }

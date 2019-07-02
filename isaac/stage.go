@@ -52,7 +52,7 @@ func (s Stage) IsValid() bool {
 	case StageINIT:
 	case StageSIGN:
 	case StageACCEPT:
-	case StageALLCONFIRM:
+	//case StageALLCONFIRM:
 	default:
 		return false
 	}
@@ -67,8 +67,6 @@ func (s Stage) Next() Stage {
 	case StageSIGN:
 		return StageACCEPT
 	case StageACCEPT:
-		return StageALLCONFIRM
-	case StageALLCONFIRM:
 		return StageINIT
 	default:
 		panic(InvalidStageError)

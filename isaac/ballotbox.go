@@ -8,6 +8,7 @@ import (
 	"github.com/spikeekips/mitum/hash"
 )
 
+// TODO clear Ballotbox.voted periodically
 type Ballotbox struct {
 	*common.Logger
 	voted     map[ /* VoteRecord.BoxHash */ hash.Hash]*VoteRecords
@@ -71,10 +72,10 @@ func (bb *Ballotbox) Vote(ballot Ballot) (VoteResult, error) {
 		return VoteResult{}, err
 	}
 
-	return bb.CheckMajority(*vrs)
+	return bb.CheckMajority(vrs)
 }
 
-func (bb *Ballotbox) CheckMajority(vrs VoteRecords) (VoteResult, error) {
+func (bb *Ballotbox) CheckMajority(vrs *VoteRecords) (VoteResult, error) {
 	log_ := bb.Log().New(log15.Ctx{"vrs": vrs})
 	log_.Debug("trying to check majority", "vrs", vrs)
 
@@ -92,6 +93,7 @@ func (bb *Ballotbox) CheckMajority(vrs VoteRecords) (VoteResult, error) {
 		if vrs.IsClosed() {
 			log_.Debug("VoteRecords already closed")
 		} else {
+			log_.Debug("VoteRecords closed")
 			vrs.Close()
 		}
 	default:

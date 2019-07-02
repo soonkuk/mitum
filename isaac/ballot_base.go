@@ -186,6 +186,16 @@ func (ibb BaseBallotBody) IsValid() error {
 		return InvalidBallotError.Newf("invalid node; node=%q", ibb.Node)
 	}
 
+	if ibb.Proposal.Empty() {
+		return InvalidBallotError.Newf("Proposal should not empty")
+	}
+	if ibb.CurrentBlock.Empty() {
+		return InvalidBallotError.Newf("CurrentBlock should not empty")
+	}
+	if ibb.NextBlock.Empty() {
+		return InvalidBallotError.Newf("NextBlock should not empty")
+	}
+
 	switch ibb.Stage {
 	case StageINIT:
 		return IsValidINITBallot(ibb)
@@ -200,6 +210,7 @@ func (ibb BaseBallotBody) IsValid() error {
 
 func (ibb BaseBallotBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
+		"type":         ibb.Type(),
 		"node":         ibb.Node,
 		"height":       ibb.Height,
 		"round":        ibb.Round,
@@ -208,4 +219,9 @@ func (ibb BaseBallotBody) MarshalJSON() ([]byte, error) {
 		"currentBlock": ibb.CurrentBlock,
 		"nextBlock":    ibb.NextBlock,
 	})
+}
+
+func (ibb BaseBallotBody) String() string {
+	b, _ := json.Marshal(ibb)
+	return string(b)
 }

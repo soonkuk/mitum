@@ -9,18 +9,18 @@ import (
 
 type HomeState struct {
 	sync.RWMutex
-	home   node.Home
-	height Height
-	block  hash.Hash
-	state  node.State
+	home          node.Home
+	currentBlock  Block
+	previousBlock Block
+	currentState  node.State
+	previousState node.State
 }
 
-func NewHomeState(home node.Home, height Height, block hash.Hash) *HomeState {
+func NewHomeState(home node.Home, block Block) *HomeState {
 	return &HomeState{
-		home:   home,
-		height: height,
-		block:  block,
-		state:  node.StateBooting, // by default, node state is booting
+		home:         home,
+		currentBlock: block,
+		currentState: node.StateBooting, // by default, node state is booting
 	}
 }
 
@@ -32,55 +32,70 @@ func (hs *HomeState) Height() Height {
 	hs.RLock()
 	defer hs.RUnlock()
 
-	return hs.height
+	return hs.currentBlock.Height()
 }
 
-func (hs *HomeState) SetHeight(height Height) *HomeState {
-	hs.Lock()
-	defer hs.Unlock()
-
-	if hs.height.Equal(height) {
-		return hs
-	}
-
-	hs.height = height
-	return hs
-}
-
-func (hs *HomeState) Block() hash.Hash {
+func (hs *HomeState) PreviousHeight() Height {
 	hs.RLock()
 	defer hs.RUnlock()
 
-	return hs.block
+	return hs.previousBlock.Height()
 }
 
-func (hs *HomeState) SetBlock(block hash.Hash) *HomeState {
+func (hs *HomeState) SetBlock(block Block) *HomeState {
 	hs.Lock()
 	defer hs.Unlock()
 
-	if hs.block.Equal(block) {
+	if hs.currentBlock.Equal(block) {
 		return hs
 	}
 
-	hs.block = block
+	hs.previousBlock = hs.currentBlock
+	hs.currentBlock = block
 	return hs
+}
+
+func (hs *HomeState) Block() Block {
+	hs.RLock()
+	defer hs.RUnlock()
+
+	return hs.currentBlock
+}
+
+func (hs *HomeState) PreviousBlock() Block {
+	hs.RLock()
+	defer hs.RUnlock()
+
+	return hs.previousBlock
 }
 
 func (hs *HomeState) State() node.State {
 	hs.RLock()
 	defer hs.RUnlock()
 
-	return hs.state
+	return hs.currentState
+}
+
+func (hs *HomeState) PreviousState() node.State {
+	hs.RLock()
+	defer hs.RUnlock()
+
+	return hs.previousState
 }
 
 func (hs *HomeState) SetState(state node.State) *HomeState {
 	hs.Lock()
 	defer hs.Unlock()
 
-	if hs.state == state {
+	if hs.currentState == state {
 		return hs
 	}
 
-	hs.state = state
+	hs.previousState = hs.currentState
+	hs.currentState = state
 	return hs
+}
+
+func (hs *HomeState) Proposal() hash.Hash {
+	return hs.currentBlock.Proposal()
 }

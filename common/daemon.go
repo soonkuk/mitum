@@ -45,12 +45,14 @@ func (d *ReaderDaemon) Reader() <-chan interface{} {
 	return d.reader
 }
 
-func (d *ReaderDaemon) Write(v interface{}) {
+func (d *ReaderDaemon) Write(v interface{}) bool {
 	if d.IsStopped() {
-		return
+		return false
 	}
 
 	d.reader <- v
+
+	return true
 }
 
 func (d *ReaderDaemon) Close() error {

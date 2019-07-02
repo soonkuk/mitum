@@ -10,9 +10,8 @@ type ReceiveFunc func(interface{}) error
 type Nodes interface {
 	common.Daemon
 	Home() node.Home
-	Receiver() <-chan interface{}
 	AddReceiver(node.Address, ReceiveFunc) error
 	RemoveReceiver(node.Address) error
-	Send(node.Address, interface{}) error
+	Send(interface{}, ...node.Address) error
 	Broadcast(interface{}) error
 }

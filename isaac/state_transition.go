@@ -3,7 +3,6 @@ package isaac
 import (
 	"sync"
 
-	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
 	"github.com/spikeekips/mitum/seal"
@@ -81,31 +80,8 @@ func (cs *StateTransition) sealCallback(message interface{}) error {
 		return xerrors.Errorf("something wrong; stateHandler is nil")
 	}
 
-	log_ := cs.Log().New(log15.Ctx{"seal": sl.Hash()})
-
-	if err := cs.stateHandler.ReceiveSeal(sl); err != nil {
-		return err
-	}
-
-	switch t := sl.Type(); t {
-	case BallotType:
-		ballot, ok := sl.(Ballot)
-		if !ok {
-			log_.Debug("is not Ballot", "seal", sl)
-		}
-
-		vr, err := cs.ballotbox.Vote(ballot)
-		if err != nil {
-			return err
-		}
-
-		log_.Debug("got vote result", "result", vr)
-
-		switch vr.Result() {
-		//case NotYetMajority, FinishedGotMajority, JustDraw:
-		case GotMajority:
-			return cs.stateHandler.ReceiveVoteResult(vr)
-		}
+	if !cs.stateHandler.Write(sl) {
+		return xerrors.Errorf("failed to write seal")
 	}
 
 	return nil

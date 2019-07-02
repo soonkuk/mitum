@@ -15,8 +15,8 @@ func init() {
 }
 
 type NodesTest struct {
-	*common.ReaderDaemon
 	*common.Logger
+	*common.ReaderDaemon
 	sync.RWMutex
 	home  node.Home
 	nodes map[node.Address]ReceiveFunc

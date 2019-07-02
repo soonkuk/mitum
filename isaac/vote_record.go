@@ -161,29 +161,27 @@ func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) 
 	}
 
 	// get majortiy of next block
-	if vrs.stage != StageINIT {
-		blocks = blocks[:0]
-		counted = counted[:0]
+	blocks = blocks[:0]
+	counted = counted[:0]
 
-		countByNextBlock := map[hash.Hash]uint{}
-		for _, vr := range vrs.voted {
-			countByNextBlock[vr.nextBlock]++
-		}
+	countByNextBlock := map[hash.Hash]uint{}
+	for _, vr := range vrs.voted {
+		countByNextBlock[vr.nextBlock]++
+	}
 
-		for nextBlock, c := range countByNextBlock {
-			blocks = append(blocks, nextBlock)
-			counted = append(counted, c)
-		}
+	for nextBlock, c := range countByNextBlock {
+		blocks = append(blocks, nextBlock)
+		counted = append(counted, c)
+	}
 
-		switch index := common.CheckMajority(total, threshold, counted...); index {
-		case -1:
-			vr.result = NotYetMajority
-		case -2:
-			vr.result = JustDraw
-		default:
-			vr.nextBlock = blocks[index]
-			vr.result = GotMajority
-		}
+	switch index := common.CheckMajority(total, threshold, counted...); index {
+	case -1:
+		vr.result = NotYetMajority
+	case -2:
+		vr.result = JustDraw
+	default:
+		vr.nextBlock = blocks[index]
+		vr.result = GotMajority
 	}
 
 	return vr, nil

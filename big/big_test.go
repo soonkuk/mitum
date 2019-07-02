@@ -24,7 +24,7 @@ func (t *testBig) TestAdd() {
 	}
 
 	{
-		b := NewBig(math.MaxUint64)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := b.AddOK(10)
 		t.True(ok)
@@ -33,8 +33,8 @@ func (t *testBig) TestAdd() {
 	}
 
 	{
-		a := NewBig(math.MaxUint64)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(math.MaxUint64)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := a.AddOK(b)
 		t.True(ok)
@@ -48,8 +48,8 @@ func (t *testBig) TestAdd() {
 
 func (t *testBig) TestSub() {
 	{
-		a := NewBig(10)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(10)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := b.SubOK(a)
 		t.True(ok)
@@ -57,8 +57,8 @@ func (t *testBig) TestSub() {
 	}
 
 	{
-		a := NewBig(10)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(10)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := a.SubOK(b)
 		t.False(ok)
@@ -66,8 +66,8 @@ func (t *testBig) TestSub() {
 	}
 
 	{
-		a := NewBig(math.MaxUint64)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(math.MaxUint64)
+		b := NewBigFromUint64(math.MaxUint64)
 		c, _ := a.AddOK(b)
 
 		d, ok := c.SubOK(a)
@@ -78,7 +78,7 @@ func (t *testBig) TestSub() {
 
 func (t *testBig) TestMul() {
 	{
-		b := NewBig(math.MaxUint64)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := b.MulOK(10)
 		t.True(ok)
@@ -86,8 +86,8 @@ func (t *testBig) TestMul() {
 	}
 
 	{
-		a := NewBig(math.MaxUint64)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(math.MaxUint64)
+		b := NewBigFromUint64(math.MaxUint64)
 		c, _ := a.AddOK(b)
 
 		d, ok := c.MulOK(a)
@@ -98,8 +98,8 @@ func (t *testBig) TestMul() {
 
 func (t *testBig) TestDiv() {
 	{
-		a := NewBig(10)
-		b := NewBig(math.MaxUint64)
+		a := NewBigFromUint64(10)
+		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := b.DivOK(a)
 		t.True(ok)
@@ -107,8 +107,8 @@ func (t *testBig) TestDiv() {
 	}
 
 	{ // divizion zero
-		a := NewBig(10)
-		b := NewBig(0)
+		a := NewBigFromUint64(10)
+		b := NewBigFromUint64(0)
 
 		c, ok := b.DivOK(a)
 		t.True(ok)
@@ -116,8 +116,8 @@ func (t *testBig) TestDiv() {
 	}
 
 	{ // zero divizion
-		a := NewBig(10)
-		b := NewBig(0)
+		a := NewBigFromUint64(10)
+		b := NewBigFromUint64(0)
 
 		c, ok := a.DivOK(b)
 		t.False(ok)
@@ -126,7 +126,7 @@ func (t *testBig) TestDiv() {
 }
 
 func (t *testBig) TestMarshalBinary() {
-	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+	a := NewBigFromUint64(math.MaxUint64).Mul(NewBigFromUint64(math.MaxUint64))
 
 	var b []byte
 	b, err := a.MarshalBinary()
@@ -141,7 +141,7 @@ func (t *testBig) TestMarshalBinary() {
 }
 
 func (t *testBig) TestJson() {
-	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+	a := NewBigFromUint64(math.MaxUint64).Mul(NewBigFromUint64(math.MaxUint64))
 
 	var b []byte
 	b, err := json.Marshal(a)
@@ -158,7 +158,7 @@ func (t *testBig) TestJson() {
 }
 
 func (t *testBig) TestEncodeDecode() {
-	a := NewBig(math.MaxUint64).Mul(NewBig(math.MaxUint64))
+	a := NewBigFromUint64(math.MaxUint64).Mul(NewBigFromUint64(math.MaxUint64))
 
 	var b []byte
 	b, err := common.RLPEncode(a)
@@ -175,7 +175,7 @@ func (t *testBig) TestFromValue() {
 	cases := []struct {
 		name     string
 		v        interface{}
-		expected uint64
+		expected int64
 		err      string
 	}{
 		{name: "int", v: int(33), expected: 33},
@@ -188,13 +188,13 @@ func (t *testBig) TestFromValue() {
 		{name: "uint16", v: uint16(33), expected: 33},
 		{name: "uint32", v: uint32(33), expected: 33},
 		{name: "uint64", v: uint64(33), expected: 33},
-		{name: "negative int", v: int(-33), err: "lower than zero"},
-		{name: "negative int8", v: int8(-33), err: "lower than zero"},
-		{name: "negative int16", v: int16(-33), err: "lower than zero"},
-		{name: "negative int32", v: int32(-33), err: "lower than zero"},
-		{name: "negative int64", v: int64(-33), err: "lower than zero"},
+		{name: "negative int", v: int(-33), expected: -33},
+		{name: "negative int8", v: int8(-33), expected: -33},
+		{name: "negative int16", v: int16(-33), expected: -33},
+		{name: "negative int32", v: int32(-33), expected: -33},
+		{name: "negative int64", v: int64(-33), expected: -33},
 		{name: "not acceptable value", v: "showme", err: "invalid value"},
-		{name: "from Big", v: NewBig(33), expected: 33},
+		{name: "from Big", v: NewBigFromUint64(33), expected: 33},
 	}
 
 	for i, c := range cases {
@@ -208,7 +208,7 @@ func (t *testBig) TestFromValue() {
 					t.Contains(err.Error(), c.err)
 				} else {
 					t.NoError(err)
-					t.True(NewBig(c.expected).Equal(result), "%d: %v; %v != %v", i, c.name, c.expected, result)
+					t.True(NewBigFromInt64(c.expected).Equal(result), "%d: %v; %v != %v", i, c.name, c.expected, result)
 				}
 			},
 		)
