@@ -10,7 +10,7 @@ import (
 	"github.com/spikeekips/mitum/seal"
 )
 
-type SealCompiler struct {
+type VoteCompiler struct {
 	sync.RWMutex
 	*common.Logger
 	*common.ReaderDaemon
@@ -21,13 +21,13 @@ type SealCompiler struct {
 	ch        chan interface{}
 }
 
-func NewSealCompiler(
+func NewVoteCompiler(
 	homeState *HomeState,
 	suffrage Suffrage,
 	ballotbox *Ballotbox,
 	ch chan interface{},
-) *SealCompiler {
-	sc := &SealCompiler{
+) *VoteCompiler {
+	vc := &VoteCompiler{
 		Logger:    common.NewLogger(Log(), "module", "ballot-compiler"),
 		homeState: homeState,
 		suffrage:  suffrage,
@@ -36,28 +36,28 @@ func NewSealCompiler(
 		ch:        ch,
 	}
 
-	sc.ReaderDaemon = common.NewReaderDaemon(true, sc.receiveSeal)
+	vc.ReaderDaemon = common.NewReaderDaemon(true, vc.receiveSeal)
 
-	return sc
+	return vc
 }
 
-func (sc *SealCompiler) LastRound() Round {
-	sc.RLock()
-	defer sc.RUnlock()
+func (vc *VoteCompiler) LastRound() Round {
+	vc.RLock()
+	defer vc.RUnlock()
 
-	return sc.lastRound
+	return vc.lastRound
 }
 
-func (sc *SealCompiler) setLastRound(round Round) *SealCompiler {
-	sc.Lock()
-	defer sc.Unlock()
+func (vc *VoteCompiler) setLastRound(round Round) *VoteCompiler {
+	vc.Lock()
+	defer vc.Unlock()
 
-	sc.lastRound = round
+	vc.lastRound = round
 
-	return sc
+	return vc
 }
 
-func (sc *SealCompiler) receiveSeal(v interface{}) error {
+func (vc *VoteCompiler) receiveSeal(v interface{}) error {
 	// TODO store seal
 
 	sl, ok := v.(seal.Seal)
@@ -71,7 +71,7 @@ func (sc *SealCompiler) receiveSeal(v interface{}) error {
 		return err
 	}
 
-	sc.Log().Debug("got seal", "seal", sl)
+	vc.Log().Debug("got seal", "seal", sl)
 
 	switch t := sl.Type(); t {
 	case BallotType:
@@ -81,7 +81,7 @@ func (sc *SealCompiler) receiveSeal(v interface{}) error {
 		}
 
 		// TODO check ballot
-		if err := sc.receiveBallot(ballot); err != nil {
+		if err := vc.receiveBallot(ballot); err != nil {
 			return err
 		}
 	case ProposalType:
@@ -90,7 +90,7 @@ func (sc *SealCompiler) receiveSeal(v interface{}) error {
 			return xerrors.Errorf("is not Proposal; seal=%q", sl)
 		}
 
-		if err := sc.receiveProposal(proposal); err != nil {
+		if err := vc.receiveProposal(proposal); err != nil {
 			return err
 		}
 	default:
@@ -100,120 +100,120 @@ func (sc *SealCompiler) receiveSeal(v interface{}) error {
 	return nil
 }
 
-func (sc *SealCompiler) receiveBallot(ballot Ballot) error {
+func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	// TODO checker ballot
 
 	if ballot.Stage() == StageINIT {
-		sub := ballot.Height().Big.Sub(sc.homeState.Height().Big)
+		sub := ballot.Height().Big.Sub(vc.homeState.Height().Big)
 		switch {
 		case sub.Equal(big.NewBigFromInt64(0)): // same
-			sc.Log().Debug(
+			vc.Log().Debug(
 				"received INIT ballot with same height",
 				"height", ballot.Height(),
-				"home", sc.homeState.Height(),
+				"home", vc.homeState.Height(),
 			)
 		case sub.Equal(big.NewBigFromInt64(-1)): // 1 lower
-			sc.Log().Debug(
+			vc.Log().Debug(
 				"received INIT ballot with previous height",
 				"height", ballot.Height(),
-				"home", sc.homeState.Height(),
+				"home", vc.homeState.Height(),
 			)
 		default: // if not, ignore it
-			sc.Log().Debug(
+			vc.Log().Debug(
 				"received INIT ballot with weird height",
 				"height", ballot.Height(),
-				"home", sc.homeState.Height(),
+				"home", vc.homeState.Height(),
 			)
 			return nil
 		}
 
-		if ballot.Round() != Round(0) && ballot.Round() != sc.LastRound() {
-			sc.Log().Debug(
+		if ballot.Round() != Round(0) && ballot.Round() != vc.LastRound() {
+			vc.Log().Debug(
 				"received INIT ballot with weird round",
 				"round", ballot.Round(),
-				"expected", sc.LastRound(),
+				"expected", vc.LastRound(),
 			)
 			return nil
 		}
 	} else {
-		if !ballot.Height().Equal(sc.homeState.Height()) { // ignore it
-			sc.Log().Debug(
+		if !ballot.Height().Equal(vc.homeState.Height()) { // ignore it
+			vc.Log().Debug(
 				"received ballot with different height",
 				"height", ballot.Height(),
-				"home", sc.homeState.Height(),
+				"home", vc.homeState.Height(),
 			)
 			return nil
 		}
 
-		if ballot.Round() != sc.LastRound() { // ignore it
-			sc.Log().Debug(
+		if ballot.Round() != vc.LastRound() { // ignore it
+			vc.Log().Debug(
 				"received ballot with different round",
 				"round", ballot.Round(),
-				"home", sc.LastRound(),
+				"home", vc.LastRound(),
 			)
 			return nil
 		}
 	}
 
-	vr, err := sc.ballotbox.Vote(ballot)
+	vr, err := vc.ballotbox.Vote(ballot)
 	if err != nil {
-		sc.Log().Error("failed to vote", "error", err)
+		vc.Log().Error("failed to vote", "error", err)
 		return err
 	}
 
 	switch vr.Result() {
 	case GotMajority:
 		if vr.Stage() == StageINIT {
-			_ = sc.setLastRound(vr.Round()) // set lastRound
-			sc.Log().Debug("set LastRound", "round", sc.LastRound())
+			_ = vc.setLastRound(vr.Round()) // set lastRound
+			vc.Log().Debug("set LastRound", "round", vc.LastRound())
 		}
 	}
 
 	// NOTE notify to state handler
-	sc.ch <- vr
+	vc.ch <- vr
 
 	return nil
 }
 
-func (sc *SealCompiler) receiveProposal(proposal Proposal) error {
+func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 	// TODO check,
 	// - Proposal is already processed
 	// - transactions in Proposal.Transactions is already in block or not.  if not, ignore it
 
 	// - Proposal.Height is same with home.  if not, ignore it
-	if !proposal.Height().Equal(sc.homeState.Height()) { // ignore it
-		sc.Log().Debug(
+	if !proposal.Height().Equal(vc.homeState.Height()) { // ignore it
+		vc.Log().Debug(
 			"received proposal with different height",
 			"height", proposal.Height(),
-			"home", sc.homeState.Height(),
+			"home", vc.homeState.Height(),
 		)
 		return nil
 	}
 
-	// - Proposal.Round is same with sc.lastRound.  if not, ignore it
-	if proposal.Round() != sc.LastRound() { // ignore it
-		sc.Log().Debug(
+	// - Proposal.Round is same with vc.lastRound.  if not, ignore it
+	if proposal.Round() != vc.LastRound() { // ignore it
+		vc.Log().Debug(
 			"received proposal with different round",
 			"round", proposal.Round(),
-			"home", sc.LastRound(),
+			"home", vc.LastRound(),
 		)
 		return nil
 	}
 
 	// - Proposal.CurrentBlock is same with home.  if not, ignore it
-	if !proposal.CurrentBlock().Equal(sc.homeState.Block().Hash()) { // ignore it
-		sc.Log().Debug(
+	if !proposal.CurrentBlock().Equal(vc.homeState.Block().Hash()) { // ignore it
+		vc.Log().Debug(
 			"received proposal with different current block",
 			"block", proposal.CurrentBlock(),
-			"home", sc.homeState.Block().Hash(),
+			"home", vc.homeState.Block().Hash(),
 		)
 		return nil
 	}
 
 	// - Proposal.Proposer is valid proposer at this round.  if not, ignore it
-	activeSuffrage := sc.suffrage.ActiveSuffrage(proposal.Height(), proposal.Round())
+	activeSuffrage := vc.suffrage.ActiveSuffrage(proposal.Height(), proposal.Round())
 	if !activeSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
-		sc.Log().Debug(
+		vc.Log().Debug(
 			"proposer is not proposer at this round",
 			"proposer", proposal.Proposer(),
 			"expected_proposer", activeSuffrage.Proposer().Address(),
@@ -225,7 +225,7 @@ func (sc *SealCompiler) receiveProposal(proposal Proposal) error {
 
 	// TODO everyting is ok, notify to state handler
 
-	sc.ch <- proposal
+	vc.ch <- proposal
 
 	return nil
 }

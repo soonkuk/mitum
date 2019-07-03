@@ -11,7 +11,7 @@ import (
 	"github.com/spikeekips/mitum/node"
 )
 
-type testSealCompiler struct {
+type testVoteCompiler struct {
 	suite.Suite
 	suffrage  Suffrage
 	policy    Policy
@@ -20,7 +20,7 @@ type testSealCompiler struct {
 	ballotbox *Ballotbox
 }
 
-func (t *testSealCompiler) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
+func (t *testVoteCompiler) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
 	ballot, _ := NewBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
 
 	pk, _ := keypair.NewStellarPrivateKey()
@@ -29,7 +29,7 @@ func (t *testSealCompiler) newBallot(n node.Address, height Height, round Round,
 	return ballot
 }
 
-func (t *testSealCompiler) setupTest(total, thr uint) {
+func (t *testVoteCompiler) setupTest(total, thr uint) {
 	t.homeState = NewRandomHomeState()
 
 	nodes := []node.Node{t.homeState.Home()}
@@ -53,10 +53,10 @@ func (t *testSealCompiler) setupTest(total, thr uint) {
 	t.ballotbox = NewBallotbox(t.threshold)
 }
 
-func (t *testSealCompiler) TestNew() {
+func (t *testVoteCompiler) TestNew() {
 	t.setupTest(4, 3)
 
-	sc := NewSealCompiler(
+	sc := NewVoteCompiler(
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
@@ -65,14 +65,14 @@ func (t *testSealCompiler) TestNew() {
 	t.Equal(Round(0), sc.LastRound())
 }
 
-func (t *testSealCompiler) TestVoteBallot() {
+func (t *testVoteCompiler) TestVoteBallot() {
 	t.setupTest(4, 3)
 
 	round := Round(0)
 
 	ch := make(chan interface{})
 
-	sc := NewSealCompiler(
+	sc := NewVoteCompiler(
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
@@ -120,7 +120,7 @@ func (t *testSealCompiler) TestVoteBallot() {
 	t.Equal(proposal, result.Proposal())
 }
 
-func (t *testSealCompiler) TestPropose() {
+func (t *testVoteCompiler) TestPropose() {
 	defer common.DebugPanic()
 
 	t.setupTest(4, 3)
@@ -128,7 +128,7 @@ func (t *testSealCompiler) TestPropose() {
 	round := Round(0)
 
 	ch := make(chan interface{})
-	sc := NewSealCompiler(
+	sc := NewVoteCompiler(
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
@@ -172,6 +172,6 @@ func (t *testSealCompiler) TestPropose() {
 	t.Equal(t.homeState.Home().PublicKey(), received.Signer())
 }
 
-func TestSealCompiler(t *testing.T) {
-	suite.Run(t, &testSealCompiler{})
+func TestVoteCompiler(t *testing.T) {
+	suite.Run(t, &testVoteCompiler{})
 }
