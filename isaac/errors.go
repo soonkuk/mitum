@@ -8,12 +8,14 @@ const (
 	AlreadyVotedErrorCode
 	InvalidPolicyValueErrorCode
 	InvalidBallotErrorCode
+	ChangeNodeStateToSyncErrorCode
 )
 
 var (
-	InvalidStageError       = common.NewError("isaac", InvalidStageErrorCode, "invalid stage")
-	FailedToVoteError       = common.NewError("isaac", FailedToVoteErrorCode, "failed to vote")
-	AlreadyVotedError       = common.NewError("isaac", AlreadyVotedErrorCode, "node already voted")
-	InvalidPolicyValueError = common.NewError("isaac", InvalidPolicyValueErrorCode, "invalid policy value")
-	InvalidBallotError      = common.NewError("isaac", InvalidBallotErrorCode, "invalid ballot")
+	InvalidStageError          = common.NewError("isaac", InvalidStageErrorCode, "invalid stage")
+	FailedToVoteError          = common.NewError("isaac", FailedToVoteErrorCode, "failed to vote")
+	AlreadyVotedError          = common.NewError("isaac", AlreadyVotedErrorCode, "node already voted")
+	InvalidPolicyValueError    = common.NewError("isaac", InvalidPolicyValueErrorCode, "invalid policy value")
+	InvalidBallotError         = common.NewError("isaac", InvalidBallotErrorCode, "invalid ballot")
+	ChangeNodeStateToSyncError = common.NewError("isaac", ChangeNodeStateToSyncErrorCode, "state changes to sync")
 )

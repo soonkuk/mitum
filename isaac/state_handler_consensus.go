@@ -1,12 +1,12 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 
 	"github.com/inconshreveable/log15"
 	"golang.org/x/xerrors"
 
-	"github.com/spikeekips/mitum/big"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
 )
@@ -52,9 +52,6 @@ func (cs *ConsensusStateHandler) Start() error {
 	if err := cs.ReaderDaemon.Start(); err != nil {
 		return err
 	}
-
-	// TODO remove
-	cs.homeState.SetState(node.StateConsensus)
 
 	if err := cs.start(); err != nil {
 		return err
@@ -161,83 +158,20 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
 	cs.Log().Debug("got majority", "vr", vr)
 
-	// TODO check:
-	// - vr.Height is same with home
-	// - vr.Proposal is valid
-	// - vr.CurrentBlock is same with home
-	// - vr.NextBlock is same with the expected
+	checker := common.NewChainChecker(
+		"showme-checker",
+		context.Background(),
+		CheckerVoteResultGoToSyncState,
+		CheckerVoteResultINIT,
+		CheckerVoteResultOtherStage,
+	)
+	_ = checker.SetContext(
+		"homeState", cs.homeState,
+		"vr", vr,
+	)
 
-	sub := vr.Height().Big.Sub(cs.homeState.Height().Big)
-	switch {
-	case sub.Equal(big.NewBigFromInt64(0)): // same
-	case sub.Equal(big.NewBigFromInt64(-1)): // 1 lower
-		if vr.Stage() != StageINIT {
-			cs.Log().Debug(
-				"VoteResult.Height is different from home",
-				"VoteResult.height", vr.Height(),
-				"home", cs.homeState.Height(),
-				"vr", vr,
-			)
-
-			cs.chanState <- node.StateSync
-			return nil
-		}
-
-		if !vr.NextBlock().Equal(cs.homeState.Block().Hash()) {
-			cs.Log().Debug(
-				"VoteResult.NextBlock is different from home",
-				"VoteResult.NextBlock", vr.NextBlock(),
-				"home", cs.homeState.Block().Hash(),
-				"vr", vr,
-			)
-
-			cs.chanState <- node.StateSync
-			return nil
-		}
-
-		if !vr.CurrentBlock().Equal(cs.homeState.PreviousBlock().Hash()) {
-			cs.Log().Debug(
-				"VoteResult.Block is different from home",
-				"VoteResult.Block", vr.CurrentBlock(),
-				"home", cs.homeState.PreviousBlock().Hash(),
-				"vr", vr,
-			)
-
-			cs.chanState <- node.StateSync
-			return nil
-		}
-		if !vr.Proposal().Equal(cs.homeState.Proposal()) {
-			cs.Log().Debug(
-				"VoteResult.Proposal is different from home",
-				"VoteResult.Proposal", vr.Proposal(),
-				"home", cs.homeState.Proposal(),
-				"vr", vr,
-			)
-
-			cs.chanState <- node.StateSync
-			return nil
-		}
-	default: // lower or higher, go to sync
-		cs.Log().Debug(
-			"VoteResult.Height is different from home",
-			"VoteResult.height", vr.Height(),
-			"home", cs.homeState.Height(),
-			"vr", vr,
-		)
-
-		cs.chanState <- node.StateSync
-		return nil
-	}
-
-	if vr.Stage() != StageINIT && !vr.CurrentBlock().Equal(cs.homeState.Block().Hash()) {
-		cs.Log().Debug(
-			"VoteResult.CurrentBlock is different from home",
-			"VoteResult.CurrentBlock", vr.CurrentBlock(),
-			"home", cs.homeState.Block().Hash(),
-		)
-
-		cs.chanState <- node.StateSync
-		return nil
+	if err := checker.Check(); err != nil {
+		return err
 	}
 
 	switch vr.Stage() {
