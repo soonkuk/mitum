@@ -118,8 +118,6 @@ func (vrs *VoteRecords) Close() {
 	}
 
 	vrs.closed = true
-
-	return
 }
 
 func (vrs VoteRecords) Records() map[node.Address]VoteRecord {

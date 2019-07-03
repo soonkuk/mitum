@@ -18,8 +18,6 @@ import (
 
 type testConsensusStateHandler struct {
 	suite.Suite
-	total         uint
-	thr           uint
 	suffrage      Suffrage
 	policy        Policy
 	homeState     *HomeState
@@ -30,10 +28,6 @@ type testConsensusStateHandler struct {
 	closeNetworks func()
 }
 
-func (t *testConsensusStateHandler) newBallotbox(total, threshold uint) *Ballotbox {
-	return NewBallotbox(NewThreshold(total, threshold))
-}
-
 func (t *testConsensusStateHandler) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
 	ballot, _ := NewBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
 
@@ -41,15 +35,6 @@ func (t *testConsensusStateHandler) newBallot(n node.Address, height Height, rou
 	_ = ballot.Sign(pk, []byte{})
 
 	return ballot
-}
-
-func (t *testConsensusStateHandler) newProposal(height Height, round Round, currentBlock hash.Hash, proposer node.Address) seal.Seal {
-	proposal, _ := NewProposal(height, round, currentBlock, proposer, nil)
-
-	pk, _ := keypair.NewStellarPrivateKey()
-	_ = proposal.Sign(pk, []byte{})
-
-	return proposal
 }
 
 func (t *testConsensusStateHandler) setupTest(total, thr uint) {
@@ -292,44 +277,38 @@ func (t *testConsensusStateHandler) TestVoteToINIT() {
 	go func() {
 		n := t.networks[t.homeState.Home().Address()]
 	end:
-		for {
-			select {
-			case message, notClosed := <-n.Reader():
-				if !notClosed {
+		for message := range n.Reader() {
+			sl, ok := message.(seal.Seal)
+			if !ok {
+				continue
+			}
+
+			if sl.Type().Equal(ProposalType) {
+				proposal := sl.(Proposal)
+				blocks = append(
+					blocks,
+					map[string]interface{}{
+						"height": proposal.Height(),
+						"round":  proposal.Round(),
+					},
+				)
+
+				if t.homeState.Height().Equal(endHeight) {
+					chanEnd <- true
 					break end
 				}
+			}
 
-				sl, ok := message.(seal.Seal)
-				if !ok {
-					continue
-				}
-
-				if sl.Type().Equal(ProposalType) {
-					proposal := sl.(Proposal)
-					blocks = append(
-						blocks,
-						map[string]interface{}{
-							"height": proposal.Height(),
-							"round":  proposal.Round(),
-						},
-					)
-
-					if t.homeState.Height().Equal(endHeight) {
-						chanEnd <- true
-						break end
-					}
-				}
-
-				if err := sc.receiveSeal(sl); err != nil {
-					Log().Error("error receiveSeal", "error", err, "seal", sl)
-				}
+			if err := sc.receiveSeal(sl); err != nil {
+				Log().Error("error receiveSeal", "error", err, "seal", sl)
 			}
 		}
 	}()
 
 	select {
+	case <-time.After(t.policy.TimeoutINITBallot + time.Millisecond*100):
+		t.NoError(xerrors.Errorf("failed to get init ballot"))
 	case <-chanEnd:
-		break
 	}
 
 	t.Equal(startHeight.Add(1), blocks[0]["height"])
@@ -362,21 +341,13 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 	chanEnd := make(chan Ballot)
 	go func() {
 		n := t.networks[t.homeState.Home().Address()]
-	end:
-		for {
-			select {
-			case message, notClosed := <-n.Reader():
-				if !notClosed {
-					break end
-				}
-
-				ballot, ok := message.(Ballot)
-				if !ok {
-					continue
-				}
-
-				chanEnd <- ballot
+		for message := range n.Reader() {
+			ballot, ok := message.(Ballot)
+			if !ok {
+				continue
 			}
+
+			chanEnd <- ballot
 		}
 	}()
 

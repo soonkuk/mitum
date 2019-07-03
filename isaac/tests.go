@@ -3,7 +3,8 @@
 package isaac
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"time"
 
 	"github.com/spikeekips/mitum/common"
@@ -38,8 +39,10 @@ func NewTestPolicy() Policy {
 }
 
 func NewRandomBlock() Block {
+	b, _ := rand.Int(rand.Reader, big.NewInt(27))
+
 	bk, _ := NewBlock(
-		NewBlockHeight(uint64(rand.Intn(1000))),
+		NewBlockHeight(uint64(b.Int64())),
 		NewRandomProposalHash(),
 	)
 

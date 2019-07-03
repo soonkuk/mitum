@@ -39,7 +39,7 @@ func (t *testBallotbox) TestVote() {
 	n := node.NewRandomAddress()
 	height := NewBlockHeight(33)
 	round := Round(0)
-	stage := StageSIGN
+	stage := StageACCEPT
 	proposal := NewRandomProposalHash()
 	currentBlock := NewRandomBlockHash()
 	nextBlock := NewRandomBlockHash()
@@ -148,7 +148,7 @@ func (t *testBallotbox) TestVoteAgain() {
 	bb := t.newBallotbox(10, 7)
 
 	height := NewBlockHeight(33)
-	round := Round(0)
+	round := Round(33)
 	stage := StageSIGN
 	proposal := NewRandomProposalHash()
 	currentBlock := NewRandomBlockHash()
