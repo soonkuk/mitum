@@ -44,6 +44,13 @@ type RLPDecodeSealType struct {
 	Body   rlp.RawValue
 }
 
+type RLPEncodeSeal struct {
+	Type   common.DataType
+	Hash   hash.Hash
+	Header Header
+	Body   Body
+}
+
 type RLPDecodeSeal struct {
 	Type   common.DataType
 	Hash   hash.Hash

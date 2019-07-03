@@ -66,17 +66,26 @@ func (bs BaseSeal) EncodeRLP(w io.Writer) error {
 		return InvalidSealError.Newf("empty body")
 	}
 
-	return rlp.Encode(w, struct {
-		T  common.DataType
-		H  hash.Hash
-		HE Header
-		B  Body
-	}{
-		T:  bs.t,
-		H:  bs.hash,
-		HE: bs.header,
-		B:  bs.body,
+	return rlp.Encode(w, RLPEncodeSeal{
+		Type:   bs.t,
+		Hash:   bs.hash,
+		Header: bs.header,
+		Body:   bs.body,
 	})
+}
+
+func (bs *BaseSeal) DecodeRLP(s *rlp.Stream) error {
+	var d RLPDecodeSeal
+	if err := s.Decode(&d); err != nil {
+		return err
+	}
+
+	bs.t = d.Type
+	bs.hash = d.Hash
+	bs.header = d.Header
+	//bs.body = d.Body
+
+	return nil
 }
 
 func (bs BaseSeal) String() string {

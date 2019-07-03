@@ -8,7 +8,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/spikeekips/mitum/common"
-	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/keypair"
 	"github.com/spikeekips/mitum/node"
 	"github.com/spikeekips/mitum/seal"
@@ -23,8 +22,10 @@ func (t *testBallotStages) TestINITBallot() {
 	height := NewBlockHeight(33)
 	round := Round(0)
 	currentBlock := NewRandomBlockHash()
+	proposal := NewRandomProposalHash()
+	nextBlock := NewRandomBlockHash()
 
-	ballot, err := NewBallot(n, height, round, StageINIT, hash.Hash{}, currentBlock, hash.Hash{})
+	ballot, err := NewBallot(n, height, round, StageINIT, proposal, currentBlock, nextBlock)
 	t.NoError(err)
 
 	pk, _ := keypair.NewStellarPrivateKey()

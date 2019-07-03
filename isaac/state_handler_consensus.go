@@ -199,6 +199,8 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 	// 	- if not, ignore it
 	// - Proposal.Round is same with cs.lastRound
 	// 	- if not, ignore it
+	// - Proposal.Proposer is valid proposer at this round
+	// 	- if not, ignore it
 	// - transactions in Proposal.Transactions is already in block or not
 	// 	- if not, ignore it
 
@@ -210,6 +212,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		return nil
 	}
 
+	// check proposer is valid
 	activeSuffrage := cs.suffrage.ActiveSuffrage(proposal.Height(), proposal.Round())
 	if !activeSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
 		cs.Log().Debug(
@@ -219,7 +222,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 			"height", proposal.Height(),
 			"round", proposal.Round(),
 		)
-		return xerrors.Errorf("proposer is not proposer at this round")
+		return nil
 	}
 
 	// TODO everyting is ok, validate it and broadcast SIGNBallot
