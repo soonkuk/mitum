@@ -7,46 +7,48 @@ import (
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
-	"github.com/spikeekips/mitum/seal"
 )
 
-// StateTransition manages voting process; it will block the vote one by one.
+// StateTransition manages consensus process by node state
 type StateTransition struct {
 	sync.RWMutex
 	*common.Logger
 	*common.ReaderDaemon
-	threshold    *Threshold
-	homeState    *HomeState
-	ballotbox    *Ballotbox
-	stateHandler StateHandler
-	chanState    chan node.State
+	homeState     *HomeState
+	voteCompiler  *VoteCompiler
+	chanState     chan node.State
+	stateHandler  StateHandler
+	stateHandlers map[node.State]StateHandler
 }
 
-func NewStateTransition(homeState *HomeState, threshold *Threshold) *StateTransition {
+func NewStateTransition(homeState *HomeState, voteCompiler *VoteCompiler) *StateTransition {
 	cs := &StateTransition{
-		Logger:    common.NewLogger(Log(), "module", "state-transition"),
-		threshold: threshold,
-		homeState: homeState,
-		chanState: make(chan node.State),
-		ballotbox: NewBallotbox(threshold),
+		Logger:        common.NewLogger(Log(), "module", "state-transition"),
+		homeState:     homeState,
+		chanState:     make(chan node.State),
+		voteCompiler:  voteCompiler,
+		stateHandlers: map[node.State]StateHandler{},
 	}
 
-	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.sealCallback)
+	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receiveFromVoteCompiler)
 
 	return cs
 }
 
 func (cs *StateTransition) Start() error {
-	cs.RLock()
-	defer cs.RUnlock()
-
-	if !cs.IsStopped() {
-		return common.DaemonAleadyStartedError.Newf("StateTransition is already running; daemon is still running")
-	}
-
 	if err := cs.ReaderDaemon.Start(); err != nil {
 		return err
 	}
+
+	cs.voteCompiler.RegisterCallback(
+		"state-transition",
+		func(v interface{}) error {
+			wrote := cs.Write(v)
+			cs.Log().Debug("sent VoteCompiler result to state handler", "wrote", wrote)
+
+			return nil
+		},
+	)
 
 	go func() {
 	end:
@@ -71,17 +73,29 @@ func (cs *StateTransition) Start() error {
 	return nil
 }
 
-func (cs *StateTransition) sealCallback(message interface{}) error {
-	sl, ok := message.(seal.Seal)
-	if !ok {
-		cs.Log().Debug("is not seal", "message", message)
+func (cs *StateTransition) ChanState() chan<- node.State {
+	return cs.chanState
+}
+
+func (cs *StateTransition) SetStateHandler(stateHandler StateHandler) error {
+	cs.Lock()
+	defer cs.Unlock()
+
+	if _, found := cs.stateHandlers[stateHandler.State()]; found {
+		return xerrors.Errorf("StateHandler already registered; state=%q", stateHandler.State())
 	}
 
+	cs.stateHandlers[stateHandler.State()] = stateHandler
+
+	return nil
+}
+
+func (cs *StateTransition) receiveFromVoteCompiler(v interface{}) error {
 	if cs.stateHandler == nil {
 		return xerrors.Errorf("something wrong; stateHandler is nil")
 	}
 
-	if !cs.stateHandler.Write(sl) {
+	if !cs.stateHandler.Write(v) {
 		return xerrors.Errorf("failed to write seal")
 	}
 
@@ -94,11 +108,11 @@ func (cs *StateTransition) runState(state node.State) error {
 	}
 
 	cs.Log().Debug("trying state transition", "current", cs.homeState.State(), "next", state)
-	if cs.stateHandler != nil {
-		if err := cs.stateHandler.Stop(); err != nil {
-			return err
-		}
-	} else if cs.stateHandler.State() == state {
+
+	cs.Lock()
+	defer cs.Unlock()
+
+	if cs.stateHandler.State() == state {
 		return xerrors.Errorf(
 			"same stateHandler is already running; handler state=%q next state=%q",
 			cs.stateHandler.State(),
@@ -106,47 +120,23 @@ func (cs *StateTransition) runState(state node.State) error {
 		)
 	}
 
-	switch state {
-	case node.StateBooting:
-		go cs.startStateBooting()
-	case node.StateJoin:
-		go cs.startStateJoin()
-	case node.StateConsensus:
-		go cs.startStateConsensus()
-	case node.StateSync:
-		go cs.startStateSync()
-	}
-
-	return nil
-}
-
-func (cs *StateTransition) startStateBooting() error {
-	cs.homeState.SetState(node.StateBooting)
-
-	return nil
-}
-
-func (cs *StateTransition) startStateJoin() error {
-	cs.homeState.SetState(node.StateJoin)
-
 	if cs.stateHandler != nil {
 		if err := cs.stateHandler.Stop(); err != nil {
 			return err
 		}
 	}
 
-	cs.stateHandler = NewStateJoinHandler(cs.threshold, cs.homeState, cs.ballotbox, cs.chanState)
-	return cs.stateHandler.Start()
-}
+	stateHandler, found := cs.stateHandlers[state]
+	if !found {
+		return xerrors.Errorf("stateHandler not registered yet; state=%q", state)
+	}
 
-func (cs *StateTransition) startStateConsensus() error {
-	cs.homeState.SetState(node.StateConsensus)
-
-	return nil
-}
-
-func (cs *StateTransition) startStateSync() error {
-	cs.homeState.SetState(node.StateSync)
+	cs.stateHandler = stateHandler
+	if err := cs.stateHandler.Start(); err != nil {
+		cs.Log().Error("failed to start stateHandler", "state", state, "error", err)
+		return err
+	}
+	cs.homeState.SetState(state)
 
 	return nil
 }

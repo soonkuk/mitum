@@ -53,6 +53,7 @@ func (cs *ConsensusStateHandler) Start() error {
 		return err
 	}
 
+	// TODO remove
 	cs.homeState.SetState(node.StateConsensus)
 
 	if err := cs.start(); err != nil {

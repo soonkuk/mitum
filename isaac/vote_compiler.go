@@ -10,6 +10,8 @@ import (
 	"github.com/spikeekips/mitum/seal"
 )
 
+type VoteCompilerCallback func(interface{}) error
+
 type VoteCompiler struct {
 	sync.RWMutex
 	*common.Logger
@@ -18,14 +20,13 @@ type VoteCompiler struct {
 	suffrage  Suffrage
 	ballotbox *Ballotbox
 	lastRound Round
-	ch        chan interface{}
+	callbacks map[string]VoteCompilerCallback
 }
 
 func NewVoteCompiler(
 	homeState *HomeState,
 	suffrage Suffrage,
 	ballotbox *Ballotbox,
-	ch chan interface{},
 ) *VoteCompiler {
 	vc := &VoteCompiler{
 		Logger:    common.NewLogger(Log(), "module", "ballot-compiler"),
@@ -33,12 +34,64 @@ func NewVoteCompiler(
 		suffrage:  suffrage,
 		ballotbox: ballotbox,
 		lastRound: Round(0),
-		ch:        ch,
+		callbacks: map[string]VoteCompilerCallback{},
 	}
 
 	vc.ReaderDaemon = common.NewReaderDaemon(true, vc.receiveSeal)
 
 	return vc
+}
+
+func (vc *VoteCompiler) sendResult(v interface{}) {
+	callbacks := vc.Callbacks()
+
+	var wg sync.WaitGroup
+	wg.Add(len(callbacks))
+
+	for name, callback := range callbacks {
+		go func(callback VoteCompilerCallback) {
+			if err := callback(v); err != nil {
+				vc.Log().Error("failed to run callback", "callback", name, "error", err)
+			}
+
+			wg.Done()
+		}(callback)
+	}
+
+	wg.Wait()
+}
+
+func (vc *VoteCompiler) Callbacks() map[string]VoteCompilerCallback {
+	vc.RLock()
+	defer vc.RUnlock()
+
+	return vc.callbacks
+}
+
+func (vc *VoteCompiler) RegisterCallback(name string, callback VoteCompilerCallback) error {
+	vc.Lock()
+	defer vc.Unlock()
+
+	if _, found := vc.callbacks[name]; found {
+		return xerrors.Errorf("VoteCompilerCallback already registered; name=%q", name)
+	}
+
+	vc.callbacks[name] = callback
+
+	return nil
+}
+
+func (vc *VoteCompiler) UnregisterCallback(name string) error {
+	vc.Lock()
+	defer vc.Unlock()
+
+	if _, found := vc.callbacks[name]; !found {
+		return xerrors.Errorf("VoteCompilerCallback not registered; name=%q", name)
+	}
+
+	delete(vc.callbacks, name)
+
+	return nil
 }
 
 func (vc *VoteCompiler) LastRound() Round {
@@ -170,7 +223,8 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	}
 
 	// NOTE notify to state handler
-	vc.ch <- vr
+
+	vc.sendResult(vr)
 
 	return nil
 }
@@ -225,7 +279,7 @@ func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 
 	// TODO everyting is ok, notify to state handler
 
-	vc.ch <- proposal
+	vc.sendResult(proposal)
 
 	return nil
 }

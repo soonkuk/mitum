@@ -60,7 +60,6 @@ func (t *testVoteCompiler) TestNew() {
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
-		nil,
 	)
 	t.Equal(Round(0), sc.LastRound())
 }
@@ -76,8 +75,12 @@ func (t *testVoteCompiler) TestVoteBallot() {
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
-		ch,
 	)
+	sc.RegisterCallback("test", func(v interface{}) error {
+		ch <- v
+		return nil
+	})
+
 	err := sc.Start()
 	t.NoError(err)
 	defer sc.Stop()
@@ -132,8 +135,12 @@ func (t *testVoteCompiler) TestPropose() {
 		t.homeState,
 		t.suffrage,
 		t.ballotbox,
-		ch,
 	)
+	sc.RegisterCallback("test", func(v interface{}) error {
+		ch <- v
+		return nil
+	})
+
 	err := sc.Start()
 	t.NoError(err)
 	defer sc.Stop()
