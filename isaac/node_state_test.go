@@ -3,9 +3,10 @@ package isaac
 import (
 	"testing"
 
-	"github.com/spikeekips/mitum/node"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/xerrors"
+
+	"github.com/spikeekips/mitum/node"
 )
 
 type testHomeState struct {

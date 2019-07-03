@@ -2,6 +2,7 @@ package encode
 
 import (
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/spikeekips/mitum/common"
 )
 

@@ -5,9 +5,10 @@ package network
 import (
 	"sync"
 
+	"golang.org/x/xerrors"
+
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
-	"golang.org/x/xerrors"
 )
 
 func init() {

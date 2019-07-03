@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/keypair"
-	"github.com/stretchr/testify/suite"
 )
 
 type testEncoder struct {

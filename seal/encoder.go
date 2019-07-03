@@ -2,9 +2,10 @@ package seal
 
 import (
 	"github.com/ethereum/go-ethereum/rlp"
+	"golang.org/x/xerrors"
+
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/hash"
-	"golang.org/x/xerrors"
 )
 
 type Encoders struct {

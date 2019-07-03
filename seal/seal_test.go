@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/stretchr/testify/suite"
+	"golang.org/x/xerrors"
+
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/keypair"
-	"github.com/stretchr/testify/suite"
-	"golang.org/x/xerrors"
 )
 
 type tSealBody struct {

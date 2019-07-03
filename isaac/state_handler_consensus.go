@@ -4,11 +4,12 @@ import (
 	"sync"
 
 	"github.com/inconshreveable/log15"
+	"golang.org/x/xerrors"
+
 	"github.com/spikeekips/mitum/big"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
 	"github.com/spikeekips/mitum/seal"
-	"golang.org/x/xerrors"
 )
 
 type ConsensusStateHandler struct {

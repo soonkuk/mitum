@@ -6,8 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/spikeekips/mitum/common"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/spikeekips/mitum/common"
 )
 
 type testBig struct {
