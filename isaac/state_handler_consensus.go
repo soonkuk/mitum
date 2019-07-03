@@ -9,7 +9,6 @@ import (
 	"github.com/spikeekips/mitum/big"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
-	"github.com/spikeekips/mitum/seal"
 )
 
 type ConsensusStateHandler struct {
@@ -19,10 +18,8 @@ type ConsensusStateHandler struct {
 	homeState     *HomeState
 	suffrage      Suffrage
 	policy        Policy
-	ballotbox     *Ballotbox
 	networkClient NetworkClient
 	chanState     chan<- node.State
-	lastRound     Round
 	timer         common.Timer
 }
 
@@ -30,22 +27,23 @@ func NewConsensusStateHandler(
 	homeState *HomeState,
 	suffrage Suffrage,
 	policy Policy,
-	ballotbox *Ballotbox,
 	networkClient NetworkClient,
 	chanState chan<- node.State,
 ) *ConsensusStateHandler {
 	cs := &ConsensusStateHandler{
-		Logger:        common.NewLogger(Log(), "module", "consensus-state-handler", "state", node.StateConsensus),
+		Logger: common.NewLogger(
+			Log(),
+			"module", "consensus-state-handler",
+			"state", node.StateConsensus,
+		),
 		homeState:     homeState,
 		suffrage:      suffrage,
 		policy:        policy,
-		ballotbox:     ballotbox,
 		networkClient: networkClient,
 		chanState:     chanState,
-		lastRound:     Round(0),
 	}
 
-	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receiveSeal)
+	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receive)
 
 	return cs
 }
@@ -55,9 +53,7 @@ func (cs *ConsensusStateHandler) Start() error {
 		return err
 	}
 
-	cs.Lock()
 	cs.homeState.SetState(node.StateConsensus)
-	cs.Unlock()
 
 	if err := cs.start(); err != nil {
 		return err
@@ -96,84 +92,25 @@ func (cs *ConsensusStateHandler) start() error {
 	return nil
 }
 
-func (cs *ConsensusStateHandler) LastRound() Round {
-	cs.RLock()
-	defer cs.RUnlock()
-
-	return cs.lastRound
-}
-
-func (cs *ConsensusStateHandler) setLastRound(round Round) *ConsensusStateHandler {
-	cs.Lock()
-	defer cs.Unlock()
-
-	cs.lastRound = round
-
-	return cs
-}
-
-func (cs *ConsensusStateHandler) receiveSeal(v interface{}) error {
-	// TODO store seal
-
-	sl, ok := v.(seal.Seal)
-	if !ok {
-		return xerrors.Errorf("not Seal")
-	}
-
-	// TODO remove; checking IsValid() should be already done in previous
-	// process
-	if err := sl.IsValid(); err != nil {
-		return err
-	}
-
-	cs.Log().Debug("got seal", "seal", sl)
-
-	switch t := sl.Type(); t {
-	case BallotType:
-		ballot, ok := sl.(Ballot)
-		if !ok {
-			return xerrors.Errorf("is not Ballot; seal=%q", sl)
-		}
-
-		// TODO check ballot
-
-		if err := cs.receiveBallot(ballot); err != nil {
+func (cs *ConsensusStateHandler) receive(v interface{}) error {
+	cs.Log().Debug("received", "v", v)
+	switch v.(type) {
+	case Proposal:
+		if err := cs.receiveProposal(v.(Proposal)); err != nil {
 			return err
 		}
-	case ProposalType:
-		proposal, ok := sl.(Proposal)
-		if !ok {
-			return xerrors.Errorf("is not Proposal; seal=%q", sl)
-		}
-
-		if err := cs.receiveProposal(proposal); err != nil {
+	case VoteResult:
+		if err := cs.receiveVoteResult(v.(VoteResult)); err != nil {
 			return err
 		}
 	default:
-		return xerrors.Errorf("not available seal type in JOIN state; type=%q", t)
+		return xerrors.Errorf("invalid seal received", "seal", v)
 	}
 
 	return nil
 }
 
-func (cs *ConsensusStateHandler) receiveBallot(ballot Ballot) error {
-	// TODO checker ballot
-
-	if ballot.Stage() != StageINIT {
-		if !ballot.Height().Equal(cs.homeState.Height()) { // ignore it
-			return nil
-		}
-
-		if ballot.Round() != cs.LastRound() { // ignore it
-			return nil
-		}
-	}
-
-	vr, err := cs.ballotbox.Vote(ballot)
-	if err != nil {
-		return err
-	}
-
+func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 	switch vr.Result() {
 	case NotYetMajority, FinishedGotMajority:
 	case JustDraw:
@@ -190,42 +127,6 @@ func (cs *ConsensusStateHandler) receiveBallot(ballot Ballot) error {
 }
 
 func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
-	// TODO check,
-	// - Proposal is already processed
-	// - Proposal.CurrentBlock is same with home
-	// 	- if not, ignore it
-	// - Proposal.Proposer is valid
-	// 	- if not, ignore it
-	// - Proposal.Height is same with home
-	// 	- if not, ignore it
-	// - Proposal.Round is same with cs.lastRound
-	// 	- if not, ignore it
-	// - Proposal.Proposer is valid proposer at this round
-	// 	- if not, ignore it
-	// - transactions in Proposal.Transactions is already in block or not
-	// 	- if not, ignore it
-
-	if !proposal.Height().Equal(cs.homeState.Height()) { // ignore it
-		return nil
-	}
-
-	if proposal.Round() != cs.LastRound() { // ignore it
-		return nil
-	}
-
-	// check proposer is valid
-	activeSuffrage := cs.suffrage.ActiveSuffrage(proposal.Height(), proposal.Round())
-	if !activeSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
-		cs.Log().Debug(
-			"proposer is not proposer at this round",
-			"proposer", proposal.Proposer(),
-			"expected_proposer", activeSuffrage.Proposer().Address(),
-			"height", proposal.Height(),
-			"round", proposal.Round(),
-		)
-		return nil
-	}
-
 	// TODO everyting is ok, validate it and broadcast SIGNBallot
 
 	// reset INITBallot timer
@@ -377,28 +278,30 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 
 	nextHeight := vr.Height().Add(1)
 	nextRound := vr.Round()
-
 	log_ := cs.Log().New(log15.Ctx{"next_height": nextHeight, "next_round": nextRound})
 
-	// TODO store next block
-	nextBlock, err := NewBlock(nextHeight, vr.NextBlock())
-	if err != nil {
-		return err
+	sub := vr.Height().Big.Sub(cs.homeState.Height().Big)
+	if !sub.IsZero() {
+		log_.Debug("already known block; just ignore it")
+	} else {
+		// TODO store next block
+		nextBlock, err := NewBlock(nextHeight, vr.NextBlock())
+		if err != nil {
+			return err
+		}
+
+		cs.homeState.SetBlock(nextBlock)
+
+		log_.Debug(
+			"new block created",
+			"previous_height", vr.Height(),
+			"previous_block", vr.CurrentBlock(),
+			"previous_round", vr.Round(),
+			"next_height", nextHeight,
+			"next_block", vr.NextBlock(),
+			"next_round", vr.Round(),
+		)
 	}
-
-	cs.homeState.SetBlock(nextBlock)
-
-	log_.Debug(
-		"new block created",
-		"previous_height", vr.Height(),
-		"previous_block", vr.CurrentBlock(),
-		"previous_round", vr.Round(),
-		"next_height", nextHeight,
-		"next_block", vr.NextBlock(),
-		"next_round", vr.Round(),
-	)
-
-	_ = cs.setLastRound(nextRound)
 
 	// TODO wait or propose Proposal with vr.Height() + 1
 	activeSuffrage := cs.suffrage.ActiveSuffrage(nextHeight, nextRound)

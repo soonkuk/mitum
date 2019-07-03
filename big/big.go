@@ -96,8 +96,6 @@ func (a Big) SubOK(v interface{}) (Big, bool) {
 	}
 
 	switch a.Int.Cmp(&n.Int) {
-	case -1:
-		return Big{}, false
 	case 0:
 		return Big{}, true
 	}

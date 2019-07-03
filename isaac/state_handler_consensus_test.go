@@ -9,11 +9,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/spikeekips/mitum/common"
-	"github.com/spikeekips/mitum/hash"
-	"github.com/spikeekips/mitum/keypair"
 	"github.com/spikeekips/mitum/network"
 	"github.com/spikeekips/mitum/node"
-	"github.com/spikeekips/mitum/seal"
 )
 
 type testConsensusStateHandler struct {
@@ -21,23 +18,12 @@ type testConsensusStateHandler struct {
 	suffrage      Suffrage
 	policy        Policy
 	homeState     *HomeState
-	threshold     *Threshold
-	ballotbox     *Ballotbox
 	networks      map[node.Address]*network.NodesTest
 	clients       map[node.Address]ClientTest
 	closeNetworks func()
 }
 
-func (t *testConsensusStateHandler) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
-	ballot, _ := NewBallot(n, height, round, stage, proposal, currentBlock, nextBlock)
-
-	pk, _ := keypair.NewStellarPrivateKey()
-	_ = ballot.Sign(pk, []byte{})
-
-	return ballot
-}
-
-func (t *testConsensusStateHandler) setupTest(total, thr uint) {
+func (t *testConsensusStateHandler) setupTest(total uint) {
 	t.homeState = NewRandomHomeState()
 
 	nodes := []node.Node{t.homeState.Home()}
@@ -84,9 +70,6 @@ func (t *testConsensusStateHandler) setupTest(total, thr uint) {
 	}
 
 	t.homeState.SetState(node.StateConsensus)
-
-	t.threshold = NewThreshold(total, thr)
-	t.ballotbox = NewBallotbox(t.threshold)
 }
 
 func (t *testConsensusStateHandler) TearDownTest() {
@@ -96,33 +79,29 @@ func (t *testConsensusStateHandler) TearDownTest() {
 }
 
 func (t *testConsensusStateHandler) TestNew() {
-	t.setupTest(4, 3)
+	t.setupTest(4)
 
-	chanState := make(chan node.State)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,
 		t.policy,
-		t.ballotbox,
 		t.clients[t.homeState.Home().Address()],
-		chanState,
+		make(chan node.State),
 	)
 	t.Equal(node.StateConsensus, sc.State())
 }
 
 func (t *testConsensusStateHandler) TestVoteBallot() {
-	t.setupTest(4, 3)
+	t.setupTest(4)
 
 	round := Round(0)
 
-	chanState := make(chan node.State)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,
 		t.policy,
-		t.ballotbox,
 		t.clients[t.homeState.Home().Address()],
-		chanState,
+		make(chan node.State),
 	)
 	err := sc.Start()
 	t.NoError(err)
@@ -131,18 +110,18 @@ func (t *testConsensusStateHandler) TestVoteBallot() {
 	nextBlock := NewRandomBlockHash()
 	proposal := NewRandomProposalHash()
 
-	for _, n := range t.suffrage.Nodes() {
-		ballot := t.newBallot(
-			n.Address(),
-			t.homeState.Height(),
-			round,
-			StageSIGN,
-			proposal,
-			t.homeState.Block().Hash(),
-			nextBlock,
-		)
-		t.True(sc.Write(ballot))
-	}
+	vr := NewVoteResult(
+		t.homeState.Height(),
+		round,
+		StageSIGN,
+		proposal,
+		VoteRecords{},
+	)
+	vr.currentBlock = t.homeState.Block().Hash()
+	vr.nextBlock = nextBlock
+	vr.result = GotMajority
+
+	t.True(sc.Write(vr))
 
 	var wg sync.WaitGroup
 	wg.Add(len(t.suffrage.Nodes()))
@@ -171,10 +150,12 @@ func (t *testConsensusStateHandler) TestVoteBallot() {
 	wg.Wait()
 }
 
-func (t *testConsensusStateHandler) TestPropose() {
+func (t *testConsensusStateHandler) TestINITPreviousHeight() {
 	defer common.DebugPanic()
 
-	t.setupTest(4, 3)
+	t.setupTest(4)
+
+	_ = t.homeState.SetBlock(NewRandomNextBlock(t.homeState.Block()))
 
 	round := Round(0)
 
@@ -183,7 +164,6 @@ func (t *testConsensusStateHandler) TestPropose() {
 		t.homeState,
 		t.suffrage,
 		t.policy,
-		t.ballotbox,
 		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)
@@ -191,21 +171,18 @@ func (t *testConsensusStateHandler) TestPropose() {
 	t.NoError(err)
 	defer sc.Stop()
 
-	nextBlock := NewRandomBlockHash()
-	proposalHash := NewRandomProposalHash()
+	vr := NewVoteResult(
+		t.homeState.PreviousBlock().Height(),
+		round,
+		StageINIT,
+		t.homeState.Block().Proposal(),
+		VoteRecords{},
+	)
+	vr.currentBlock = t.homeState.PreviousBlock().Hash()
+	vr.nextBlock = t.homeState.Block().Hash()
+	vr.result = GotMajority
 
-	for _, n := range t.suffrage.Nodes() {
-		ballot := t.newBallot(
-			n.Address(),
-			t.homeState.Height(),
-			round,
-			StageINIT,
-			proposalHash,
-			t.homeState.Block().Hash(),
-			nextBlock,
-		)
-		t.True(sc.Write(ballot))
-	}
+	t.True(sc.Write(vr))
 
 	var wg sync.WaitGroup
 	wg.Add(len(t.suffrage.Nodes()))
@@ -234,17 +211,18 @@ func (t *testConsensusStateHandler) TestPropose() {
 	wg.Wait()
 }
 
-func (t *testConsensusStateHandler) TestVoteToINIT() {
-	t.setupTest(1, 1)
+func (t *testConsensusStateHandler) TestPropose() {
+	defer common.DebugPanic()
 
-	round := Round(3)
+	t.setupTest(4)
+
+	round := Round(0)
 
 	chanState := make(chan node.State)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,
 		t.policy,
-		t.ballotbox,
 		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)
@@ -253,75 +231,50 @@ func (t *testConsensusStateHandler) TestVoteToINIT() {
 	defer sc.Stop()
 
 	nextBlock := NewRandomBlockHash()
-	proposal := NewRandomProposalHash()
+	proposalHash := NewRandomProposalHash()
 
-	for _, n := range t.suffrage.Nodes() {
-		ballot := t.newBallot(
-			n.Address(),
-			t.homeState.Height(),
-			round,
-			StageINIT,
-			proposal,
-			t.homeState.Block().Hash(),
-			nextBlock,
-		)
-		t.True(sc.Write(ballot))
-	}
+	vr := NewVoteResult(
+		t.homeState.Height(),
+		round,
+		StageINIT,
+		proposalHash,
+		VoteRecords{},
+	)
+	vr.currentBlock = t.homeState.Block().Hash()
+	vr.nextBlock = nextBlock
+	vr.result = GotMajority
 
-	var blocks []map[string]interface{}
-	chanEnd := make(chan bool)
+	t.True(sc.Write(vr))
 
-	startHeight := t.homeState.Height()
-	endHeight := t.homeState.Height().Add(3)
+	var wg sync.WaitGroup
+	wg.Add(len(t.suffrage.Nodes()))
 
 	go func() {
-		n := t.networks[t.homeState.Home().Address()]
-	end:
-		for message := range n.Reader() {
-			sl, ok := message.(seal.Seal)
-			if !ok {
-				continue
-			}
+		for _, nt := range t.networks {
+			message := <-nt.Reader()
 
-			if sl.Type().Equal(ProposalType) {
-				proposal := sl.(Proposal)
-				blocks = append(
-					blocks,
-					map[string]interface{}{
-						"height": proposal.Height(),
-						"round":  proposal.Round(),
-					},
-				)
+			proposal, ok := message.(Proposal)
+			t.True(ok)
 
-				if t.homeState.Height().Equal(endHeight) {
-					chanEnd <- true
-					break end
-				}
-			}
+			t.NoError(proposal.IsValid())
 
-			if err := sc.receiveSeal(sl); err != nil {
-				Log().Error("error receiveSeal", "error", err, "seal", sl)
-			}
+			t.Equal(t.homeState.Height(), proposal.Height())
+			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
+
+			t.Equal(round, proposal.Round())
+			t.Equal(t.homeState.Home().Address(), proposal.Proposer())
+			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
+			t.Equal(t.homeState.Home().PublicKey(), proposal.Signer())
+
+			wg.Done()
 		}
 	}()
 
-	select {
-	case <-time.After(t.policy.TimeoutINITBallot + time.Millisecond*100):
-		t.NoError(xerrors.Errorf("failed to get init ballot"))
-	case <-chanEnd:
-	}
-
-	t.Equal(startHeight.Add(1), blocks[0]["height"])
-	t.Equal(round, blocks[0]["round"])
-
-	for i, d := range blocks[1:] {
-		t.Equal(startHeight.Add(i+2), d["height"])
-		t.Equal(Round(0), d["round"])
-	}
+	wg.Wait()
 }
 
 func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
-	t.setupTest(1, 1)
+	t.setupTest(1)
 
 	t.policy.TimeoutINITBallot = time.Millisecond * 700
 
@@ -330,7 +283,6 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 		t.homeState,
 		t.suffrage,
 		t.policy,
-		t.ballotbox,
 		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)

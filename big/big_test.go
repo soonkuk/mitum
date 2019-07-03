@@ -62,8 +62,8 @@ func (t *testBig) TestSub() {
 		b := NewBigFromUint64(math.MaxUint64)
 
 		c, ok := a.SubOK(b)
-		t.False(ok)
-		t.Equal("0", c.Int.String())
+		t.True(ok)
+		t.Equal("-18446744073709551605", c.Int.String())
 	}
 
 	{
