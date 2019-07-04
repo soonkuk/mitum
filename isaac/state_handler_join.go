@@ -50,6 +50,8 @@ func (js *JoinStateHandler) Start() error {
 		return err
 	}
 
+	js.Log().Debug("JoinStateHandler is started")
+
 	return nil
 }
 
@@ -93,6 +95,7 @@ func (js *JoinStateHandler) Stop() error {
 		js.timer = nil
 	}
 
+	js.Log().Debug("JoinStateHandler is stopped")
 	return nil
 }
 

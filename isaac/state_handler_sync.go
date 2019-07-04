@@ -2,6 +2,7 @@ package isaac
 
 import (
 	"sync"
+	"time"
 
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/node"
@@ -52,12 +53,30 @@ func (ss *SyncStateHandler) Start() error {
 		return err
 	}
 
+	ss.Log().Debug("SyncStateHandler is started")
+
+	return nil
+}
+
+func (ss *SyncStateHandler) Stop() error {
+	if err := ss.ReaderDaemon.Stop(); err != nil {
+		return err
+	}
+
+	ss.Log().Debug("SyncStateHandler is stopped")
+
 	return nil
 }
 
 func (ss *SyncStateHandler) start() error {
 	// TODO
-	// request BlockProof to the last
+	// - request BlockProof to the last
+
+	// TODO remove
+	go func() {
+		<-time.After(time.Millisecond * 100)
+		ss.chanState <- node.StateJoin
+	}()
 
 	return nil
 }

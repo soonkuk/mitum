@@ -61,6 +61,7 @@ func (cs *StateTransition) Start() error {
 							"failed state transition",
 							"current", cs.homeState.State(),
 							"next", nextState,
+							"error", err,
 						)
 					}
 				}(nextState)
@@ -72,11 +73,29 @@ func (cs *StateTransition) Start() error {
 		}
 	}()
 
-	if err := cs.runState(cs.homeState.State()); err != nil {
+	// if err := cs.runState(cs.homeState.State()); err != nil {
+	// 	return err
+	// }
+
+	return nil
+}
+
+func (cs *StateTransition) Stop() error {
+	if err := cs.ReaderDaemon.Start(); err != nil {
 		return err
 	}
 
+	if cs.stateHandler != nil {
+		if err := cs.stateHandler.Stop(); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (cs *StateTransition) StateHandler() StateHandler {
+	return cs.stateHandler
 }
 
 func (cs *StateTransition) ChanState() chan<- node.State {
@@ -118,7 +137,7 @@ func (cs *StateTransition) runState(state node.State) error {
 	cs.Lock()
 	defer cs.Unlock()
 
-	if cs.stateHandler.State() == state {
+	if cs.stateHandler != nil && cs.stateHandler.State() == state {
 		return xerrors.Errorf(
 			"same stateHandler is already running; handler state=%q next state=%q",
 			cs.stateHandler.State(),

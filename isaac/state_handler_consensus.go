@@ -57,6 +57,7 @@ func (cs *ConsensusStateHandler) Start() error {
 		return err
 	}
 
+	cs.Log().Debug("ConsensusStateHandler is started")
 	return nil
 }
 
@@ -74,6 +75,7 @@ func (cs *ConsensusStateHandler) Stop() error {
 		}
 		cs.timer = nil
 	}
+	cs.Log().Debug("ConsensusStateHandler is stopped")
 
 	return nil
 }
