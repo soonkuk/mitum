@@ -31,7 +31,7 @@ func NewJoinStateHandler(
 		Logger: common.NewLogger(
 			Log(),
 			"module", "join-state-handler",
-			"state", node.StateConsensus,
+			"state", node.StateJoin,
 		),
 		homeState: homeState,
 		suffrage:  suffrage,
