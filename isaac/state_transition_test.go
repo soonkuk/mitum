@@ -62,7 +62,7 @@ func (t *testStateTransition) TestNew() {
 
 	{ // join
 		err := st.SetStateHandler(
-			NewJoinStateHandler(t.homeState, t.policy, st.ChanState()),
+			NewJoinStateHandler(t.homeState, t.policy, nil, st.ChanState()),
 		)
 		t.NoError(err)
 	}
@@ -90,7 +90,7 @@ func (t *testStateTransition) TestTransition() {
 	// register handler
 	_ = st.SetStateHandler(NewBootingStateHandler(t.homeState, st.ChanState()))
 	_ = st.SetStateHandler(NewSyncStateHandler(t.homeState, t.suffrage, t.policy, nil, st.ChanState()))
-	_ = st.SetStateHandler(NewJoinStateHandler(t.homeState, t.policy, st.ChanState()))
+	_ = st.SetStateHandler(NewJoinStateHandler(t.homeState, t.policy, nil, st.ChanState()))
 	_ = st.SetStateHandler(NewConsensusStateHandler(t.homeState, t.suffrage, t.policy, nil, st.ChanState()))
 	_ = st.SetStateHandler(NewStoppedStateHandler(t.homeState))
 

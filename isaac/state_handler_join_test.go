@@ -13,6 +13,7 @@ import (
 type testJoinStateHandler struct {
 	suite.Suite
 	policy        Policy
+	suffrage      Suffrage
 	homeState     *HomeState
 	networks      map[node.Address]*network.NodesTest
 	clients       map[node.Address]ClientTest
@@ -28,9 +29,50 @@ func (t *testJoinStateHandler) setupTest(total uint) {
 		nodes = append(nodes, n)
 	}
 
+	t.suffrage = NewSuffrageTest(
+		nodes,
+		func(height Height, round Round, nodes []node.Node) []node.Node {
+			return nodes
+		},
+	)
+
+	networks := map[node.Address]*network.NodesTest{}
+	for _, n := range t.suffrage.Nodes() {
+		networks[n.Address()] = network.NewNodesTest(n.(node.Home))
+	}
+	t.networks = networks
+
+	for _, nt := range networks {
+		for _, ot := range networks {
+			nt.AddReceiver(ot.Home().Address(), ot.ReceiveFunc)
+		}
+		err := nt.Start()
+		t.NoError(err)
+	}
+
+	clients := map[node.Address]ClientTest{}
+	for _, nt := range networks {
+		clients[nt.Home().Address()] = NewClientTest(nt)
+	}
+
+	t.clients = clients
+
+	t.closeNetworks = func() {
+		for _, nt := range networks {
+			err := nt.Stop()
+			t.NoError(err)
+		}
+	}
+
 	t.policy = NewTestPolicy()
 
 	t.homeState.SetState(node.StateJoin)
+}
+
+func (t *testJoinStateHandler) TearDownTest() {
+	if t.closeNetworks != nil {
+		t.closeNetworks()
+	}
 }
 
 func (t *testJoinStateHandler) TestNew() {
@@ -39,6 +81,7 @@ func (t *testJoinStateHandler) TestNew() {
 	sc := NewJoinStateHandler(
 		t.homeState,
 		t.policy,
+		t.clients[t.homeState.Home().Address()],
 		make(chan node.State),
 	)
 	t.Equal(node.StateJoin, sc.State())
@@ -53,6 +96,7 @@ func (t *testJoinStateHandler) TestINITVoteResultNewBlockCreated() {
 	sc := NewJoinStateHandler(
 		t.homeState,
 		t.policy,
+		t.clients[t.homeState.Home().Address()],
 		make(chan node.State),
 	)
 	err := sc.Start()
@@ -106,6 +150,7 @@ func (t *testJoinStateHandler) TestINITACCEPTVoteResult() {
 	sc := NewJoinStateHandler(
 		t.homeState,
 		t.policy,
+		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)
 	err := sc.Start()
@@ -184,6 +229,7 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	sc := NewJoinStateHandler(
 		t.homeState,
 		t.policy,
+		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)
 	err := sc.Start()
@@ -240,14 +286,8 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	t.Equal(node.StateJoin, t.homeState.State())
 }
 
-func (t *testJoinStateHandler) TestTimeout() {
+func (t *testJoinStateHandler) TestBroadcastINITBallot() {
 	t.setupTest(4)
-
-	// condition:
-	// - height: same with homeState
-	// - init VoteResult is finished
-	// - invalid accept VoteResult is received
-	// - it will be ignored
 
 	chanState := make(chan node.State)
 
@@ -260,19 +300,31 @@ func (t *testJoinStateHandler) TestTimeout() {
 		}
 	}()
 
-	t.policy.TimeoutINITVoteResult = time.Millisecond * 100
 	sc := NewJoinStateHandler(
 		t.homeState,
 		t.policy,
+		t.clients[t.homeState.Home().Address()],
 		chanState,
 	)
 	err := sc.Start()
 	t.NoError(err)
 	defer sc.Stop()
 
-	// wrong accept VoteResult will be ignored
-	<-time.After(t.policy.TimeoutINITVoteResult + time.Millisecond*100)
-	t.Equal(node.StateSync, t.homeState.State())
+	// check init ballot
+	<-time.After(time.Millisecond * 50)
+	for _, nt := range t.networks {
+		message := <-nt.Reader()
+
+		ballot, ok := message.(Ballot)
+		t.True(ok)
+
+		t.True(t.homeState.PreviousBlock().Height().Equal(ballot.Height()))
+		t.Equal(StageINIT, ballot.Stage())
+		t.Equal(Round(0), ballot.Round())
+		t.Equal(t.homeState.Home().PublicKey(), ballot.Signer())
+		t.True(t.homeState.Block().Proposal().Equal(ballot.Proposal()))
+		t.True(t.homeState.Block().Hash().Equal(ballot.NextBlock()))
+	}
 }
 
 func TestJoinStateHandler(t *testing.T) {

@@ -3,6 +3,7 @@ package isaac
 import (
 	"context"
 	"sync"
+	"time"
 
 	"golang.org/x/xerrors"
 
@@ -14,15 +15,17 @@ type JoinStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
 	*common.Logger
-	homeState *HomeState
-	policy    Policy
-	chanState chan<- node.State
-	timer     common.Timer
+	homeState     *HomeState
+	policy        Policy
+	networkClient NetworkClient
+	chanState     chan<- node.State
+	timer         common.Timer
 }
 
 func NewJoinStateHandler(
 	homeState *HomeState,
 	policy Policy,
+	networkClient NetworkClient,
 	chanState chan<- node.State,
 ) *JoinStateHandler {
 	js := &JoinStateHandler{
@@ -31,9 +34,10 @@ func NewJoinStateHandler(
 			"module", "join-state-handler",
 			"state", node.StateJoin,
 		),
-		homeState: homeState,
-		policy:    policy,
-		chanState: chanState,
+		homeState:     homeState,
+		policy:        policy,
+		networkClient: networkClient,
+		chanState:     chanState,
 	}
 
 	js.ReaderDaemon = common.NewReaderDaemon(true, js.receive)
@@ -55,31 +59,6 @@ func (js *JoinStateHandler) Start() error {
 	return nil
 }
 
-func (js *JoinStateHandler) start() error {
-	// TODO
-	// - basically after sync, join will start
-	// - wait INIT VoteResult for current height
-	// - store next block with VoteResult.Proposal()
-	// - process Proposal of next block
-	// - follow next VoteResults
-	// - after ACCEPT VoteResult, change to ConsensusStateHandler
-
-	if js.timer != nil {
-		if err := js.timer.Stop(); err != nil {
-			return err
-		}
-	}
-
-	// start timer for INITBallot
-	js.timer = common.NewCallbackTimer(
-		"join-failed",
-		js.policy.TimeoutINITVoteResult,
-		js.whenTimeoutJoin,
-	)
-
-	return js.timer.Start()
-}
-
 func (js *JoinStateHandler) Stop() error {
 	if err := js.ReaderDaemon.Stop(); err != nil {
 		return err
@@ -97,6 +76,38 @@ func (js *JoinStateHandler) Stop() error {
 
 	js.Log().Debug("JoinStateHandler is stopped")
 	return nil
+}
+
+func (js *JoinStateHandler) start() error {
+	// TODO
+	// - basically after sync, join will start
+	// - wait INIT VoteResult for current height
+	// - store next block with VoteResult.Proposal()
+	// - process Proposal of next block
+	// - follow next VoteResults
+	// - after ACCEPT VoteResult, change to ConsensusStateHandler
+
+	if js.timer != nil {
+		if err := js.timer.Stop(); err != nil {
+			return err
+		}
+	}
+
+	// start timer for INITBallot
+	js.timer = common.NewCallbackTimer(
+		"broadcast-init-ballot-in-join",
+		js.policy.IntervalINITBallotOfJoin,
+		js.broadcastINITBallot,
+	)
+	js.timer.(*common.CallbackTimer).SetIntervalFunc(func(count uint, elapsed time.Duration) time.Duration {
+		if count == 0 {
+			return time.Second * 0
+		}
+
+		return js.policy.IntervalINITBallotOfJoin
+	})
+
+	return js.timer.Start()
 }
 
 func (js *JoinStateHandler) State() node.State {
@@ -189,9 +200,17 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 	}
 
 	if heightDiff == -1 { // next height did not processed, go to consensus
+		if err := js.timer.Stop(); err != nil {
+			return err
+		}
+
 		js.chanState <- node.StateConsensus
 		return nil
 	} else if heightDiff == 0 {
+		if err := js.timer.Stop(); err != nil {
+			return err
+		}
+
 		// TODO process vr.Proposal()
 		// TODO store next block
 		nextHeight := vr.Height().Add(1)
@@ -242,16 +261,30 @@ func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 	return nil
 }
 
-func (js *JoinStateHandler) whenTimeoutJoin(timer common.Timer) error {
+func (js *JoinStateHandler) broadcastINITBallot(timer common.Timer) error {
 	t := timer.(*common.CallbackTimer)
 	js.Log().Debug(
-		"timeout for waiting to finish join; go to sync",
-		"timeout", js.policy.TimeoutINITVoteResult,
+		"broadcast INITBallot for current block",
+		"interval", js.policy.IntervalINITBallotOfJoin,
 		"run_count", t.RunCount(),
 	)
 
-	// go to sync
-	js.chanState <- node.StateSync
+	ballot, err := NewBallot(
+		js.homeState.Home().Address(),
+		js.homeState.PreviousBlock().Height(),
+		Round(0),
+		StageINIT,
+		js.homeState.Proposal(),
+		js.homeState.PreviousBlock().Hash(),
+		js.homeState.Block().Hash(),
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := js.networkClient.Vote(&ballot); err != nil {
+		return err
+	}
 
 	return nil
 }
