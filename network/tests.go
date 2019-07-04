@@ -31,6 +31,7 @@ func NewNodesTest(home node.Home) *NodesTest {
 	}
 
 	nt.ReaderDaemon = common.NewReaderDaemon(true, nil)
+	nt.AddReceiver(nt.home.Address(), nt.ReceiveFunc)
 
 	return nt
 }

@@ -262,6 +262,10 @@ func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 }
 
 func (js *JoinStateHandler) broadcastINITBallot(timer common.Timer) error {
+	if js.networkClient == nil {
+		return xerrors.Errorf("network client is missing")
+	}
+
 	t := timer.(*common.CallbackTimer)
 	js.Log().Debug(
 		"broadcast INITBallot for current block",
