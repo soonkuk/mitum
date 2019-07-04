@@ -61,12 +61,12 @@ func (cs *ConsensusStateHandler) Start() error {
 }
 
 func (cs *ConsensusStateHandler) Stop() error {
-	cs.Lock()
-	defer cs.Unlock()
-
 	if err := cs.ReaderDaemon.Stop(); err != nil {
 		return err
 	}
+
+	cs.Lock()
+	defer cs.Unlock()
 
 	if cs.timer != nil {
 		if err := cs.timer.Stop(); err != nil {
@@ -170,7 +170,12 @@ func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
 		"vr", vr,
 	)
 
-	if err := checker.Check(); err != nil {
+	err := checker.Check()
+	if err != nil {
+		if xerrors.Is(err, ChangeNodeStateToSyncError) {
+			cs.chanState <- node.StateSync
+			return nil
+		}
 		return err
 	}
 

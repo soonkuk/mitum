@@ -55,9 +55,15 @@ func (cs *StateTransition) Start() error {
 		for {
 			select {
 			case nextState := <-cs.chanState:
-				if err := cs.runState(nextState); err != nil {
-					cs.Log().Error("failed state transition", "current", cs.homeState.State(), "next", nextState)
-				}
+				go func(nextState node.State) {
+					if err := cs.runState(nextState); err != nil {
+						cs.Log().Error(
+							"failed state transition",
+							"current", cs.homeState.State(),
+							"next", nextState,
+						)
+					}
+				}(nextState)
 			default:
 				if cs.ReaderDaemon.IsStopped() {
 					break end

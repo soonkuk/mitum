@@ -34,7 +34,7 @@ func CheckerVoteResultGoToSyncState(ck *common.ChainChecker) error {
 			"vr", vr,
 		)
 
-		return ChangeNodeStateToSyncError
+		return nil
 	}
 
 	return nil
