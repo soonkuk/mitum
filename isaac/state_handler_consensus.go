@@ -161,7 +161,7 @@ func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
 	checker := common.NewChainChecker(
 		"showme-checker",
 		context.Background(),
-		CheckerVoteResultGoToSyncState,
+		CheckerVoteResult,
 		CheckerVoteResultINIT,
 		CheckerVoteResultOtherStage,
 	)
@@ -225,7 +225,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 		log_.Debug("already known block; just ignore it")
 	} else {
 		// TODO store next block
-		nextBlock, err := NewBlock(nextHeight, vr.NextBlock())
+		nextBlock, err := NewBlock(nextHeight, vr.Proposal())
 		if err != nil {
 			return err
 		}

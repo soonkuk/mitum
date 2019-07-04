@@ -7,7 +7,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func CheckerVoteResultGoToSyncState(ck *common.ChainChecker) error {
+func CheckerVoteResult(ck *common.ChainChecker) error {
 	var vr VoteResult
 	if err := ck.ContextValue("vr", &vr); err != nil {
 		return err
@@ -140,7 +140,7 @@ func CheckerVoteResultOtherStage(ck *common.ChainChecker) error {
 	case -1:
 		return xerrors.Errorf("ignore; result is behind from home")
 	default:
-		return ChangeNodeStateToSyncError
+		return xerrors.Errorf("ignore; result is future from home")
 	}
 
 	return nil

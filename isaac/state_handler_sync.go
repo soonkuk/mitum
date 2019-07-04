@@ -58,6 +58,8 @@ func (ss *SyncStateHandler) Start() error {
 func (ss *SyncStateHandler) start() error {
 	// TODO
 	// request BlockProof to the last
+
+	return nil
 }
 
 func (ss *SyncStateHandler) State() node.State {

@@ -34,7 +34,8 @@ func NewRandomBlockHash() hash.Hash {
 
 func NewTestPolicy() Policy {
 	return Policy{
-		TimeoutINITBallot: time.Second * 10,
+		TimeoutINITBallot:     time.Second * 10,
+		TimeoutINITVoteResult: time.Second * 10,
 	}
 }
 

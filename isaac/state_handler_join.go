@@ -15,7 +15,6 @@ type JoinStateHandler struct {
 	*common.ReaderDaemon
 	*common.Logger
 	homeState *HomeState
-	suffrage  Suffrage
 	policy    Policy
 	chanState chan<- node.State
 	timer     common.Timer
@@ -23,7 +22,6 @@ type JoinStateHandler struct {
 
 func NewJoinStateHandler(
 	homeState *HomeState,
-	suffrage Suffrage,
 	policy Policy,
 	chanState chan<- node.State,
 ) *JoinStateHandler {
@@ -34,7 +32,6 @@ func NewJoinStateHandler(
 			"state", node.StateJoin,
 		),
 		homeState: homeState,
-		suffrage:  suffrage,
 		policy:    policy,
 		chanState: chanState,
 	}
@@ -74,7 +71,7 @@ func (js *JoinStateHandler) start() error {
 	// start timer for INITBallot
 	js.timer = common.NewCallbackTimer(
 		"join-failed",
-		js.policy.TimeoutINITBallot,
+		js.policy.TimeoutINITVoteResult,
 		js.whenTimeoutJoin,
 	)
 
@@ -165,7 +162,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 	checker := common.NewChainChecker(
 		"showme-checker",
 		context.Background(),
-		CheckerVoteResultGoToSyncState,
+		CheckerVoteResult,
 		CheckerVoteResultINIT,
 	)
 	_ = checker.SetContext(
@@ -195,7 +192,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 		// TODO process vr.Proposal()
 		// TODO store next block
 		nextHeight := vr.Height().Add(1)
-		nextBlock, err := NewBlock(nextHeight, vr.NextBlock())
+		nextBlock, err := NewBlock(nextHeight, vr.Proposal())
 		if err != nil {
 			return err
 		}
@@ -210,6 +207,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 			"next_height", nextHeight,
 			"next_block", vr.NextBlock(),
 			"next_round", vr.Round(),
+			"new_block", nextBlock,
 		)
 	} else {
 		js.Log().Debug("already known block; just ignore it", "diff", heightDiff)
@@ -221,6 +219,21 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 	js.Log().Debug("got accept VoteResult", "vr", vr)
 
+	checker := common.NewChainChecker(
+		"showme-checker",
+		context.Background(),
+		CheckerVoteResult,
+		CheckerVoteResultOtherStage,
+	)
+	_ = checker.SetContext(
+		"homeState", js.homeState,
+		"vr", vr,
+	)
+
+	if err := checker.Check(); err != nil {
+		return err
+	}
+
 	js.chanState <- node.StateConsensus
 
 	return nil
@@ -230,7 +243,7 @@ func (js *JoinStateHandler) whenTimeoutJoin(timer common.Timer) error {
 	t := timer.(*common.CallbackTimer)
 	js.Log().Debug(
 		"timeout for waiting to finish join; go to sync",
-		"timeout", js.policy.TimeoutINITBallot,
+		"timeout", js.policy.TimeoutINITVoteResult,
 		"run_count", t.RunCount(),
 	)
 
