@@ -134,6 +134,11 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		return err
 	}
 
+	nextBlock, err := NewBlock(proposal.Height().Add(1), proposal.Hash())
+	if err != nil {
+		return err
+	}
+
 	// broadcast SIGNBallot for next round
 	ballot, err := NewBallot(
 		cs.homeState.Home().Address(),
@@ -142,7 +147,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		StageSIGN,
 		proposal.Hash(),
 		proposal.CurrentBlock(),
-		NewRandomBlockHash(), // TODO remove
+		nextBlock.Hash(),
 	)
 	if err != nil {
 		return err
