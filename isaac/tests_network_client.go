@@ -37,7 +37,7 @@ func (ct ClientTest) Propose(proposal *Proposal) error {
 	}
 
 	// TODO NOTE broadcast:
-	// 1. send to the active suffrage members by Ballot.Stage()
+	// 1. send to the acting suffrage members by Ballot.Stage()
 	// 2. and then, broadcast to the suffrage network
 	ct.Log().Debug("broadcast Proposal", "proposal", proposal)
 	return ct.nodesNetwork.Broadcast(*proposal)
@@ -49,7 +49,7 @@ func (ct ClientTest) Vote(ballot Ballot) error {
 	}
 
 	// TODO NOTE broadcast:
-	// 1. send to the active suffrage members by Ballot.Stage()
+	// 1. send to the acting suffrage members by Ballot.Stage()
 	// 2. and then, broadcast to the suffrage network
 	ct.Log().Debug("trying to vote", "ballot", ballot.Hash())
 	return ct.nodesNetwork.Broadcast(ballot)

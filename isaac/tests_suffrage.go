@@ -10,24 +10,24 @@ import (
 
 type SuffrageTest struct {
 	nodes          []node.Node
-	activeSelector func(Height, Round, []node.Node) []node.Node
+	actingSelector func(Height, Round, []node.Node) []node.Node
 }
 
 func NewSuffrageTest(
 	nodes []node.Node,
-	activeSelector func(Height, Round, []node.Node) []node.Node,
+	actingSelector func(Height, Round, []node.Node) []node.Node,
 ) *SuffrageTest {
-	return &SuffrageTest{nodes: nodes, activeSelector: activeSelector}
+	return &SuffrageTest{nodes: nodes, actingSelector: actingSelector}
 }
 
 func (st *SuffrageTest) Nodes() []node.Node {
 	return st.nodes
 }
 
-func (st *SuffrageTest) ActiveSuffrage(height Height, round Round) ActiveSuffrage {
-	nodes := st.activeSelector(height, round, st.nodes)
+func (st *SuffrageTest) ActingSuffrage(height Height, round Round) ActingSuffrage {
+	nodes := st.actingSelector(height, round, st.nodes)
 
-	return NewActiveSuffrage(height, round, nodes[0], nodes)
+	return NewActingSuffrage(height, round, nodes[0], nodes)
 }
 
 func (st SuffrageTest) MarshalJSON() ([]byte, error) {

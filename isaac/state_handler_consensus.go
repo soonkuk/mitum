@@ -272,18 +272,18 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 	}
 
 	// TODO wait or propose Proposal with vr.Height() + 1
-	activeSuffrage := cs.suffrage.ActiveSuffrage(nextHeight, nextRound)
+	actingSuffrage := cs.suffrage.ActingSuffrage(nextHeight, nextRound)
 
-	log_.Debug("move to next block", "vr", vr, "active_suffrage", activeSuffrage)
+	log_.Debug("move to next block", "vr", vr, "acting_suffrage", actingSuffrage)
 
 	log_.Debug(
 		"proposer selected",
-		"proposer", activeSuffrage.Proposer().Address(),
-		"home is proposer?", activeSuffrage.Proposer().Equal(cs.homeState.Home()),
+		"proposer", actingSuffrage.Proposer().Address(),
+		"home is proposer?", actingSuffrage.Proposer().Equal(cs.homeState.Home()),
 	)
 
-	if activeSuffrage.Proposer().Equal(cs.homeState.Home()) {
-		log_.Debug("home is proposer", "proposer", activeSuffrage.Proposer().Address())
+	if actingSuffrage.Proposer().Equal(cs.homeState.Home()) {
+		log_.Debug("home is proposer", "proposer", actingSuffrage.Proposer().Address())
 
 		/*
 			proposal, err := NewProposal(
@@ -304,7 +304,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 		*/
 
 		go func(nextRound Round) {
-			<-time.After(time.Second * 2)
+			<-time.After(cs.policy.IntervalProposeProposal)
 			if err := cs.propose(nextRound); err != nil {
 				cs.Log().Error("failed to propose Proposal", "error", err)
 			}

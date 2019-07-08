@@ -265,12 +265,12 @@ func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 	}
 
 	// - Proposal.Proposer is valid proposer at this round.  if not, ignore it
-	activeSuffrage := vc.suffrage.ActiveSuffrage(proposal.Height(), proposal.Round())
-	if !activeSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
+	actingSuffrage := vc.suffrage.ActingSuffrage(proposal.Height(), proposal.Round())
+	if !actingSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
 		vc.Log().Debug(
 			"proposer is not proposer at this round",
 			"proposer", proposal.Proposer(),
-			"expected_proposer", activeSuffrage.Proposer().Address(),
+			"expected_proposer", actingSuffrage.Proposer().Address(),
 			"height", proposal.Height(),
 			"round", proposal.Round(),
 		)
