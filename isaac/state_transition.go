@@ -56,32 +56,15 @@ func (cs *StateTransition) Start() error {
 		for {
 			select {
 			case ctx := <-cs.chanState:
-				if ctx == nil {
-					continue
-				}
-
-				v := ctx.Value("state")
-				if v == nil {
-					cs.Log().Error("context for chanState should have 'state' value")
-					continue
-				}
-
-				nextState, ok := v.(node.State)
-				if !ok {
-					cs.Log().Error("invalid 'state' value found; state for chanState should be node.State")
-					continue
-				}
-
-				go func(nextState node.State) {
-					if err := cs.runState(nextState); err != nil {
+				go func(ctx context.Context) {
+					if err := cs.runState(ctx); err != nil {
 						cs.Log().Error(
 							"failed state transition",
 							"current", cs.homeState.State(),
-							"next", nextState,
 							"error", err,
 						)
 					}
-				}(nextState)
+				}(ctx)
 			default:
 				if cs.ReaderDaemon.IsStopped() {
 					break end
@@ -144,40 +127,54 @@ func (cs *StateTransition) receiveFromVoteCompiler(v interface{}) error {
 	return nil
 }
 
-func (cs *StateTransition) runState(state node.State) error {
-	if err := state.IsValid(); err != nil {
+func (cs *StateTransition) runState(ctx context.Context) error {
+	if ctx == nil {
+		return xerrors.Errorf("empty context")
+	}
+
+	v := ctx.Value("state")
+	if v == nil {
+		return xerrors.Errorf("context for chanState should have 'state' value")
+	}
+
+	nextState, ok := v.(node.State)
+	if !ok {
+		return xerrors.Errorf("invalid 'state' value found; state for chanState should be node.State")
+	}
+
+	if err := nextState.IsValid(); err != nil {
 		return err
 	}
 
 	cs.Lock()
 	defer cs.Unlock()
 
-	if cs.stateHandler != nil && cs.stateHandler.State() == state {
+	if cs.stateHandler != nil && cs.stateHandler.State() == nextState {
 		return xerrors.Errorf(
 			"same stateHandler is already running; handler state=%q next state=%q",
 			cs.stateHandler.State(),
-			state,
+			nextState,
 		)
 	}
 
-	cs.Log().Debug("trying state transition", "current", cs.homeState.State(), "next", state)
+	cs.Log().Debug("trying state transition", "current", cs.homeState.State(), "next", nextState)
 	if cs.stateHandler != nil {
 		if err := cs.stateHandler.Stop(); err != nil {
 			return err
 		}
 	}
 
-	stateHandler, found := cs.stateHandlers[state]
+	stateHandler, found := cs.stateHandlers[nextState]
 	if !found {
-		return xerrors.Errorf("stateHandler not registered yet; state=%q", state)
+		return xerrors.Errorf("stateHandler not registered yet; state=%q", nextState)
 	}
 
 	cs.stateHandler = stateHandler
-	if err := cs.stateHandler.Start(); err != nil {
-		cs.Log().Error("failed to start stateHandler", "state", state, "error", err)
+	if err := cs.stateHandler.StartWithContext(ctx); err != nil {
+		cs.Log().Error("failed to start stateHandler", "state", nextState, "error", err)
 		return err
 	}
-	cs.homeState.SetState(state)
+	cs.homeState.SetState(nextState)
 
 	return nil
 }

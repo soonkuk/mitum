@@ -18,6 +18,7 @@ type SyncStateHandler struct {
 	policy        Policy
 	networkClient NetworkClient
 	chanState     chan<- context.Context
+	ctx           context.Context
 }
 
 func NewSyncStateHandler(
@@ -43,6 +44,14 @@ func NewSyncStateHandler(
 	ss.ReaderDaemon = common.NewReaderDaemon(true, ss.receive)
 
 	return ss
+}
+
+func (ss *SyncStateHandler) StartWithContext(ctx context.Context) error {
+	ss.Lock()
+	ss.ctx = ctx
+	ss.Unlock()
+
+	return ss.Start()
 }
 
 func (ss *SyncStateHandler) Start() error {

@@ -2,7 +2,9 @@ package isaac
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/inconshreveable/log15"
 	"golang.org/x/xerrors"
@@ -20,6 +22,7 @@ type ConsensusStateHandler struct {
 	policy        Policy
 	networkClient NetworkClient
 	chanState     chan<- context.Context
+	ctx           context.Context
 	timer         common.Timer
 }
 
@@ -46,6 +49,14 @@ func NewConsensusStateHandler(
 	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receive)
 
 	return cs
+}
+
+func (cs *ConsensusStateHandler) StartWithContext(ctx context.Context) error {
+	cs.Lock()
+	cs.ctx = ctx
+	cs.Unlock()
+
+	return cs.Start()
 }
 
 func (cs *ConsensusStateHandler) Start() error {
@@ -89,6 +100,15 @@ func (cs *ConsensusStateHandler) start() error {
 		return err
 	}
 
+	if cs.ctx != nil {
+		vr, ok := cs.ctx.Value("vr").(VoteResult)
+		fmt.Println(">>>>>>>>>>>..", ok, vr)
+		if ok {
+			cs.Log().Debug("start with VoteResult", "vr", vr)
+			return cs.gotMajority(vr)
+		}
+	}
+
 	return nil
 }
 
@@ -118,6 +138,28 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 			return err
 		}
 	case GotMajority:
+		checker := common.NewChainChecker(
+			"showme-checker",
+			context.Background(),
+			CheckerVoteResult,
+			CheckerVoteResultINIT,
+			CheckerVoteResultOtherStage,
+		)
+		_ = checker.SetLogContext(cs.LogContext())
+		_ = checker.SetContext(
+			"homeState", cs.homeState,
+			"vr", vr,
+		)
+
+		err := checker.Check()
+		if err != nil {
+			if xerrors.Is(err, ChangeNodeStateToSyncError) {
+				cs.chanState <- common.SetContext(nil, "state", node.StateSync)
+				return nil
+			}
+			return err
+		}
+
 		if err := cs.gotMajority(vr); err != nil {
 			return err
 		}
@@ -164,27 +206,6 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 
 func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
 	cs.Log().Debug("got majority", "vr", vr)
-
-	checker := common.NewChainChecker(
-		"showme-checker",
-		context.Background(),
-		CheckerVoteResult,
-		CheckerVoteResultINIT,
-		CheckerVoteResultOtherStage,
-	)
-	_ = checker.SetContext(
-		"homeState", cs.homeState,
-		"vr", vr,
-	)
-
-	err := checker.Check()
-	if err != nil {
-		if xerrors.Is(err, ChangeNodeStateToSyncError) {
-			cs.chanState <- common.SetContext(nil, "state", node.StateSync)
-			return nil
-		}
-		return err
-	}
 
 	switch vr.Stage() {
 	case StageINIT:
@@ -264,21 +285,30 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 	if activeSuffrage.Proposer().Equal(cs.homeState.Home()) {
 		log_.Debug("home is proposer", "proposer", activeSuffrage.Proposer().Address())
 
-		proposal, err := NewProposal(
-			cs.homeState.Height(),
-			nextRound,
-			cs.homeState.Block().Hash(),
-			cs.homeState.Home().Address(),
-			nil, // TODO set Transactions
-		)
-		if err != nil {
-			return err
-		}
+		/*
+			proposal, err := NewProposal(
+				cs.homeState.Height(),
+				nextRound,
+				cs.homeState.Block().Hash(),
+				cs.homeState.Home().Address(),
+				nil, // TODO set Transactions
+			)
+			if err != nil {
+				return err
+			}
 
-		log_.Debug("broadcast proposal for next block", "proposal", proposal)
-		if err := cs.networkClient.Propose(&proposal); err != nil {
-			return err
-		}
+			log_.Debug("broadcast proposal for next block", "proposal", proposal)
+			if err := cs.networkClient.Propose(&proposal); err != nil {
+				return err
+			}
+		*/
+
+		go func(nextRound Round) {
+			<-time.After(time.Second * 2)
+			if err := cs.propose(nextRound); err != nil {
+				cs.Log().Error("failed to propose Proposal", "error", err)
+			}
+		}(nextRound)
 	}
 
 	return nil
@@ -398,6 +428,26 @@ func (cs *ConsensusStateHandler) whenTimeoutINITBallot(timer common.Timer) error
 	cs.Log().Debug("broadcast init ballot for timeout", "ballot", ballot)
 
 	if err := cs.networkClient.Vote(&ballot); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cs *ConsensusStateHandler) propose(nextRound Round) error {
+	proposal, err := NewProposal(
+		cs.homeState.Height(),
+		nextRound,
+		cs.homeState.Block().Hash(),
+		cs.homeState.Home().Address(),
+		nil, // TODO set Transactions
+	)
+	if err != nil {
+		return err
+	}
+
+	cs.Log().Debug("broadcast proposal for next block", "proposal", proposal)
+	if err := cs.networkClient.Propose(&proposal); err != nil {
 		return err
 	}
 

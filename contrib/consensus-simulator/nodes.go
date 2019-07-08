@@ -45,7 +45,7 @@ func run() error {
 
 	policy := isaac.NewTestPolicy()
 	policy.TimeoutINITBallot = time.Second * 3
-	policy.IntervalINITBallotOfJoin = time.Millisecond * 300
+	policy.IntervalINITBallotOfJoin = time.Second * 3
 	policy.BasePercent = 66
 
 	threshold, err := isaac.NewThreshold(FlagNumberOfNodes, policy.BasePercent)

@@ -19,6 +19,7 @@ type JoinStateHandler struct {
 	policy        Policy
 	networkClient NetworkClient
 	chanState     chan<- context.Context
+	ctx           context.Context
 	timer         common.Timer
 }
 
@@ -43,6 +44,14 @@ func NewJoinStateHandler(
 	js.ReaderDaemon = common.NewReaderDaemon(true, js.receive)
 
 	return js
+}
+
+func (js *JoinStateHandler) StartWithContext(ctx context.Context) error {
+	js.Lock()
+	js.ctx = ctx
+	js.Unlock()
+
+	return js.Start()
 }
 
 func (js *JoinStateHandler) Start() error {
@@ -179,6 +188,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 		CheckerVoteResult,
 		CheckerVoteResultINIT,
 	)
+	_ = checker.SetLogContext(js.LogContext())
 	_ = checker.SetContext(
 		"homeState", js.homeState,
 		"vr", vr,
@@ -204,7 +214,11 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 			return err
 		}
 
-		js.chanState <- common.SetContext(nil, "state", node.StateConsensus)
+		js.chanState <- common.SetContext(
+			nil,
+			"state", node.StateConsensus,
+			"vr", vr,
+		)
 		return nil
 	} else if heightDiff == 0 {
 		if err := js.timer.Stop(); err != nil {
@@ -256,7 +270,11 @@ func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 		return err
 	}
 
-	js.chanState <- common.SetContext(nil, "state", node.StateConsensus)
+	js.chanState <- common.SetContext(
+		nil,
+		"state", node.StateConsensus,
+		"vr", vr,
+	)
 
 	return nil
 }

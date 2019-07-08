@@ -15,6 +15,7 @@ type BootingStateHandler struct {
 	*common.Logger
 	homeState *HomeState
 	chanState chan<- context.Context
+	ctx       context.Context
 }
 
 func NewBootingStateHandler(
@@ -48,6 +49,14 @@ func (bs *BootingStateHandler) Start() error {
 	bs.Log().Debug("BootingStateHandler is started")
 
 	return nil
+}
+
+func (bs *BootingStateHandler) StartWithContext(ctx context.Context) error {
+	bs.Lock()
+	bs.ctx = ctx
+	bs.Unlock()
+
+	return bs.Start()
 }
 
 func (bs *BootingStateHandler) Stop() error {

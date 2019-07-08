@@ -24,6 +24,8 @@ func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suf
 	ballotbox := isaac.NewBallotbox(policy.Threshold)
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
 
+	alias := homeState.Home().Alias()
+
 	go func() {
 		for message := range nt.Reader() {
 			voteCompiler.Write(message)
@@ -32,20 +34,23 @@ func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suf
 
 	st := isaac.NewStateTransition(homeState, voteCompiler)
 
-	stateHandlers := []isaac.StateHandler{
-		isaac.NewBootingStateHandler(homeState, st.ChanState()),
-		isaac.NewSyncStateHandler(homeState, suffrage, policy, client, st.ChanState()),
-		isaac.NewJoinStateHandler(homeState, policy, client, st.ChanState()),
-		isaac.NewConsensusStateHandler(homeState, suffrage, policy, client, st.ChanState()),
-	}
+	{
+		booting := isaac.NewBootingStateHandler(homeState, st.ChanState())
+		sync := isaac.NewSyncStateHandler(homeState, suffrage, policy, client, st.ChanState())
+		join := isaac.NewJoinStateHandler(homeState, policy, client, st.ChanState())
+		con := isaac.NewConsensusStateHandler(homeState, suffrage, policy, client, st.ChanState())
+		stopped := isaac.NewStoppedStateHandler(homeState)
 
-	for _, handler := range stateHandlers {
-		if err := st.SetStateHandler(handler); err != nil {
-			return Node{}, err
+		stateHandlers := []isaac.StateHandler{booting, sync, join, con, stopped}
+
+		for _, handler := range stateHandlers {
+			handler.SetLogContext(nil, "node", alias)
+			if err := st.SetStateHandler(handler); err != nil {
+				return Node{}, err
+			}
 		}
 	}
 
-	alias := homeState.Home().Alias()
 	n := Node{
 		Logger:       common.NewLogger(log, "node", alias),
 		homeState:    homeState,
@@ -84,7 +89,7 @@ func (no Node) Start() error {
 		return err
 	}
 	<-time.After(time.Millisecond * 50)
-	no.st.ChanState() <- node.StateBooting
+	no.st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
 
 	return nil
 }
