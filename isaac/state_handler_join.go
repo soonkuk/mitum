@@ -162,8 +162,6 @@ func (js *JoinStateHandler) receiveProposal(proposal Proposal) error {
 }
 
 func (js *JoinStateHandler) gotMajority(vr VoteResult) error {
-	js.Log().Debug("got majority", "vr", vr)
-
 	switch stage := vr.Stage(); stage {
 	case StageINIT:
 		return js.stageINIT(vr)
@@ -228,7 +226,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 		// TODO process vr.Proposal()
 		// TODO store next block
 		nextHeight := vr.Height().Add(1)
-		nextBlock, err := NewBlock(nextHeight, vr.Proposal())
+		nextBlock, err := NewBlock(nextHeight, vr.Round(), vr.Proposal())
 		if err != nil {
 			return err
 		}
@@ -242,7 +240,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 			"previous_round", vr.Round(),
 			"next_height", nextHeight,
 			"next_block", vr.NextBlock(),
-			"next_round", vr.Round(),
+			"next_round", vr.Round()+1,
 			"new_block", nextBlock,
 		)
 	} else {
@@ -289,12 +287,13 @@ func (js *JoinStateHandler) broadcastINITBallot(timer common.Timer) error {
 		"broadcast INITBallot for current block",
 		"interval", js.policy.IntervalINITBallotOfJoin,
 		"run_count", t.RunCount(),
+		"round", js.homeState.Block().Round()+1,
 	)
 
 	ballot, err := NewBallot(
 		js.homeState.Home().Address(),
 		js.homeState.PreviousBlock().Height(),
-		Round(0),
+		js.homeState.Block().Round()+1,
 		StageINIT,
 		js.homeState.Proposal(),
 		js.homeState.PreviousBlock().Hash(),

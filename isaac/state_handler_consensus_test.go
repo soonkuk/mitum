@@ -205,7 +205,7 @@ func (t *testConsensusStateHandler) TestINITPreviousHeight() {
 			t.Equal(t.homeState.Height(), proposal.Height())
 			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
 
-			t.Equal(round, proposal.Round())
+			t.Equal(round+1, proposal.Round())
 			t.Equal(t.homeState.Home().Address(), proposal.Proposer())
 			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
 			t.Equal(t.homeState.Home().PublicKey(), proposal.Signer())
@@ -268,7 +268,7 @@ func (t *testConsensusStateHandler) TestPropose() {
 			t.Equal(t.homeState.Height(), proposal.Height())
 			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
 
-			t.Equal(round, proposal.Round())
+			t.Equal(round+1, proposal.Round())
 			t.Equal(t.homeState.Home().Address(), proposal.Proposer())
 			t.Equal(t.homeState.Block().Hash(), proposal.CurrentBlock())
 			t.Equal(t.homeState.Home().PublicKey(), proposal.Signer())
@@ -320,7 +320,7 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 
 	t.Equal(StageINIT, ballot.Stage())
 	t.True(ballot.Height().Equal(t.homeState.PreviousBlock().Height()))
-	t.Equal(Round(0), ballot.Round())
+	t.Equal(t.homeState.Block().Round()+1, ballot.Round())
 	t.True(ballot.CurrentBlock().Equal(t.homeState.PreviousBlock().Hash()))
 	t.True(ballot.NextBlock().Equal(t.homeState.Block().Hash()))
 	t.True(ballot.Proposal().Equal(t.homeState.Proposal()))

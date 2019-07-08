@@ -23,13 +23,15 @@ type Block struct {
 	hash      hash.Hash
 	height    Height
 	proposal  hash.Hash
+	round     Round
 	createdAt common.Time
 }
 
-func NewBlock(height Height, proposal hash.Hash) (Block, error) {
+func NewBlock(height Height, round Round, proposal hash.Hash) (Block, error) {
 	bk := Block{
 		height:    height,
 		proposal:  proposal,
+		round:     round,
 		createdAt: common.Now(),
 	}
 
@@ -49,6 +51,7 @@ func (bk Block) makeHash() (hash.Hash, error) {
 
 	b, err := rlp.EncodeToBytes([]interface{}{
 		bk.height,
+		bk.round,
 		bk.proposal,
 	})
 
@@ -63,6 +66,7 @@ func (bk Block) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"hash":      bk.hash,
 		"height":    bk.height,
+		"round":     bk.round,
 		"proposal":  bk.proposal,
 		"createdAt": bk.createdAt,
 	})
@@ -81,12 +85,20 @@ func (bk Block) Height() Height {
 	return bk.height
 }
 
+func (bk Block) Round() Round {
+	return bk.round
+}
+
 func (bk Block) Proposal() hash.Hash {
 	return bk.proposal
 }
 
 func (bk Block) Equal(n Block) bool {
 	if !bk.Height().Equal(n.Height()) {
+		return false
+	}
+
+	if bk.Round() != n.Round() {
 		return false
 	}
 

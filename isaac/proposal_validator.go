@@ -27,5 +27,5 @@ func (dp *DefaultProposalValidator) NewBlock(proposal Proposal) (Block, error) {
 		return Block{}, err
 	}
 
-	return NewBlock(proposal.Height().Add(1), proposal.Hash())
+	return NewBlock(proposal.Height().Add(1), proposal.Round(), proposal.Hash())
 }

@@ -62,13 +62,11 @@ func (t *testVoteCompiler) TestNew() {
 		t.suffrage,
 		t.ballotbox,
 	)
-	t.Equal(Round(0), sc.LastRound())
+	t.Equal(t.homeState.Block().Round(), sc.LastRound())
 }
 
 func (t *testVoteCompiler) TestVoteBallot() {
 	t.setupTest(4)
-
-	round := Round(0)
 
 	ch := make(chan interface{})
 
@@ -86,6 +84,7 @@ func (t *testVoteCompiler) TestVoteBallot() {
 	t.NoError(err)
 	defer sc.Stop()
 
+	round := sc.LastRound() + 1
 	nextBlock := NewRandomBlockHash()
 	proposal := NewRandomProposalHash()
 
@@ -129,8 +128,6 @@ func (t *testVoteCompiler) TestPropose() {
 
 	t.setupTest(4)
 
-	round := Round(0)
-
 	ch := make(chan interface{})
 	sc := NewVoteCompiler(
 		t.homeState,
@@ -146,6 +143,7 @@ func (t *testVoteCompiler) TestPropose() {
 	t.NoError(err)
 	defer sc.Stop()
 
+	round := t.homeState.Block().Round() + 1
 	proposal, err := NewProposal(
 		t.homeState.Height(),
 		round,

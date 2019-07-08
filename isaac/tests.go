@@ -44,6 +44,7 @@ func NewRandomBlock() Block {
 
 	bk, _ := NewBlock(
 		NewBlockHeight(uint64(b.Int64())),
+		Round(uint64(b.Int64())),
 		NewRandomProposalHash(),
 	)
 
@@ -53,6 +54,7 @@ func NewRandomBlock() Block {
 func NewRandomNextBlock(bk Block) Block {
 	nbk, _ := NewBlock(
 		bk.Height().Add(1),
+		bk.Round()+1,
 		NewRandomProposalHash(),
 	)
 

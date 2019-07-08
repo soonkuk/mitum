@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/inconshreveable/log15"
 	"github.com/spikeekips/mitum/big"
 	"github.com/spikeekips/mitum/common"
 	"github.com/spikeekips/mitum/seal"
@@ -33,7 +34,7 @@ func NewVoteCompiler(
 		homeState: homeState,
 		suffrage:  suffrage,
 		ballotbox: ballotbox,
-		lastRound: Round(0),
+		lastRound: homeState.Block().Round(),
 		callbacks: map[string]VoteCompilerCallback{},
 	}
 
@@ -156,23 +157,25 @@ func (vc *VoteCompiler) receiveSeal(v interface{}) error {
 func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	// TODO checker ballot
 
+	log_ := vc.Log().New(log15.Ctx{"ballot": ballot.Hash()})
+
 	if ballot.Stage() == StageINIT {
 		sub := ballot.Height().Big.Sub(vc.homeState.Height().Big)
 		switch {
 		case sub.Equal(big.NewBigFromInt64(0)): // same
-			vc.Log().Debug(
+			log_.Debug(
 				"received INIT ballot with same height",
 				"height", ballot.Height(),
 				"home", vc.homeState.Height(),
 			)
 		case sub.Equal(big.NewBigFromInt64(-1)): // 1 lower
-			vc.Log().Debug(
+			log_.Warn(
 				"received INIT ballot with previous height",
 				"height", ballot.Height(),
 				"home", vc.homeState.Height(),
 			)
 		default: // if not, ignore it
-			vc.Log().Debug(
+			log_.Warn(
 				"received INIT ballot with weird height",
 				"height", ballot.Height(),
 				"home", vc.homeState.Height(),
@@ -180,29 +183,41 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 			return nil
 		}
 
-		if ballot.Round() != Round(0) && ballot.Round() != vc.LastRound() {
-			vc.Log().Debug(
-				"received INIT ballot with weird round",
+		if ballot.Round() == vc.LastRound() {
+			log_.Warn(
+				"received INIT ballot with previous round",
 				"round", ballot.Round(),
 				"expected", vc.LastRound(),
+			)
+		} else if ballot.Round() == vc.LastRound()+1 {
+			log_.Debug(
+				"received INIT ballot with running round",
+				"round", ballot.Round(),
+				"expected", vc.LastRound()+1,
+			)
+		} else {
+			log_.Warn(
+				"received INIT ballot with weird round",
+				"round", ballot.Round(),
+				"expected", []Round{vc.LastRound(), vc.LastRound()},
 			)
 			return nil
 		}
 	} else {
 		if !ballot.Height().Equal(vc.homeState.Height()) { // ignore it
-			vc.Log().Debug(
+			log_.Warn(
 				"received ballot with different height",
 				"height", ballot.Height(),
-				"home", vc.homeState.Height(),
+				"expected", vc.homeState.Height(),
 			)
 			return nil
 		}
 
-		if ballot.Round() != vc.LastRound() { // ignore it
-			vc.Log().Debug(
+		if ballot.Round() != vc.LastRound()+1 { // ignore it
+			log_.Warn(
 				"received ballot with different round",
 				"round", ballot.Round(),
-				"home", vc.LastRound(),
+				"expected", vc.LastRound()+1,
 			)
 			return nil
 		}
@@ -210,7 +225,7 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 
 	vr, err := vc.ballotbox.Vote(ballot)
 	if err != nil {
-		vc.Log().Error("failed to vote", "error", err)
+		log_.Error("failed to vote", "error", err)
 		return err
 	}
 
@@ -218,7 +233,7 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	case GotMajority:
 		if vr.Stage() == StageINIT {
 			_ = vc.setLastRound(vr.Round()) // set lastRound
-			vc.Log().Debug("set LastRound", "round", vc.LastRound())
+			log_.Debug("set LastRound", "round", vc.LastRound())
 		}
 	}
 
@@ -245,8 +260,8 @@ func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 	}
 
 	// - Proposal.Round is same with vc.lastRound.  if not, ignore it
-	if proposal.Round() != vc.LastRound() { // ignore it
-		vc.Log().Debug(
+	if proposal.Round() != vc.LastRound()+1 { // ignore it
+		vc.Log().Warn(
 			"received proposal with different round",
 			"round", proposal.Round(),
 			"home", vc.LastRound(),
@@ -256,7 +271,7 @@ func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 
 	// - Proposal.CurrentBlock is same with home.  if not, ignore it
 	if !proposal.CurrentBlock().Equal(vc.homeState.Block().Hash()) { // ignore it
-		vc.Log().Debug(
+		vc.Log().Warn(
 			"received proposal with different current block",
 			"block", proposal.CurrentBlock(),
 			"home", vc.homeState.Block().Hash(),
@@ -267,7 +282,7 @@ func (vc *VoteCompiler) receiveProposal(proposal Proposal) error {
 	// - Proposal.Proposer is valid proposer at this round.  if not, ignore it
 	actingSuffrage := vc.suffrage.ActingSuffrage(proposal.Height(), proposal.Round())
 	if !actingSuffrage.Proposer().Address().Equal(proposal.Proposer()) {
-		vc.Log().Debug(
+		vc.Log().Warn(
 			"proposer is not proposer at this round",
 			"proposer", proposal.Proposer(),
 			"expected_proposer", actingSuffrage.Proposer().Address(),

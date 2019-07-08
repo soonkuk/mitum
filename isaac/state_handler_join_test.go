@@ -68,7 +68,7 @@ func (t *testJoinStateHandler) TestINITVoteResultNewBlockCreated() {
 		VoteRecords{},
 	)
 
-	nextBlock, err := NewBlock(vr.Height().Add(1), vr.Proposal())
+	nextBlock, err := NewBlock(vr.Height().Add(1), vr.Round(), vr.Proposal())
 	t.NoError(err)
 
 	vr.currentBlock = t.homeState.Block().Hash()
@@ -122,7 +122,7 @@ func (t *testJoinStateHandler) TestINITACCEPTVoteResult() {
 	)
 
 	{
-		nextBlock, err := NewBlock(initVR.Height().Add(1), initVR.Proposal())
+		nextBlock, err := NewBlock(initVR.Height().Add(1), initVR.Round(), initVR.Proposal())
 		t.NoError(err)
 
 		initVR.currentBlock = t.homeState.Block().Hash()
@@ -147,7 +147,7 @@ func (t *testJoinStateHandler) TestINITACCEPTVoteResult() {
 	)
 
 	{
-		nextBlock, err := NewBlock(t.homeState.Height().Add(1), acceptVR.Proposal())
+		nextBlock, err := NewBlock(t.homeState.Height().Add(1), acceptVR.Round(), acceptVR.Proposal())
 		t.NoError(err)
 
 		acceptVR.currentBlock = t.homeState.Block().Hash()
@@ -200,7 +200,7 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	)
 
 	{
-		nextBlock, err := NewBlock(initVR.Height().Add(1), initVR.Proposal())
+		nextBlock, err := NewBlock(initVR.Height().Add(1), initVR.Round(), initVR.Proposal())
 		t.NoError(err)
 
 		initVR.currentBlock = t.homeState.Block().Hash()
@@ -225,7 +225,7 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	)
 
 	{
-		nextBlock, err := NewBlock(t.homeState.Height().Add(1), acceptVR.Proposal())
+		nextBlock, err := NewBlock(t.homeState.Height().Add(1), acceptVR.Round(), acceptVR.Proposal())
 		t.NoError(err)
 
 		acceptVR.currentBlock = t.homeState.Block().Hash()
@@ -273,7 +273,7 @@ func (t *testJoinStateHandler) TestBroadcastINITBallot() {
 
 	t.True(t.homeState.PreviousBlock().Height().Equal(ballot.Height()))
 	t.Equal(StageINIT, ballot.Stage())
-	t.Equal(Round(0), ballot.Round())
+	t.Equal(t.homeState.Block().Round()+1, ballot.Round())
 	t.Equal(t.homeState.Home().PublicKey(), ballot.Signer())
 	t.True(t.homeState.Block().Proposal().Equal(ballot.Proposal()))
 	t.True(t.homeState.Block().Hash().Equal(ballot.NextBlock()))

@@ -247,7 +247,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 	}
 
 	nextHeight := vr.Height().Add(1)
-	nextRound := vr.Round()
+	nextRound := vr.Round() + 1
 	log_ := cs.Log().New(log15.Ctx{"next_height": nextHeight, "next_round": nextRound})
 
 	sub := vr.Height().Big.Sub(cs.homeState.Height().Big)
@@ -255,7 +255,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 		log_.Debug("already known block; just ignore it")
 	} else {
 		// TODO store next block
-		nextBlock, err := NewBlock(nextHeight, vr.Proposal())
+		nextBlock, err := NewBlock(nextHeight, vr.Round(), vr.Proposal())
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 			"previous_round", vr.Round(),
 			"next_height", nextHeight,
 			"next_block", vr.NextBlock(),
-			"next_round", vr.Round(),
+			"next_round", nextRound,
 		)
 	}
 
@@ -288,6 +288,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 		log_.Debug("home is proposer", "proposer", actingSuffrage.Proposer().Address())
 
 		go func(nextRound Round) {
+			// TODO check the max round; if over max, reset to 0
 			if err := cs.propose(nextRound); err != nil {
 				cs.Log().Error("failed to propose Proposal", "error", err)
 			}
@@ -340,15 +341,10 @@ func (cs *ConsensusStateHandler) moveToNextStage(vr VoteResult) error {
 	}
 
 	// NOTE for next INIT, Round should be initialize to zero
-	round := vr.Round()
-	if nextStage == StageINIT {
-		round = Round(0)
-	}
-
 	ballot, err := NewBallot(
 		cs.homeState.Home().Address(),
 		vr.Height(),
-		round,
+		vr.Round(),
 		nextStage,
 		vr.Proposal(),
 		vr.CurrentBlock(),
@@ -398,7 +394,7 @@ func (cs *ConsensusStateHandler) whenTimeoutINITBallot(timer common.Timer) error
 	ballot, err := NewBallot(
 		cs.homeState.Home().Address(),
 		cs.homeState.PreviousHeight(),
-		Round(0),
+		cs.homeState.Block().Round()+1,
 		StageINIT,
 		cs.homeState.Proposal(),
 		cs.homeState.PreviousBlock().Hash(),
