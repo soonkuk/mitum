@@ -29,7 +29,7 @@ func (t *testVoteCompiler) newBallot(n node.Address, height Height, round Round,
 	return ballot
 }
 
-func (t *testVoteCompiler) setupTest(total, thr uint) {
+func (t *testVoteCompiler) setupTest(total uint) {
 	t.homeState = NewRandomHomeState()
 
 	nodes := []node.Node{t.homeState.Home()}
@@ -49,12 +49,13 @@ func (t *testVoteCompiler) setupTest(total, thr uint) {
 
 	t.homeState.SetState(node.StateConsensus)
 
-	t.threshold = NewThreshold(total, thr)
-	t.ballotbox = NewBallotbox(t.threshold)
+	threshold, err := NewThreshold(total, 66)
+	t.NoError(err)
+	t.ballotbox = NewBallotbox(threshold)
 }
 
 func (t *testVoteCompiler) TestNew() {
-	t.setupTest(4, 3)
+	t.setupTest(4)
 
 	sc := NewVoteCompiler(
 		t.homeState,
@@ -65,7 +66,7 @@ func (t *testVoteCompiler) TestNew() {
 }
 
 func (t *testVoteCompiler) TestVoteBallot() {
-	t.setupTest(4, 3)
+	t.setupTest(4)
 
 	round := Round(0)
 
@@ -126,7 +127,7 @@ func (t *testVoteCompiler) TestVoteBallot() {
 func (t *testVoteCompiler) TestPropose() {
 	defer common.DebugPanic()
 
-	t.setupTest(4, 3)
+	t.setupTest(4)
 
 	round := Round(0)
 

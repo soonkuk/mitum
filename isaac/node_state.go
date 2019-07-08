@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/spikeekips/mitum/hash"
@@ -98,4 +99,14 @@ func (hs *HomeState) SetState(state node.State) *HomeState {
 
 func (hs *HomeState) Proposal() hash.Hash {
 	return hs.currentBlock.Proposal()
+}
+
+func (hs *HomeState) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"home":          hs.home,
+		"currentBlock":  hs.currentBlock,
+		"previousBlock": hs.previousBlock,
+		"currentState":  hs.currentState,
+		"previousState": hs.previousState,
+	})
 }

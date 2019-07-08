@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 
 	"golang.org/x/xerrors"
@@ -16,7 +17,7 @@ type StateTransition struct {
 	*common.ReaderDaemon
 	homeState     *HomeState
 	voteCompiler  *VoteCompiler
-	chanState     chan node.State
+	chanState     chan context.Context
 	stateHandler  StateHandler
 	stateHandlers map[node.State]StateHandler
 }
@@ -25,7 +26,7 @@ func NewStateTransition(homeState *HomeState, voteCompiler *VoteCompiler) *State
 	cs := &StateTransition{
 		Logger:        common.NewLogger(Log(), "module", "state-transition"),
 		homeState:     homeState,
-		chanState:     make(chan node.State),
+		chanState:     make(chan context.Context),
 		voteCompiler:  voteCompiler,
 		stateHandlers: map[node.State]StateHandler{},
 	}
@@ -54,7 +55,23 @@ func (cs *StateTransition) Start() error {
 	end:
 		for {
 			select {
-			case nextState := <-cs.chanState:
+			case ctx := <-cs.chanState:
+				if ctx == nil {
+					continue
+				}
+
+				v := ctx.Value("state")
+				if v == nil {
+					cs.Log().Error("context for chanState should have 'state' value")
+					continue
+				}
+
+				nextState, ok := v.(node.State)
+				if !ok {
+					cs.Log().Error("invalid 'state' value found; state for chanState should be node.State")
+					continue
+				}
+
 				go func(nextState node.State) {
 					if err := cs.runState(nextState); err != nil {
 						cs.Log().Error(
@@ -81,7 +98,7 @@ func (cs *StateTransition) Start() error {
 }
 
 func (cs *StateTransition) Stop() error {
-	if err := cs.ReaderDaemon.Start(); err != nil {
+	if err := cs.ReaderDaemon.Stop(); err != nil {
 		return err
 	}
 
@@ -98,7 +115,7 @@ func (cs *StateTransition) StateHandler() StateHandler {
 	return cs.stateHandler
 }
 
-func (cs *StateTransition) ChanState() chan<- node.State {
+func (cs *StateTransition) ChanState() chan<- context.Context {
 	return cs.chanState
 }
 
@@ -132,8 +149,6 @@ func (cs *StateTransition) runState(state node.State) error {
 		return err
 	}
 
-	cs.Log().Debug("trying state transition", "current", cs.homeState.State(), "next", state)
-
 	cs.Lock()
 	defer cs.Unlock()
 
@@ -145,6 +160,7 @@ func (cs *StateTransition) runState(state node.State) error {
 		)
 	}
 
+	cs.Log().Debug("trying state transition", "current", cs.homeState.State(), "next", state)
 	if cs.stateHandler != nil {
 		if err := cs.stateHandler.Stop(); err != nil {
 			return err

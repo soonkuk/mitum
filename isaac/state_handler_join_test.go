@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func (t *testJoinStateHandler) TestNew() {
 		t.homeState,
 		t.policy,
 		t.client,
-		make(chan node.State),
+		make(chan context.Context),
 	)
 	t.Equal(node.StateJoin, sc.State())
 }
@@ -52,7 +53,7 @@ func (t *testJoinStateHandler) TestINITVoteResultNewBlockCreated() {
 		t.homeState,
 		t.policy,
 		t.client,
-		make(chan node.State),
+		make(chan context.Context),
 	)
 	err := sc.Start()
 	t.NoError(err)
@@ -89,12 +90,13 @@ func (t *testJoinStateHandler) TestINITACCEPTVoteResult() {
 	// - expected accept VoteResult is received
 	// - state will be changed
 
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 
 	go func() {
 		for {
 			select {
-			case newState := <-chanState:
+			case ctx := <-chanState:
+				newState := ctx.Value("state").(node.State)
 				t.homeState.SetState(newState)
 			}
 		}
@@ -166,12 +168,13 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	// - invalid accept VoteResult is received
 	// - it will be ignored
 
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 
 	go func() {
 		for {
 			select {
-			case newState := <-chanState:
+			case ctx := <-chanState:
+				newState := ctx.Value("state").(node.State)
 				t.homeState.SetState(newState)
 			}
 		}
@@ -238,12 +241,13 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 }
 
 func (t *testJoinStateHandler) TestBroadcastINITBallot() {
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 
 	go func() {
 		for {
 			select {
-			case newState := <-chanState:
+			case ctx := <-chanState:
+				newState := ctx.Value("state").(node.State)
 				t.homeState.SetState(newState)
 			}
 		}

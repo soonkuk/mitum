@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -13,12 +14,12 @@ type BootingStateHandler struct {
 	*common.ReaderDaemon
 	*common.Logger
 	homeState *HomeState
-	chanState chan<- node.State
+	chanState chan<- context.Context
 }
 
 func NewBootingStateHandler(
 	homeState *HomeState,
-	chanState chan<- node.State,
+	chanState chan<- context.Context,
 ) *BootingStateHandler {
 	bs := &BootingStateHandler{
 		Logger: common.NewLogger(
@@ -71,7 +72,7 @@ func (bs *BootingStateHandler) start() error {
 	// TODO remove
 	go func() {
 		<-time.After(time.Millisecond * 100)
-		bs.chanState <- node.StateSync
+		bs.chanState <- common.SetContext(nil, "state", node.StateSync)
 	}()
 
 	return nil

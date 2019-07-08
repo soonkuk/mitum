@@ -88,6 +88,8 @@ func (nt *NodesTest) Send(v interface{}, addresses ...node.Address) error {
 	}
 	nt.RUnlock()
 
+	nt.Log().Debug("trying to send message", "addresses", addresses)
+
 	var errs []error
 	var wg sync.WaitGroup
 	wg.Add(len(nodes))

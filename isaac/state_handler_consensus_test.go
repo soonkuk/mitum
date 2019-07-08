@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -86,7 +87,7 @@ func (t *testConsensusStateHandler) TestNew() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
-		make(chan node.State),
+		make(chan context.Context),
 	)
 	t.Equal(node.StateConsensus, sc.State())
 }
@@ -101,7 +102,7 @@ func (t *testConsensusStateHandler) TestVoteBallot() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
-		make(chan node.State),
+		make(chan context.Context),
 	)
 	err := sc.Start()
 	t.NoError(err)
@@ -159,7 +160,7 @@ func (t *testConsensusStateHandler) TestINITPreviousHeight() {
 
 	round := Round(0)
 
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,
@@ -218,7 +219,7 @@ func (t *testConsensusStateHandler) TestPropose() {
 
 	round := Round(0)
 
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,
@@ -278,7 +279,7 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 
 	t.policy.TimeoutINITBallot = time.Millisecond * 700
 
-	chanState := make(chan node.State)
+	chanState := make(chan context.Context)
 	sc := NewConsensusStateHandler(
 		t.homeState,
 		t.suffrage,

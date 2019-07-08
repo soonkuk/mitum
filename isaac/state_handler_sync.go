@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ type SyncStateHandler struct {
 	suffrage      Suffrage
 	policy        Policy
 	networkClient NetworkClient
-	chanState     chan<- node.State
+	chanState     chan<- context.Context
 }
 
 func NewSyncStateHandler(
@@ -24,7 +25,7 @@ func NewSyncStateHandler(
 	suffrage Suffrage,
 	policy Policy,
 	networkClient NetworkClient,
-	chanState chan<- node.State,
+	chanState chan<- context.Context,
 ) *SyncStateHandler {
 	ss := &SyncStateHandler{
 		Logger: common.NewLogger(
@@ -75,7 +76,7 @@ func (ss *SyncStateHandler) start() error {
 	// TODO remove
 	go func() {
 		<-time.After(time.Millisecond * 100)
-		ss.chanState <- node.StateJoin
+		ss.chanState <- common.SetContext(nil, "state", node.StateJoin)
 	}()
 
 	return nil

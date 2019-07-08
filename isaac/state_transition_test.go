@@ -31,7 +31,10 @@ func (t *testStateTransition) SetupTest() {
 		},
 	)
 
-	ballotbox := NewBallotbox(NewThreshold(1, 1))
+	threshold, err := NewThreshold(1, 66)
+	t.NoError(err)
+
+	ballotbox := NewBallotbox(threshold)
 	t.voteCompiler = NewVoteCompiler(t.homeState, t.suffrage, ballotbox)
 }
 
@@ -100,7 +103,7 @@ func (t *testStateTransition) TestTransition() {
 	<-time.After(time.Millisecond * 50)
 	t.Nil(st.StateHandler())
 
-	st.ChanState() <- node.StateBooting
+	st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
 	<-time.After(time.Millisecond * 50)
 	t.Equal(t.homeState.State(), st.StateHandler().State())
 }
@@ -113,7 +116,7 @@ func (t *testStateTransition) TestMissingState() {
 	t.NoError(st.Start())
 	defer st.Stop()
 
-	st.ChanState() <- node.StateBooting
+	st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
 	<-time.After(time.Millisecond * 50)
 	t.Nil(st.StateHandler())
 }

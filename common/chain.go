@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -86,16 +85,10 @@ func (c *ChainChecker) Context() context.Context {
 }
 
 func (c *ChainChecker) SetContext(args ...interface{}) *ChainChecker {
-	if len(args)%2 != 0 {
-		panic(fmt.Errorf("invalid number of args: %v", len(args)))
-	}
-
 	c.Lock()
 	defer c.Unlock()
 
-	for i := 0; i < len(args); i += 2 {
-		c.ctx = context.WithValue(c.ctx, args[i], args[i+1])
-	}
+	c.ctx = SetContext(c.ctx, args...)
 
 	return c
 }

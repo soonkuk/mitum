@@ -18,7 +18,7 @@ type JoinStateHandler struct {
 	homeState     *HomeState
 	policy        Policy
 	networkClient NetworkClient
-	chanState     chan<- node.State
+	chanState     chan<- context.Context
 	timer         common.Timer
 }
 
@@ -26,7 +26,7 @@ func NewJoinStateHandler(
 	homeState *HomeState,
 	policy Policy,
 	networkClient NetworkClient,
-	chanState chan<- node.State,
+	chanState chan<- context.Context,
 ) *JoinStateHandler {
 	js := &JoinStateHandler{
 		Logger: common.NewLogger(
@@ -187,7 +187,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 	err := checker.Check()
 	if err != nil {
 		if xerrors.Is(err, ChangeNodeStateToSyncError) {
-			js.chanState <- node.StateSync
+			js.chanState <- common.SetContext(nil, "state", node.StateSync)
 			return nil
 		}
 		return err
@@ -204,7 +204,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 			return err
 		}
 
-		js.chanState <- node.StateConsensus
+		js.chanState <- common.SetContext(nil, "state", node.StateConsensus)
 		return nil
 	} else if heightDiff == 0 {
 		if err := js.timer.Stop(); err != nil {
@@ -256,7 +256,7 @@ func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 		return err
 	}
 
-	js.chanState <- node.StateConsensus
+	js.chanState <- common.SetContext(nil, "state", node.StateConsensus)
 
 	return nil
 }

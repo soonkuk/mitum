@@ -50,6 +50,10 @@ func (hm Home) Other() Other {
 	return NewOther(hm.address, hm.publicKey)
 }
 
+func (hm Home) Alias() string {
+	return hm.Address().String()[:6]
+}
+
 func (hm Home) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"address":   hm.address,

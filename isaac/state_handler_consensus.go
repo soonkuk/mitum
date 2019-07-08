@@ -19,7 +19,7 @@ type ConsensusStateHandler struct {
 	suffrage      Suffrage
 	policy        Policy
 	networkClient NetworkClient
-	chanState     chan<- node.State
+	chanState     chan<- context.Context
 	timer         common.Timer
 }
 
@@ -28,7 +28,7 @@ func NewConsensusStateHandler(
 	suffrage Suffrage,
 	policy Policy,
 	networkClient NetworkClient,
-	chanState chan<- node.State,
+	chanState chan<- context.Context,
 ) *ConsensusStateHandler {
 	cs := &ConsensusStateHandler{
 		Logger: common.NewLogger(
@@ -180,7 +180,7 @@ func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
 	err := checker.Check()
 	if err != nil {
 		if xerrors.Is(err, ChangeNodeStateToSyncError) {
-			cs.chanState <- node.StateSync
+			cs.chanState <- common.SetContext(nil, "state", node.StateSync)
 			return nil
 		}
 		return err

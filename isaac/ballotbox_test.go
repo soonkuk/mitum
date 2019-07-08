@@ -13,10 +13,15 @@ import (
 
 type testBallotbox struct {
 	suite.Suite
+	threshold *Threshold
 }
 
-func (t *testBallotbox) newBallotbox(total, threshold uint) *Ballotbox {
-	return NewBallotbox(NewThreshold(total, threshold))
+func (t *testBallotbox) newBallotbox(total uint) *Ballotbox {
+	th, err := NewThreshold(total, 66)
+	t.NoError(err)
+
+	t.threshold = th
+	return NewBallotbox(th)
 }
 
 func (t *testBallotbox) newBallot(n node.Address, height Height, round Round, stage Stage, proposal hash.Hash, currentBlock hash.Hash, nextBlock hash.Hash) Ballot {
@@ -29,12 +34,12 @@ func (t *testBallotbox) newBallot(n node.Address, height Height, round Round, st
 }
 
 func (t *testBallotbox) TestNew() {
-	bb := t.newBallotbox(10, 7)
+	bb := t.newBallotbox(10)
 	t.NotNil(bb)
 }
 
 func (t *testBallotbox) TestVote() {
-	bb := t.newBallotbox(10, 7)
+	bb := t.newBallotbox(10)
 
 	n := node.NewRandomAddress()
 	height := NewBlockHeight(33)
@@ -54,9 +59,9 @@ func (t *testBallotbox) TestVote() {
 }
 
 func (t *testBallotbox) TestBasicVoteRecords() {
-	var total, threshold uint = 5, 3
+	var total uint = 5
 
-	bb := t.newBallotbox(total, threshold)
+	bb := t.newBallotbox(total)
 
 	height := NewBlockHeight(33)
 	round := Round(0)
@@ -66,6 +71,7 @@ func (t *testBallotbox) TestBasicVoteRecords() {
 	nextBlock := NewRandomBlockHash()
 
 	// vote under threshold
+	_, threshold := t.threshold.Get(stage)
 	for i := uint(0); i < threshold-1; i++ {
 		n := node.NewRandomAddress()
 
@@ -94,8 +100,8 @@ func (t *testBallotbox) TestBasicVoteRecords() {
 }
 
 func (t *testBallotbox) TestClosedVoteRecords() {
-	var total, threshold uint = 5, 3
-	bb := t.newBallotbox(total, threshold)
+	var total uint = 5
+	bb := t.newBallotbox(total)
 
 	height := NewBlockHeight(33)
 	round := Round(0)
@@ -145,7 +151,7 @@ func (t *testBallotbox) TestClosedVoteRecords() {
 }
 
 func (t *testBallotbox) TestVoteAgain() {
-	bb := t.newBallotbox(10, 7)
+	bb := t.newBallotbox(10)
 
 	height := NewBlockHeight(33)
 	round := Round(33)
