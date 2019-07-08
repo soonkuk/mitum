@@ -80,6 +80,17 @@ func run() error {
 		nodes = append(nodes, n)
 	}
 
+	// connect networks
+	for _, a := range nodes {
+		for _, b := range nodes {
+			if a.nt.Home().Equal(b.nt.Home()) {
+				continue
+			}
+
+			a.nt.AddReceiver(b.nt.Home().Address(), b.nt.ReceiveFunc)
+		}
+	}
+
 	// start nodes
 	errChan := make(chan error, 100)
 	for _, n := range nodes {

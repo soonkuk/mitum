@@ -63,21 +63,25 @@ func formatLogJSONValue(value interface{}) (result interface{}) {
 	}()
 
 	switch v := value.(type) {
-	case json.Marshaler:
-		return v
 	case *errors.Error:
-		return v
+		result = v
 	case Time:
-		return v.String()
+		result = v.String()
+	case time.Duration:
+		result = v.String()
 	case time.Time:
-		return v.Format(TIMEFORMAT_ISO8601)
+		result = v.Format(TIMEFORMAT_ISO8601)
+	case json.Marshaler:
+		result = v
 	case error:
-		return v.Error()
+		result = v.Error()
 	case fmt.Stringer:
-		return v.String()
+		result = v.String()
 	default:
-		return v
+		result = v
 	}
+
+	return
 }
 
 func JsonFormatEx() log15.Format {
