@@ -23,6 +23,7 @@ func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suf
 	client := isaac.NewClientTest(nt)
 	ballotbox := isaac.NewBallotbox(policy.Threshold)
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
+	proposalValidator := isaac.NewTestProposalValidator(policy, time.Second*2)
 
 	alias := homeState.Home().Alias()
 
@@ -38,7 +39,7 @@ func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suf
 		booting := isaac.NewBootingStateHandler(homeState, st.ChanState())
 		sync := isaac.NewSyncStateHandler(homeState, suffrage, policy, client, st.ChanState())
 		join := isaac.NewJoinStateHandler(homeState, policy, client, st.ChanState())
-		con := isaac.NewConsensusStateHandler(homeState, suffrage, policy, client, st.ChanState())
+		con := isaac.NewConsensusStateHandler(homeState, suffrage, policy, client, proposalValidator, st.ChanState())
 		stopped := isaac.NewStoppedStateHandler(homeState)
 
 		stateHandlers := []isaac.StateHandler{booting, sync, join, con, stopped}

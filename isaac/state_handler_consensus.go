@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/inconshreveable/log15"
 	"golang.org/x/xerrors"
@@ -17,13 +16,14 @@ type ConsensusStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
 	*common.Logger
-	homeState     *HomeState
-	suffrage      Suffrage
-	policy        Policy
-	networkClient NetworkClient
-	chanState     chan<- context.Context
-	ctx           context.Context
-	timer         common.Timer
+	homeState         *HomeState
+	suffrage          Suffrage
+	policy            Policy
+	networkClient     NetworkClient
+	proposalValidator ProposalValidator
+	chanState         chan<- context.Context
+	ctx               context.Context
+	timer             common.Timer
 }
 
 func NewConsensusStateHandler(
@@ -31,6 +31,7 @@ func NewConsensusStateHandler(
 	suffrage Suffrage,
 	policy Policy,
 	networkClient NetworkClient,
+	proposalValidator ProposalValidator,
 	chanState chan<- context.Context,
 ) *ConsensusStateHandler {
 	cs := &ConsensusStateHandler{
@@ -39,11 +40,12 @@ func NewConsensusStateHandler(
 			"module", "consensus-state-handler",
 			"state", node.StateConsensus,
 		),
-		homeState:     homeState,
-		suffrage:      suffrage,
-		policy:        policy,
-		networkClient: networkClient,
-		chanState:     chanState,
+		homeState:         homeState,
+		suffrage:          suffrage,
+		policy:            policy,
+		networkClient:     networkClient,
+		proposalValidator: proposalValidator,
+		chanState:         chanState,
 	}
 
 	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receive)
@@ -176,7 +178,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		return err
 	}
 
-	nextBlock, err := NewBlock(proposal.Height().Add(1), proposal.Hash())
+	nextBlock, err := cs.proposalValidator.NewBlock(proposal)
 	if err != nil {
 		return err
 	}
@@ -285,26 +287,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 	if actingSuffrage.Proposer().Equal(cs.homeState.Home()) {
 		log_.Debug("home is proposer", "proposer", actingSuffrage.Proposer().Address())
 
-		/*
-			proposal, err := NewProposal(
-				cs.homeState.Height(),
-				nextRound,
-				cs.homeState.Block().Hash(),
-				cs.homeState.Home().Address(),
-				nil, // TODO set Transactions
-			)
-			if err != nil {
-				return err
-			}
-
-			log_.Debug("broadcast proposal for next block", "proposal", proposal)
-			if err := cs.networkClient.Propose(&proposal); err != nil {
-				return err
-			}
-		*/
-
 		go func(nextRound Round) {
-			<-time.After(cs.policy.IntervalProposeProposal)
 			if err := cs.propose(nextRound); err != nil {
 				cs.Log().Error("failed to propose Proposal", "error", err)
 			}

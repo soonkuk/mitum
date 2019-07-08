@@ -27,7 +27,7 @@ func (ct ClientTest) Home() node.Home {
 	return ct.nodesNetwork.Home()
 }
 
-func (ct ClientTest) RequestNodeInfo(address ...node.Address) ([]NodeInfo, error) {
+func (ct ClientTest) RequestNodeInfo(...node.Address) ([]NodeInfo, error) {
 	return nil, nil
 }
 
@@ -55,12 +55,12 @@ func (ct ClientTest) Vote(ballot Ballot) error {
 	return ct.nodesNetwork.Broadcast(ballot)
 }
 
-func (ct ClientTest) RequestLatestBlockProof(addresses ...node.Address) error {
+func (ct ClientTest) RequestLatestBlockProof(...node.Address) error {
 	// TODO implement
 	return nil
 }
 
-func (ct ClientTest) RequestBlockProof(block hash.Hash, addresses ...node.Address) error {
+func (ct ClientTest) RequestBlockProof(hash.Hash, ...node.Address) error {
 	// TODO implement
 	return nil
 }

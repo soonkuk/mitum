@@ -17,4 +17,5 @@ $ go test -race -tags test ./... -v
 
 ```
 $ golangci-lint run
+$ for i in account big common contrib encode hash isaac keypair network node seal transaction; do nargs ./$i; done
 ```

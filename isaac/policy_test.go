@@ -47,7 +47,7 @@ func (t *testPolicy) TestCopy() {
 
 	policy := Policy{Threshold: th}
 
-	check := func(p Policy, stage Stage) {
+	check := func(p Policy, _ Stage) {
 		total, threshold := th.Get(StageINIT)
 		pTotal, pThreshold := p.Threshold.Get(StageINIT)
 		t.Equal(total, pTotal)

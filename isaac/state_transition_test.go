@@ -11,10 +11,11 @@ import (
 
 type testStateTransition struct {
 	suite.Suite
-	suffrage     Suffrage
-	homeState    *HomeState
-	policy       Policy
-	voteCompiler *VoteCompiler
+	suffrage          Suffrage
+	homeState         *HomeState
+	policy            Policy
+	voteCompiler      *VoteCompiler
+	proposalValidator ProposalValidator
 }
 
 func (t *testStateTransition) SetupTest() {
@@ -22,6 +23,7 @@ func (t *testStateTransition) SetupTest() {
 	t.homeState.SetState(node.StateBooting)
 
 	t.policy = NewTestPolicy()
+	t.proposalValidator = NewTestProposalValidator(t.policy, time.Millisecond*1)
 
 	nodes := []node.Node{t.homeState.Home()}
 	t.suffrage = NewSuffrageTest(
@@ -72,7 +74,7 @@ func (t *testStateTransition) TestNew() {
 
 	{ // consensus
 		err := st.SetStateHandler(
-			NewConsensusStateHandler(t.homeState, t.suffrage, t.policy, nil, st.ChanState()),
+			NewConsensusStateHandler(t.homeState, t.suffrage, t.policy, nil, t.proposalValidator, st.ChanState()),
 		)
 		t.NoError(err)
 	}
@@ -94,7 +96,7 @@ func (t *testStateTransition) TestTransition() {
 	_ = st.SetStateHandler(NewBootingStateHandler(t.homeState, st.ChanState()))
 	_ = st.SetStateHandler(NewSyncStateHandler(t.homeState, t.suffrage, t.policy, nil, st.ChanState()))
 	_ = st.SetStateHandler(NewJoinStateHandler(t.homeState, t.policy, nil, st.ChanState()))
-	_ = st.SetStateHandler(NewConsensusStateHandler(t.homeState, t.suffrage, t.policy, nil, st.ChanState()))
+	_ = st.SetStateHandler(NewConsensusStateHandler(t.homeState, t.suffrage, t.policy, nil, t.proposalValidator, st.ChanState()))
 	_ = st.SetStateHandler(NewStoppedStateHandler(t.homeState))
 
 	t.NoError(st.Start())

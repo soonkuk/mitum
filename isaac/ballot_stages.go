@@ -18,14 +18,14 @@ func NewBallot(n node.Address, height Height, round Round, stage Stage, proposal
 	return NewBaseBallot(body)
 }
 
-func IsValidINITBallot(body BaseBallotBody) error {
+func IsValidINITBallot(BaseBallotBody) error {
 	return nil
 }
 
-func IsValidSIGNBallot(body BaseBallotBody) error {
+func IsValidSIGNBallot(BaseBallotBody) error {
 	return nil
 }
 
-func IsValidACCEPTBallot(body BaseBallotBody) error {
+func IsValidACCEPTBallot(BaseBallotBody) error {
 	return nil
 }

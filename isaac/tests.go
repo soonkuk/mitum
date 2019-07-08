@@ -35,7 +35,6 @@ func NewRandomBlockHash() hash.Hash {
 func NewTestPolicy() Policy {
 	return Policy{
 		TimeoutINITBallot:        time.Second * 10,
-		IntervalProposeProposal:  time.Millisecond * 10,
 		IntervalINITBallotOfJoin: time.Second * 3,
 	}
 }

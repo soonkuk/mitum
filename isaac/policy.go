@@ -11,7 +11,6 @@ import (
 
 type Policy struct {
 	TimeoutINITBallot        time.Duration // wait for INITBallot
-	IntervalProposeProposal  time.Duration
 	IntervalINITBallotOfJoin time.Duration // interval for broadcasting init ballot in join state
 	BasePercent              float64
 	Threshold                *Threshold

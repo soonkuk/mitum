@@ -16,12 +16,13 @@ import (
 
 type testConsensusStateHandler struct {
 	suite.Suite
-	suffrage      Suffrage
-	policy        Policy
-	homeState     *HomeState
-	networks      map[node.Address]*network.NodesTest
-	clients       map[node.Address]ClientTest
-	closeNetworks func()
+	suffrage          Suffrage
+	policy            Policy
+	proposalValidator ProposalValidator
+	homeState         *HomeState
+	networks          map[node.Address]*network.NodesTest
+	clients           map[node.Address]ClientTest
+	closeNetworks     func()
 }
 
 func (t *testConsensusStateHandler) setupTest(total uint) {
@@ -34,6 +35,7 @@ func (t *testConsensusStateHandler) setupTest(total uint) {
 	}
 
 	t.policy = NewTestPolicy()
+	t.proposalValidator = NewTestProposalValidator(t.policy, time.Millisecond*1)
 
 	t.suffrage = NewSuffrageTest(
 		nodes,
@@ -87,6 +89,7 @@ func (t *testConsensusStateHandler) TestNew() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
+		t.proposalValidator,
 		make(chan context.Context),
 	)
 	t.Equal(node.StateConsensus, sc.State())
@@ -102,6 +105,7 @@ func (t *testConsensusStateHandler) TestVoteBallot() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
+		t.proposalValidator,
 		make(chan context.Context),
 	)
 	err := sc.Start()
@@ -166,6 +170,7 @@ func (t *testConsensusStateHandler) TestINITPreviousHeight() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
+		t.proposalValidator,
 		chanState,
 	)
 	err := sc.Start()
@@ -225,6 +230,7 @@ func (t *testConsensusStateHandler) TestPropose() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
+		t.proposalValidator,
 		chanState,
 	)
 	err := sc.Start()
@@ -285,6 +291,7 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 		t.suffrage,
 		t.policy,
 		t.clients[t.homeState.Home().Address()],
+		t.proposalValidator,
 		chanState,
 	)
 	err := sc.Start()
