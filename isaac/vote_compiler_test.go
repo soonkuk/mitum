@@ -16,7 +16,6 @@ type testVoteCompiler struct {
 	suffrage  Suffrage
 	policy    Policy
 	homeState *HomeState
-	threshold *Threshold
 	ballotbox *Ballotbox
 }
 

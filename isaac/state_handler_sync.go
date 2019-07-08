@@ -85,7 +85,7 @@ func (ss *SyncStateHandler) start() error {
 	// TODO remove
 	go func() {
 		<-time.After(time.Millisecond * 100)
-		ss.chanState <- common.SetContext(nil, "state", node.StateJoin)
+		ss.chanState <- common.SetContext(context.TODO(), "state", node.StateJoin)
 	}()
 
 	return nil

@@ -81,7 +81,7 @@ func (bs *BootingStateHandler) start() error {
 	// TODO remove
 	go func() {
 		<-time.After(time.Millisecond * 100)
-		bs.chanState <- common.SetContext(nil, "state", node.StateSync)
+		bs.chanState <- common.SetContext(context.TODO(), "state", node.StateSync)
 	}()
 
 	return nil

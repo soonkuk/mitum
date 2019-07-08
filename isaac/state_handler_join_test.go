@@ -13,11 +13,10 @@ import (
 
 type testJoinStateHandler struct {
 	suite.Suite
-	policy        Policy
-	homeState     *HomeState
-	network       *network.NodesTest
-	client        ClientTest
-	closeNetworks func()
+	policy    Policy
+	homeState *HomeState
+	network   *network.NodesTest
+	client    ClientTest
 }
 
 func (t *testJoinStateHandler) SetupTest() {
@@ -93,12 +92,9 @@ func (t *testJoinStateHandler) TestINITACCEPTVoteResult() {
 	chanState := make(chan context.Context)
 
 	go func() {
-		for {
-			select {
-			case ctx := <-chanState:
-				newState := ctx.Value("state").(node.State)
-				t.homeState.SetState(newState)
-			}
+		for ctx := range chanState {
+			newState := ctx.Value("state").(node.State)
+			t.homeState.SetState(newState)
 		}
 	}()
 
@@ -171,12 +167,9 @@ func (t *testJoinStateHandler) TestINITButInvalidACCEPTVoteResult() {
 	chanState := make(chan context.Context)
 
 	go func() {
-		for {
-			select {
-			case ctx := <-chanState:
-				newState := ctx.Value("state").(node.State)
-				t.homeState.SetState(newState)
-			}
+		for ctx := range chanState {
+			newState := ctx.Value("state").(node.State)
+			t.homeState.SetState(newState)
 		}
 	}()
 
@@ -244,12 +237,9 @@ func (t *testJoinStateHandler) TestBroadcastINITBallot() {
 	chanState := make(chan context.Context)
 
 	go func() {
-		for {
-			select {
-			case ctx := <-chanState:
-				newState := ctx.Value("state").(node.State)
-				t.homeState.SetState(newState)
-			}
+		for ctx := range chanState {
+			newState := ctx.Value("state").(node.State)
+			t.homeState.SetState(newState)
 		}
 	}()
 

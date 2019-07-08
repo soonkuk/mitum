@@ -156,7 +156,7 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 		err := checker.Check()
 		if err != nil {
 			if xerrors.Is(err, ChangeNodeStateToSyncError) {
-				cs.chanState <- common.SetContext(nil, "state", node.StateSync)
+				cs.chanState <- common.SetContext(context.TODO(), "state", node.StateSync)
 				return nil
 			}
 			return err

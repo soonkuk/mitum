@@ -13,7 +13,7 @@ import (
 
 func printError(cmd *cobra.Command, err error) {
 	fmt.Fprintf(os.Stderr, "error: %s\n\n", err.Error())
-	cmd.Help()
+	_ = cmd.Help()
 }
 
 func printFlags(cmd *cobra.Command, format string) interface{} {

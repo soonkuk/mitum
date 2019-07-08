@@ -1,6 +1,7 @@
 package isaac
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -105,7 +106,7 @@ func (t *testStateTransition) TestTransition() {
 	<-time.After(time.Millisecond * 50)
 	t.Nil(st.StateHandler())
 
-	st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
+	st.ChanState() <- common.SetContext(context.TODO(), "state", node.StateBooting)
 	<-time.After(time.Millisecond * 50)
 	t.Equal(t.homeState.State(), st.StateHandler().State())
 }
@@ -118,7 +119,7 @@ func (t *testStateTransition) TestMissingState() {
 	t.NoError(st.Start())
 	defer st.Stop()
 
-	st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
+	st.ChanState() <- common.SetContext(context.TODO(), "state", node.StateBooting)
 	<-time.After(time.Millisecond * 50)
 	t.Nil(st.StateHandler())
 }

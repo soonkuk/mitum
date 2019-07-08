@@ -170,8 +170,6 @@ func (js *JoinStateHandler) gotMajority(vr VoteResult) error {
 	default:
 		return nil
 	}
-
-	return nil
 }
 
 func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
@@ -195,7 +193,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 	err := checker.Check()
 	if err != nil {
 		if xerrors.Is(err, ChangeNodeStateToSyncError) {
-			js.chanState <- common.SetContext(nil, "state", node.StateSync)
+			js.chanState <- common.SetContext(context.TODO(), "state", node.StateSync)
 			return nil
 		}
 		return err
@@ -213,7 +211,7 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 		}
 
 		js.chanState <- common.SetContext(
-			nil,
+			context.TODO(),
 			"state", node.StateConsensus,
 			"vr", vr,
 		)
@@ -269,7 +267,7 @@ func (js *JoinStateHandler) stageACCEPT(vr VoteResult) error {
 	}
 
 	js.chanState <- common.SetContext(
-		nil,
+		context.TODO(),
 		"state", node.StateConsensus,
 		"vr", vr,
 	)

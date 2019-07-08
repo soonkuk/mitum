@@ -7,10 +7,6 @@ import (
 
 var log log15.Logger = log15.New("module", "main")
 
-func Log() log15.Logger {
-	return log
-}
-
 func init() {
 	//handler, _ := LogHandler(LogFormatter("terminal"), "")
 	handler, _ := common.LogHandler(common.LogFormatter("json"), "")

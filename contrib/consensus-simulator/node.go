@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/spikeekips/mitum/common"
@@ -90,7 +91,7 @@ func (no Node) Start() error {
 		return err
 	}
 	<-time.After(time.Millisecond * 50)
-	no.st.ChanState() <- common.SetContext(nil, "state", node.StateBooting)
+	no.st.ChanState() <- common.SetContext(context.TODO(), "state", node.StateBooting)
 
 	return nil
 }

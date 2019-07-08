@@ -50,13 +50,13 @@ func (vc *VoteCompiler) sendResult(v interface{}) {
 	wg.Add(len(callbacks))
 
 	for name, callback := range callbacks {
-		go func(callback VoteCompilerCallback) {
+		go func(name string, callback VoteCompilerCallback) {
 			if err := callback(v); err != nil {
 				vc.Log().Error("failed to run callback", "callback", name, "error", err)
 			}
 
 			wg.Done()
-		}(callback)
+		}(name, callback)
 	}
 
 	wg.Wait()

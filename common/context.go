@@ -10,7 +10,7 @@ func SetContext(ctx context.Context, args ...interface{}) context.Context {
 		panic(fmt.Errorf("invalid number of args: %v", len(args)))
 	}
 
-	if ctx == nil {
+	if ctx == nil || ctx == context.TODO() {
 		ctx = context.Background()
 	}
 

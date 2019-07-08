@@ -41,7 +41,7 @@ func (cs *StateTransition) Start() error {
 		return err
 	}
 
-	cs.voteCompiler.RegisterCallback(
+	err := cs.voteCompiler.RegisterCallback(
 		"state-transition",
 		func(v interface{}) error {
 			wrote := cs.Write(v)
@@ -50,6 +50,9 @@ func (cs *StateTransition) Start() error {
 			return nil
 		},
 	)
+	if err != nil {
+		cs.Log().Error("error in cs.voteCompiler.RegisterCallback", "error", err)
+	}
 
 	go func() {
 	end:
@@ -89,6 +92,10 @@ func (cs *StateTransition) Stop() error {
 		if err := cs.stateHandler.Stop(); err != nil {
 			return err
 		}
+	}
+
+	if err := cs.voteCompiler.UnregisterCallback("state-transition"); err != nil {
+		cs.Log().Error("error in cs.voteCompiler.UnregisterCallback", "error", err)
 	}
 
 	return nil

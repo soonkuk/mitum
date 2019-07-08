@@ -97,22 +97,17 @@ func run() error {
 	var wg sync.WaitGroup
 	wg.Add(len(nodes))
 	go func() {
-		for {
-			select {
-			case err := <-errChan:
-				if err != nil {
-					log.Error("failed to start Node", "error", err)
-				}
-				wg.Done()
+		for err := range errChan {
+			if err != nil {
+				log.Error("failed to start Node", "error", err)
 			}
+			wg.Done()
 		}
 	}()
 
 	wg.Wait()
 
 	select {}
-
-	return nil
 }
 
 func newHome(n uint) node.Home {
