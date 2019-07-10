@@ -14,7 +14,6 @@ import (
 type JoinStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
-	*common.Logger
 	homeState     *HomeState
 	policy        Policy
 	networkClient NetworkClient
@@ -30,18 +29,18 @@ func NewJoinStateHandler(
 	chanState chan<- context.Context,
 ) *JoinStateHandler {
 	js := &JoinStateHandler{
-		Logger: common.NewLogger(
-			Log(),
-			"module", "join-state-handler",
-			"state", node.StateJoin,
-		),
 		homeState:     homeState,
 		policy:        policy,
 		networkClient: networkClient,
 		chanState:     chanState,
 	}
 
-	js.ReaderDaemon = common.NewReaderDaemon(true, js.receive)
+	js.ReaderDaemon = common.NewReaderDaemon(false, 1000, js.receive)
+	js.ReaderDaemon.Logger = common.NewLogger(
+		Log(),
+		"module", "join-state-handler",
+		"state", node.StateJoin,
+	)
 
 	return js
 }
@@ -206,10 +205,6 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 	}
 
 	if heightDiff == -1 { // next height did not processed, go to consensus
-		if err := js.timer.Stop(); err != nil {
-			return err
-		}
-
 		js.chanState <- common.SetContext(
 			context.TODO(),
 			"state", node.StateConsensus,
@@ -217,10 +212,6 @@ func (js *JoinStateHandler) stageINIT(vr VoteResult) error {
 		)
 		return nil
 	} else if heightDiff == 0 {
-		if err := js.timer.Stop(); err != nil {
-			return err
-		}
-
 		// TODO process vr.Proposal()
 		// TODO store next block
 		nextHeight := vr.Height().Add(1)

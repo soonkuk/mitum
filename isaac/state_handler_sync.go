@@ -12,7 +12,6 @@ import (
 type SyncStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
-	*common.Logger
 	homeState     *HomeState
 	suffrage      Suffrage
 	policy        Policy
@@ -29,11 +28,6 @@ func NewSyncStateHandler(
 	chanState chan<- context.Context,
 ) *SyncStateHandler {
 	ss := &SyncStateHandler{
-		Logger: common.NewLogger(
-			Log(),
-			"module", "sync-state-handler",
-			"state", node.StateSync,
-		),
 		homeState:     homeState,
 		suffrage:      suffrage,
 		policy:        policy,
@@ -41,7 +35,12 @@ func NewSyncStateHandler(
 		chanState:     chanState,
 	}
 
-	ss.ReaderDaemon = common.NewReaderDaemon(true, ss.receive)
+	ss.ReaderDaemon = common.NewReaderDaemon(false, 1000, ss.receive)
+	ss.ReaderDaemon.Logger = common.NewLogger(
+		Log(),
+		"module", "sync-state-handler",
+		"state", node.StateSync,
+	)
 
 	return ss
 }

@@ -16,7 +16,6 @@ func init() {
 }
 
 type NodesTest struct {
-	*common.Logger
 	*common.ReaderDaemon
 	sync.RWMutex
 	home  node.Home
@@ -25,12 +24,13 @@ type NodesTest struct {
 
 func NewNodesTest(home node.Home) *NodesTest {
 	nt := &NodesTest{
-		Logger: common.NewLogger(Log(), "module", "test-nodes-network", "home", home),
-		home:   home,
-		nodes:  map[node.Address]ReceiveFunc{},
+		home:  home,
+		nodes: map[node.Address]ReceiveFunc{},
 	}
 
-	nt.ReaderDaemon = common.NewReaderDaemon(true, nil)
+	nt.ReaderDaemon = common.NewReaderDaemon(false, 0, nil)
+	nt.ReaderDaemon.Logger = common.NewLogger(Log(), "module", "test-nodes-network", "home", home)
+
 	_ = nt.AddReceiver(nt.home.Address(), nt.ReceiveFunc)
 
 	return nt
@@ -88,7 +88,7 @@ func (nt *NodesTest) Send(v interface{}, addresses ...node.Address) error {
 	}
 	nt.RUnlock()
 
-	nt.Log().Debug("trying to send message", "addresses", addresses)
+	nt.Log().Debug("trying to send message", "addresses", addresses, "message", v)
 
 	var errs []error
 	var wg sync.WaitGroup
@@ -105,9 +105,10 @@ func (nt *NodesTest) Send(v interface{}, addresses ...node.Address) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return xerrors.Errorf("failed to broadcast; errors=%q")
+		return xerrors.Errorf("failed to broadcast; errors=%q message=%q", errs, v)
 	}
 
+	nt.Log().Debug("sent message", "addresses", addresses, "message", v)
 	return nil
 }
 

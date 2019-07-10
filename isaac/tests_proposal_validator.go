@@ -1,14 +1,23 @@
 package isaac
 
-import "time"
+import (
+	"time"
+
+	"github.com/spikeekips/mitum/common"
+)
 
 type TestProposalValidator struct {
+	*common.Logger
 	policy   Policy
 	duration time.Duration
 }
 
 func NewTestProposalValidator(policy Policy, duration time.Duration) *TestProposalValidator {
-	return &TestProposalValidator{policy: policy, duration: duration}
+	return &TestProposalValidator{
+		Logger:   common.NewLogger(log, "duration", duration),
+		policy:   policy,
+		duration: duration,
+	}
 }
 
 func (dp *TestProposalValidator) isValid(proposal Proposal) error {
@@ -23,10 +32,17 @@ func (dp *TestProposalValidator) isValid(proposal Proposal) error {
 	return nil
 }
 
-func (dp *TestProposalValidator) NewBlock(proposal Proposal) (Block, error) {
-	if err := dp.isValid(proposal); err != nil {
-		return Block{}, err
+func (dp *TestProposalValidator) NewBlock(proposal Proposal) (block Block, err error) {
+	dp.Log().Debug("trying to validate proposal", "proposal", proposal)
+	if err = dp.isValid(proposal); err != nil {
+		return
 	}
 
-	return NewBlock(proposal.Height().Add(1), proposal.Round(), proposal.Hash())
+	defer func() {
+		dp.Log().Debug("proposal validated", "proposal", proposal, "block", block)
+	}()
+
+	block, err = NewBlock(proposal.Height().Add(1), proposal.Round(), proposal.Hash())
+
+	return
 }

@@ -19,12 +19,27 @@ type Node struct {
 	st           *isaac.StateTransition
 }
 
-func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suffrage) (Node, error) {
+func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
+	policy, err := newPolicy()
+	if err != nil {
+		return Node{}, err
+	}
+
 	nt := network.NewNodesTest(homeState.Home())
 	client := isaac.NewClientTest(nt)
+
 	ballotbox := isaac.NewBallotbox(policy.Threshold)
+
+	suffrage := isaac.NewSuffrageTest(
+		homes,
+		func(height isaac.Height, round isaac.Round, nodes []node.Node) []node.Node {
+			return homes
+		},
+	)
+	log.Debug("suffrage created", "suffrage", suffrage)
+
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
-	proposalValidator := isaac.NewTestProposalValidator(policy, time.Second*2)
+	proposalValidator := isaac.NewTestProposalValidator(policy, time.Millisecond*500)
 
 	alias := homeState.Home().Alias()
 
@@ -67,8 +82,9 @@ func NewNode(homeState *isaac.HomeState, policy isaac.Policy, suffrage isaac.Suf
 	ballotbox.SetLogContext(nil, "node", alias)
 	voteCompiler.SetLogContext(nil, "node", alias)
 	st.SetLogContext(nil, "node", alias)
+	proposalValidator.SetLogContext(nil, "node", alias)
 
-	n.Log().Debug(
+	n.Log().Info(
 		"node created",
 		"homeState", homeState,
 		"policy", policy,

@@ -86,7 +86,7 @@ func (bb *Ballotbox) CheckMajority(vrs *VoteRecords) (VoteResult, error) {
 		return VoteResult{}, err
 	}
 
-	bb.Log().Debug("got vote result", "result", vr)
+	bb.Log().Debug("got vote result", "vr", vr)
 
 	switch vr.Result() {
 	case JustDraw, GotMajority:

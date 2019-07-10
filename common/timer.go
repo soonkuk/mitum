@@ -45,13 +45,14 @@ func NewCallbackTimer(name string, interval time.Duration, callbacks ...TimerCal
 	id := RandomUUID()
 	ct := &CallbackTimer{
 		id:        id,
-		Logger:    NewLogger(Log(), "timer_name", name, "timer_id", id),
+		Logger:    NewLogger(Log(), "name", name, "timer_id", id),
 		callbacks: callbacks,
 		intervalFunc: func(uint, time.Duration) time.Duration {
 			return interval
 		},
 	}
-	ct.daemon = NewReaderDaemon(true, ct.runCallback)
+	ct.daemon = NewReaderDaemon(true, 0, ct.runCallback)
+	_ = ct.daemon.SetLogContext(ct.LogContext())
 
 	return ct
 }
@@ -76,6 +77,8 @@ func (ct *CallbackTimer) Start() error {
 
 	go ct.next()
 
+	ct.Log().Debug("timer started")
+
 	return nil
 }
 
@@ -86,6 +89,7 @@ func (ct *CallbackTimer) Stop() error {
 	if err := ct.daemon.Stop(); err != nil {
 		return err
 	}
+	ct.Log().Debug("timer stopped")
 
 	return nil
 }

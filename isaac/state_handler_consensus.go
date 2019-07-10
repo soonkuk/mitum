@@ -2,7 +2,6 @@ package isaac
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/inconshreveable/log15"
@@ -15,7 +14,6 @@ import (
 type ConsensusStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
-	*common.Logger
 	homeState         *HomeState
 	suffrage          Suffrage
 	policy            Policy
@@ -35,11 +33,6 @@ func NewConsensusStateHandler(
 	chanState chan<- context.Context,
 ) *ConsensusStateHandler {
 	cs := &ConsensusStateHandler{
-		Logger: common.NewLogger(
-			Log(),
-			"module", "consensus-state-handler",
-			"state", node.StateConsensus,
-		),
 		homeState:         homeState,
 		suffrage:          suffrage,
 		policy:            policy,
@@ -48,7 +41,12 @@ func NewConsensusStateHandler(
 		chanState:         chanState,
 	}
 
-	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receive)
+	cs.ReaderDaemon = common.NewReaderDaemon(false, 1000, cs.receive)
+	cs.ReaderDaemon.Logger = common.NewLogger(
+		Log(),
+		"module", "consensus-state-handler",
+		"state", node.StateConsensus,
+	)
 
 	return cs
 }
@@ -104,10 +102,9 @@ func (cs *ConsensusStateHandler) start() error {
 
 	if cs.ctx != nil {
 		vr, ok := cs.ctx.Value("vr").(VoteResult)
-		fmt.Println(">>>>>>>>>>>..", ok, vr)
 		if ok {
 			cs.Log().Debug("start with VoteResult", "vr", vr)
-			return cs.gotMajority(vr)
+			go cs.gotMajority(vr)
 		}
 	}
 
@@ -171,13 +168,15 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 }
 
 func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
-	// TODO everyting is ok, validate it and broadcast SIGNBallot
+	log_ := cs.Log().New(log15.Ctx{"proposal": proposal.Hash()})
+	log_.Debug("received proposal")
 
 	// reset INITBallot timer
 	if err := cs.startTimeoutINITBallot(); err != nil {
 		return err
 	}
 
+	// TODO everyting is ok, validate it and broadcast SIGNBallot
 	nextBlock, err := cs.proposalValidator.NewBlock(proposal)
 	if err != nil {
 		return err
@@ -197,7 +196,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		return err
 	}
 
-	cs.Log().Debug("broadcast ballot for proposal", "proposal", proposal.Hash())
+	log_.Debug("broadcast ballot for proposal")
 
 	if err := cs.networkClient.Vote(&ballot); err != nil {
 		return err

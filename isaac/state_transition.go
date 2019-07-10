@@ -13,7 +13,6 @@ import (
 // StateTransition manages consensus process by node state
 type StateTransition struct {
 	sync.RWMutex
-	*common.Logger
 	*common.ReaderDaemon
 	homeState     *HomeState
 	voteCompiler  *VoteCompiler
@@ -24,14 +23,14 @@ type StateTransition struct {
 
 func NewStateTransition(homeState *HomeState, voteCompiler *VoteCompiler) *StateTransition {
 	cs := &StateTransition{
-		Logger:        common.NewLogger(Log(), "module", "state-transition"),
 		homeState:     homeState,
 		chanState:     make(chan context.Context),
 		voteCompiler:  voteCompiler,
 		stateHandlers: map[node.State]StateHandler{},
 	}
 
-	cs.ReaderDaemon = common.NewReaderDaemon(true, cs.receiveFromVoteCompiler)
+	cs.ReaderDaemon = common.NewReaderDaemon(false, 1000, cs.receiveFromVoteCompiler)
+	cs.ReaderDaemon.Logger = common.NewLogger(Log(), "module", "state-transition")
 
 	return cs
 }
@@ -45,7 +44,7 @@ func (cs *StateTransition) Start() error {
 		"state-transition",
 		func(v interface{}) error {
 			wrote := cs.Write(v)
-			cs.Log().Debug("sent VoteCompiler result to state handler", "wrote", wrote)
+			cs.Log().Debug("sent VoteCompiler result to state handler", "wrote", wrote, "result", v)
 
 			return nil
 		},
@@ -55,24 +54,16 @@ func (cs *StateTransition) Start() error {
 	}
 
 	go func() {
-	end:
-		for {
-			select {
-			case ctx := <-cs.chanState:
-				go func(ctx context.Context) {
-					if err := cs.runState(ctx); err != nil {
-						cs.Log().Error(
-							"failed state transition",
-							"current", cs.homeState.State(),
-							"error", err,
-						)
-					}
-				}(ctx)
-			default:
-				if cs.ReaderDaemon.IsStopped() {
-					break end
+		for ctx := range cs.chanState {
+			go func(ctx context.Context) {
+				if err := cs.runState(ctx); err != nil {
+					cs.Log().Error(
+						"failed state transition",
+						"current", cs.homeState.State(),
+						"error", err,
+					)
 				}
-			}
+			}(ctx)
 		}
 	}()
 
@@ -123,6 +114,9 @@ func (cs *StateTransition) SetStateHandler(stateHandler StateHandler) error {
 }
 
 func (cs *StateTransition) receiveFromVoteCompiler(v interface{}) error {
+	cs.RLock()
+	defer cs.RUnlock()
+
 	if cs.stateHandler == nil {
 		return xerrors.Errorf("something wrong; stateHandler is nil")
 	}

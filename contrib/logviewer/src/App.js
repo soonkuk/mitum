@@ -280,18 +280,11 @@ class CenteredGrid extends React.Component {
   }
 
   onLoading = false
-  limit = 100
+  limit = 500
   recordsOffset = 0
 
   onScroll = () => {
     var root = document.getElementById('inner-root')
-    /*
-    console.log(
-      window.innerHeight, window.scrollY + document.body.offsetHeight, root.offsetHeight,
-      root.offsetTop,
-    )
-    */
-
     if ((window.scrollY + document.body.offsetHeight) >= (root.offsetHeight - 1)) {
       if (this.onLoading) {
         return

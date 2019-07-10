@@ -18,15 +18,15 @@ type StoppedStateHandler struct {
 
 func NewStoppedStateHandler(homeState *HomeState) *StoppedStateHandler {
 	ss := &StoppedStateHandler{
-		Logger: common.NewLogger(
-			Log(),
-			"module", "stopped-state-handler",
-			"state", node.StateStopped,
-		),
 		homeState: homeState,
 	}
 
-	ss.ReaderDaemon = common.NewReaderDaemon(true, func(interface{}) error { return nil })
+	ss.ReaderDaemon = common.NewReaderDaemon(false, 0, nil)
+	ss.ReaderDaemon.Logger = common.NewLogger(
+		Log(),
+		"module", "stopped-state-handler",
+		"state", node.StateStopped,
+	)
 
 	return ss
 }

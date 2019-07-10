@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
 
 	"github.com/inconshreveable/log15"
 	"github.com/spf13/cobra"
@@ -49,6 +52,29 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Debug("parsed flags", "flags", printFlags(cmd, flagLogFormat.f))
+
+		if len(flagCPUProfile) > 0 {
+			f, err := os.Create(flagCPUProfile)
+			if err != nil {
+				panic(err)
+			}
+			pprof.StartCPUProfile(f)
+
+			sigc := make(chan os.Signal, 1)
+			signal.Notify(
+				sigc,
+				syscall.SIGTERM,
+				syscall.SIGQUIT,
+				syscall.SIGKILL,
+			)
+
+			go func() {
+				_ = <-sigc
+				pprof.StopCPUProfile()
+				os.Exit(0)
+			}()
+			log.Debug("cpuprofile enabled")
+		}
 	},
 }
 
@@ -56,6 +82,7 @@ func main() {
 	rootCmd.PersistentFlags().Var(&flagLogLevel, "log-level", "log level: {debug error warn info crit}")
 	rootCmd.PersistentFlags().Var(&flagLogFormat, "log-format", "log format: {json terminal}")
 	rootCmd.PersistentFlags().StringVar(&FlagLogOut, "log", FlagLogOut, "log output file")
+	rootCmd.PersistentFlags().StringVar(&flagCPUProfile, "cpuprofile", flagCPUProfile, "write cpu profile to file")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

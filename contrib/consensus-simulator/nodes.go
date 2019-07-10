@@ -30,6 +30,23 @@ func init() {
 	rootCmd.AddCommand(nodesCmd)
 }
 
+func newPolicy() (isaac.Policy, error) {
+	policy := isaac.NewTestPolicy()
+	policy.TimeoutINITBallot = time.Second * 3
+	policy.IntervalINITBallotOfJoin = time.Second * 3
+	policy.BasePercent = 67
+
+	threshold, err := isaac.NewThreshold(FlagNumberOfNodes, policy.BasePercent)
+	if err != nil {
+		return isaac.Policy{}, err
+	}
+	policy.Threshold = threshold
+
+	log.Debug("policy created", "policy", policy)
+
+	return policy, nil
+}
+
 func run() error {
 	// create homes
 	var homes []node.Node
@@ -37,32 +54,8 @@ func run() error {
 		//n := node.NewRandomHome()
 		n := newHome(i)
 		homes = append(homes, n)
-		log.Debug("home created", "home", n, "node", n.Alias())
+		log.Info("home created", "home", n, "node", n.Alias())
 	}
-
-	a := float64(FlagNumberOfNodes) * 0.62
-	fmt.Println(a, int64(a), a > float64(int64(a)))
-
-	policy := isaac.NewTestPolicy()
-	policy.TimeoutINITBallot = time.Second * 3
-	policy.IntervalINITBallotOfJoin = time.Second * 3
-	policy.BasePercent = 66
-
-	threshold, err := isaac.NewThreshold(FlagNumberOfNodes, policy.BasePercent)
-	if err != nil {
-		return err
-	}
-	policy.Threshold = threshold
-
-	log.Debug("policy created", "policy", policy)
-
-	suffrage := isaac.NewSuffrageTest(
-		homes,
-		func(height isaac.Height, round isaac.Round, nodes []node.Node) []node.Node {
-			return homes
-		},
-	)
-	log.Debug("suffrage created", "suffrage", suffrage)
 
 	previousBlock := isaac.NewRandomBlock()
 	currentBlock := isaac.NewRandomNextBlock(previousBlock)
@@ -72,7 +65,7 @@ func run() error {
 		homeState := isaac.NewHomeState(home.(node.Home), previousBlock)
 		homeState.SetBlock(currentBlock)
 
-		n, err := NewNode(homeState, policy, suffrage)
+		n, err := NewNode(homeState, homes)
 		if err != nil {
 			return err
 		}

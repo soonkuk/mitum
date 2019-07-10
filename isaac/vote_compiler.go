@@ -15,7 +15,6 @@ type VoteCompilerCallback func(interface{}) error
 
 type VoteCompiler struct {
 	sync.RWMutex
-	*common.Logger
 	*common.ReaderDaemon
 	homeState *HomeState
 	suffrage  Suffrage
@@ -30,7 +29,6 @@ func NewVoteCompiler(
 	ballotbox *Ballotbox,
 ) *VoteCompiler {
 	vc := &VoteCompiler{
-		Logger:    common.NewLogger(Log(), "module", "ballot-compiler"),
 		homeState: homeState,
 		suffrage:  suffrage,
 		ballotbox: ballotbox,
@@ -38,7 +36,8 @@ func NewVoteCompiler(
 		callbacks: map[string]VoteCompilerCallback{},
 	}
 
-	vc.ReaderDaemon = common.NewReaderDaemon(true, vc.receiveSeal)
+	vc.ReaderDaemon = common.NewReaderDaemon(true, 1000, vc.receiveSeal)
+	vc.ReaderDaemon.Logger = common.NewLogger(Log(), "module", "vote-compiler")
 
 	return vc
 }

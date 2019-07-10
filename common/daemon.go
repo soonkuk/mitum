@@ -32,11 +32,11 @@ type ReaderDaemon struct {
 	errCallback    func(error)
 }
 
-func NewReaderDaemon(synchronous bool, readerCallback func(interface{}) error) *ReaderDaemon {
+func NewReaderDaemon(synchronous bool, bufsize uint, readerCallback func(interface{}) error) *ReaderDaemon {
 	return &ReaderDaemon{
-		Logger:         NewLogger(log, "module", "reader-daemon"),
+		Logger:         NewLogger(log),
 		synchronous:    synchronous,
-		reader:         make(chan interface{}),
+		reader:         make(chan interface{}, int(bufsize)),
 		readerCallback: readerCallback,
 	}
 }

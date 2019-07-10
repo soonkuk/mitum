@@ -12,7 +12,6 @@ import (
 type BootingStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
-	*common.Logger
 	homeState *HomeState
 	chanState chan<- context.Context
 	ctx       context.Context
@@ -23,16 +22,16 @@ func NewBootingStateHandler(
 	chanState chan<- context.Context,
 ) *BootingStateHandler {
 	bs := &BootingStateHandler{
-		Logger: common.NewLogger(
-			Log(),
-			"module", "booting-state-handler",
-			"state", node.StateBooting,
-		),
 		homeState: homeState,
 		chanState: chanState,
 	}
 
-	bs.ReaderDaemon = common.NewReaderDaemon(true, func(interface{}) error { return nil })
+	bs.ReaderDaemon = common.NewReaderDaemon(false, 0, nil)
+	bs.ReaderDaemon.Logger = common.NewLogger(
+		Log(),
+		"module", "booting-state-handler",
+		"state", node.StateBooting,
+	)
 
 	return bs
 }

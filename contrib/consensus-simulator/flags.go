@@ -12,6 +12,7 @@ var (
 	flagLogLevel      FlagLogLevel  = FlagLogLevel{lvl: log15.LvlDebug}
 	flagLogFormat     FlagLogFormat = FlagLogFormat{f: "json"}
 	FlagLogOut        string
+	flagCPUProfile    string
 )
 
 type FlagLogLevel struct {

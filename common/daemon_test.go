@@ -26,7 +26,7 @@ func (t *testReaderDaemon) TestNew() {
 		return nil
 	}
 
-	d := NewReaderDaemon(true, callback)
+	d := NewReaderDaemon(true, 0, callback)
 
 	err := d.Start()
 	t.NoError(err)
@@ -69,7 +69,7 @@ func (t *testReaderDaemon) TestCount() {
 		return nil
 	}
 
-	d := NewReaderDaemon(true, callback)
+	d := NewReaderDaemon(true, 0, callback)
 
 	err := d.Start()
 	t.NoError(err)
@@ -100,7 +100,7 @@ func (t *testReaderDaemon) TestAsynchronous() {
 		return nil
 	}
 
-	d := NewReaderDaemon(false, callback)
+	d := NewReaderDaemon(false, 0, callback)
 
 	err := d.Start()
 	t.NoError(err)
@@ -133,7 +133,7 @@ func (t *testReaderDaemon) TestErrCallback() {
 		return nil
 	}
 
-	d := NewReaderDaemon(false, callback)
+	d := NewReaderDaemon(false, 0, callback)
 
 	d.SetErrCallback(func(err error) {
 		defer wg.Done()
