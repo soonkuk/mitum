@@ -11,7 +11,6 @@ import (
 type StoppedStateHandler struct {
 	sync.RWMutex
 	*common.ReaderDaemon
-	*common.Logger
 	homeState *HomeState
 	ctx       context.Context
 }
