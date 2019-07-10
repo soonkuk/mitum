@@ -18,7 +18,7 @@ type ClientTest struct {
 
 func NewClientTest(nodesNetwork network.Nodes) ClientTest {
 	return ClientTest{
-		Logger:       common.NewLogger(Log(), "module", "network-client", "node", nodesNetwork.Home().Address()),
+		Logger:       common.NewLogger(Log(), "module", "network-client"),
 		nodesNetwork: nodesNetwork,
 	}
 }

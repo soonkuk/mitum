@@ -1,23 +1,53 @@
 package main
 
 import (
-	"fmt"
+	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/isaac"
-	"github.com/spikeekips/mitum/keypair"
 	"github.com/spikeekips/mitum/node"
 )
 
-var nodesCmd = &cobra.Command{
-	Use:   "nodes",
-	Short: "run multiple nodes",
-	Args:  cobra.MinimumNArgs(0),
+var (
+	globalConfig NodesGlobalConfig
+)
+
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "run consensus simulator",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		{
+			log.Debug("trying to load config", "file", args[0])
+			b, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				cmd.Println("Error:", err.Error())
+				os.Exit(1)
+			}
+
+			gc, err := newNodesConfigFromBytes(b)
+			if err != nil {
+				cmd.Println("Error:", err.Error())
+				os.Exit(1)
+			}
+
+			globalConfig = gc
+
+			if flagExitAfter > 0 {
+				globalConfig.ExitAfter = flagExitAfter
+			}
+
+			if flagNumberOfNodes > 0 {
+				globalConfig.NumberOfNodes = flagNumberOfNodes
+			}
+
+			log.Debug("config loaded", "config", globalConfig)
+		}
+
 		if err := run(); err != nil {
 			printError(cmd, err)
 		}
@@ -25,40 +55,23 @@ var nodesCmd = &cobra.Command{
 }
 
 func init() {
-	nodesCmd.Flags().UintVar(&FlagNumberOfNodes, "nodes", FlagNumberOfNodes, "number of nodes")
+	runCmd.Flags().DurationVar(&flagExitAfter, "exit-after", 0, "exit after; 0 forever")
+	runCmd.Flags().UintVar(&flagNumberOfNodes, "number-of-nodes", 0, "number of nodes")
 
-	rootCmd.AddCommand(nodesCmd)
-}
-
-func newPolicy() (isaac.Policy, error) {
-	policy := isaac.NewTestPolicy()
-	policy.TimeoutINITBallot = time.Second * 3
-	policy.IntervalINITBallotOfJoin = time.Second * 3
-	policy.BasePercent = 67
-
-	threshold, err := isaac.NewThreshold(FlagNumberOfNodes, policy.BasePercent)
-	if err != nil {
-		return isaac.Policy{}, err
-	}
-	policy.Threshold = threshold
-
-	log.Debug("policy created", "policy", policy)
-
-	return policy, nil
+	rootCmd.AddCommand(runCmd)
 }
 
 func run() error {
 	// create homes
 	var homes []node.Node
-	for i := uint(0); i < FlagNumberOfNodes; i++ {
-		//n := node.NewRandomHome()
+	for i := uint(0); i < globalConfig.NumberOfNodes; i++ {
 		n := newHome(i)
 		homes = append(homes, n)
 		log.Info("home created", "home", n, "node", n.Alias())
 	}
 
-	previousBlock := isaac.NewRandomBlock()
-	currentBlock := isaac.NewRandomNextBlock(previousBlock)
+	previousBlock := newRandomBlock(globalConfig.Global.Block.StartHeight-1, 0)
+	currentBlock := newRandomBlock(globalConfig.Global.Block.StartHeight, globalConfig.Global.Block.StartRound)
 
 	var nodes []Node
 	for _, home := range homes {
@@ -111,19 +124,15 @@ func run() error {
 
 	wg.Wait()
 
-	select {}
-}
+	if globalConfig.ExitAfter == 0 {
+		select {}
+	} else {
+		select {
+		case <-time.After(globalConfig.ExitAfter):
+			break
+		}
+	}
+	defer log.Debug("exited")
 
-func newHome(n uint) node.Home {
-	pk, _ := keypair.NewStellarPrivateKey()
-
-	prefix := []byte(fmt.Sprintf("%d", n))
-
-	var b [32]byte
-	copy(b[:], prefix)
-
-	h, _ := hash.NewHash(node.AddressHashHint, b[:])
-	address := node.Address{Hash: h}
-
-	return node.NewHome(address, pk)
+	return nil
 }

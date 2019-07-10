@@ -1,0 +1,10 @@
+number-of-nodes: 4
+
+global:
+  policy:
+    timeout-init-ballot: 5s
+    interval-init-ballot-of-join: 5s
+
+  block:
+    start-height: 33
+    start-round: 0

@@ -87,14 +87,18 @@ func (vrs *VoteRecords) Vote(vr VoteRecord) error {
 }
 
 func (vrs VoteRecords) Copy() VoteRecords {
+	voted := map[node.Address]VoteRecord{}
+	for address, vr := range vrs.voted {
+		voted[address] = vr
+	}
+
 	return VoteRecords{
-		Logger:   vrs.Logger,
 		hash:     vrs.hash,
 		height:   vrs.height,
 		round:    vrs.round,
 		stage:    vrs.stage,
 		proposal: vrs.proposal,
-		voted:    vrs.voted,
+		voted:    voted,
 		closed:   vrs.closed,
 	}
 }
@@ -104,9 +108,6 @@ func (vrs VoteRecords) Len() int {
 }
 
 func (vrs VoteRecords) IsClosed() bool {
-	vrs.RLock()
-	defer vrs.RUnlock()
-
 	return vrs.closed
 }
 
@@ -187,35 +188,30 @@ func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) 
 }
 
 func (vrs VoteRecords) MarshalJSON() ([]byte, error) {
-	voted := map[string]VoteRecord{}
-	for address, vr := range vrs.voted {
-		voted[address.String()] = vr
-	}
-
 	b, err := json.Marshal(map[string]interface{}{
 		"height":   vrs.height,
 		"round":    vrs.round,
 		"stage":    vrs.stage,
 		"proposal": vrs.proposal,
-		"voted":    voted,
+		"voted":    vrs.voted,
 		"closed":   vrs.closed,
 	})
 
 	return b, err
 }
 
-func (vnr VoteRecords) String() string {
-	b, _ := json.Marshal(vnr)
+func (vrs VoteRecords) String() string {
+	b, _ := json.Marshal(vrs)
 	return string(b)
 }
 
-func (vnr VoteRecords) IsNodeVoted(n node.Address) bool {
-	_, found := vnr.voted[n]
+func (vrs VoteRecords) IsNodeVoted(n node.Address) bool {
+	_, found := vrs.voted[n]
 	return found
 }
 
-func (vnr VoteRecords) NodeVote(n node.Address) (VoteRecord, bool) {
-	vr, found := vnr.voted[n]
+func (vrs VoteRecords) NodeVote(n node.Address) (VoteRecord, bool) {
+	vr, found := vrs.voted[n]
 	return vr, found
 }
 

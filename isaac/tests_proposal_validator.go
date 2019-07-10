@@ -1,3 +1,5 @@
+// +build test
+
 package isaac
 
 import (
@@ -24,8 +26,6 @@ func (dp *TestProposalValidator) isValid(proposal Proposal) error {
 	if err := proposal.IsValid(); err != nil {
 		return err
 	}
-
-	// TODO process transactions
 
 	<-time.After(dp.duration)
 

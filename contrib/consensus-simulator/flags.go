@@ -2,17 +2,20 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/inconshreveable/log15"
 	"golang.org/x/xerrors"
 )
 
 var (
-	FlagNumberOfNodes uint          = 10
 	flagLogLevel      FlagLogLevel  = FlagLogLevel{lvl: log15.LvlDebug}
 	flagLogFormat     FlagLogFormat = FlagLogFormat{f: "json"}
 	FlagLogOut        string
 	flagCPUProfile    string
+	flagExitAfter     time.Duration
+	flagNumberOfNodes uint = 3
+	flagQuiet         bool
 )
 
 type FlagLogLevel struct {

@@ -23,13 +23,20 @@ import (
 	"github.com/spikeekips/mitum/transaction"
 )
 
+var sigc chan os.Signal
+
 var rootCmd = &cobra.Command{
 	Use:   "cs",
 	Short: "cs is the consensus simulator of ISAAC+",
 	Args:  cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// set logging
-		handler, _ := common.LogHandler(common.LogFormatter(flagLogFormat.f), FlagLogOut)
+		var handler log15.Handler
+		if len(FlagLogOut) > 0 {
+			handler = LogFileByNodeHandler(FlagLogOut, common.LogFormatter(flagLogFormat.f), flagQuiet)
+		} else {
+			handler, _ = common.LogHandler(common.LogFormatter(flagLogFormat.f), FlagLogOut)
+		}
 		handler = log15.CallerFileHandler(handler)
 		handler = log15.LvlFilterHandler(flagLogLevel.lvl, handler)
 
@@ -71,18 +78,24 @@ var rootCmd = &cobra.Command{
 			go func() {
 				_ = <-sigc
 				pprof.StopCPUProfile()
+				log.Debug("cpuprofile closed")
 				os.Exit(0)
 			}()
 			log.Debug("cpuprofile enabled")
 		}
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		pprof.StopCPUProfile()
+		log.Debug("cpuprofile closed")
 	},
 }
 
 func main() {
 	rootCmd.PersistentFlags().Var(&flagLogLevel, "log-level", "log level: {debug error warn info crit}")
 	rootCmd.PersistentFlags().Var(&flagLogFormat, "log-format", "log format: {json terminal}")
-	rootCmd.PersistentFlags().StringVar(&FlagLogOut, "log", FlagLogOut, "log output file")
+	rootCmd.PersistentFlags().StringVar(&FlagLogOut, "log", FlagLogOut, "log output directory")
 	rootCmd.PersistentFlags().StringVar(&flagCPUProfile, "cpuprofile", flagCPUProfile, "write cpu profile to file")
+	rootCmd.PersistentFlags().BoolVar(&flagQuiet, "quiet", flagQuiet, "quiet")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

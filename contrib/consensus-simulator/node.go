@@ -20,6 +20,8 @@ type Node struct {
 }
 
 func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
+	alias := homeState.Home().Alias()
+
 	policy, err := newPolicy()
 	if err != nil {
 		return Node{}, err
@@ -27,6 +29,7 @@ func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
 
 	nt := network.NewNodesTest(homeState.Home())
 	client := isaac.NewClientTest(nt)
+	client.SetLogContext(nil, "node", alias)
 
 	ballotbox := isaac.NewBallotbox(policy.Threshold)
 
@@ -40,8 +43,6 @@ func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
 
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
 	proposalValidator := isaac.NewTestProposalValidator(policy, time.Millisecond*700)
-
-	alias := homeState.Home().Alias()
 
 	go func() {
 		for message := range nt.Reader() {
