@@ -114,6 +114,7 @@ func (js *JoinStateHandler) start() error {
 
 		return js.policy.IntervalINITBallotOfJoin
 	})
+	js.timer.(*common.CallbackTimer).SetLogContext(js.LogContext())
 
 	return js.timer.Start()
 }

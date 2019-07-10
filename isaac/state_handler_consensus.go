@@ -168,13 +168,13 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 }
 
 func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
-	log_ := cs.Log().New(log15.Ctx{"proposal": proposal.Hash()})
-	log_.Debug("received proposal")
-
 	// reset INITBallot timer
 	if err := cs.startTimeoutINITBallot(); err != nil {
 		return err
 	}
+
+	log_ := cs.Log().New(log15.Ctx{"proposal": proposal.Hash()})
+	log_.Debug("trying to validate proposal")
 
 	// TODO everyting is ok, validate it and broadcast SIGNBallot
 	nextBlock, err := cs.proposalValidator.NewBlock(proposal)
@@ -196,7 +196,7 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 		return err
 	}
 
-	log_.Debug("broadcast ballot for proposal")
+	log_.Debug("proposal validated; broadcast ballot for proposal")
 
 	if err := cs.networkClient.Vote(&ballot); err != nil {
 		return err
@@ -378,6 +378,7 @@ func (cs *ConsensusStateHandler) startTimeoutINITBallot() error {
 		cs.policy.TimeoutINITBallot,
 		cs.whenTimeoutINITBallot,
 	)
+	cs.timer.(*common.CallbackTimer).SetLogContext(cs.LogContext())
 
 	return cs.timer.Start()
 }

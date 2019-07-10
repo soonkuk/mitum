@@ -39,7 +39,7 @@ func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
 	log.Debug("suffrage created", "suffrage", suffrage)
 
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
-	proposalValidator := isaac.NewTestProposalValidator(policy, time.Millisecond*500)
+	proposalValidator := isaac.NewTestProposalValidator(policy, time.Millisecond*700)
 
 	alias := homeState.Home().Alias()
 
