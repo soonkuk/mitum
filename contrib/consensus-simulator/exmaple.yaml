@@ -8,3 +8,15 @@ global:
   block:
     start-height: 33
     start-round: 0
+
+  modules:
+      ProposalValidator:
+        name: isaac.TestProposalValidator
+        duration: 1s
+
+nodes:
+    n0:
+      modules:
+          ProposalValidator:
+            name: isaac.TestProposalValidator
+            duration: 2s

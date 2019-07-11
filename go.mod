@@ -6,6 +6,7 @@ require (
 	boscoin.io/sebak v0.0.0-20190213022301-8aa4d74daff1
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcutil v0.0.0-20190112041146-bf1e1be93589
+	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/inconshreveable/log15 v0.0.0-20180818164646-67afb5ed74ec
 	github.com/kr/pretty v0.1.0 // indirect

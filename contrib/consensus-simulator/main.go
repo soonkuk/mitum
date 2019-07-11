@@ -85,8 +85,11 @@ var rootCmd = &cobra.Command{
 		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		pprof.StopCPUProfile()
-		log.Debug("cpuprofile closed")
+		if len(flagCPUProfile) > 0 {
+			pprof.StopCPUProfile()
+			log.Debug("cpuprofile closed")
+		}
+		log.Debug("stopped")
 	},
 }
 

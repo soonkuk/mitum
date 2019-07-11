@@ -188,12 +188,17 @@ func (vrs VoteRecords) CheckMajority(total, threshold uint) (VoteResult, error) 
 }
 
 func (vrs VoteRecords) MarshalJSON() ([]byte, error) {
+	voted := map[string]VoteRecord{}
+	for address, vr := range vrs.voted {
+		voted[address.String()] = vr
+	}
+
 	b, err := json.Marshal(map[string]interface{}{
 		"height":   vrs.height,
 		"round":    vrs.round,
 		"stage":    vrs.stage,
 		"proposal": vrs.proposal,
-		"voted":    vrs.voted,
+		"voted":    voted,
 		"closed":   vrs.closed,
 	})
 

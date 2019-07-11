@@ -9,9 +9,9 @@ import (
 
 type Loggerable interface {
 	Log() log15.Logger
-	SetLogger(log15.Logger)
-	LogContext() []interface{}
-	SetLogContext(...interface{})
+	SetLogger(log15.Logger) *Logger
+	LogContext() log15.Ctx
+	SetLogContext(log15.Ctx, ...interface{}) *Logger
 }
 
 type Logger struct {

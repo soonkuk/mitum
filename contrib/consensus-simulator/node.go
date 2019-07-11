@@ -8,6 +8,7 @@ import (
 	"github.com/spikeekips/mitum/isaac"
 	"github.com/spikeekips/mitum/network"
 	"github.com/spikeekips/mitum/node"
+	"golang.org/x/xerrors"
 )
 
 type Node struct {
@@ -19,7 +20,9 @@ type Node struct {
 	st           *isaac.StateTransition
 }
 
-func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
+func NewNode(name string, homeState *isaac.HomeState, homes []node.Node) (Node, error) {
+	config := globalConfig.Node(name)
+
 	alias := homeState.Home().Alias()
 
 	policy, err := newPolicy()
@@ -42,7 +45,11 @@ func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
 	log.Debug("suffrage created", "suffrage", suffrage)
 
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
-	proposalValidator := isaac.NewTestProposalValidator(policy, time.Millisecond*700)
+
+	proposalValidator, err := newProposalValidator(policy, config.Modules.ProposalValidator)
+	if err != nil {
+		return Node{}, err
+	}
 
 	go func() {
 		for message := range nt.Reader() {
@@ -83,13 +90,14 @@ func NewNode(homeState *isaac.HomeState, homes []node.Node) (Node, error) {
 	ballotbox.SetLogContext(nil, "node", alias)
 	voteCompiler.SetLogContext(nil, "node", alias)
 	st.SetLogContext(nil, "node", alias)
-	proposalValidator.SetLogContext(nil, "node", alias)
+	proposalValidator.(common.Loggerable).SetLogContext(nil, "node", alias)
 
 	n.Log().Info(
 		"node created",
 		"homeState", homeState,
 		"policy", policy,
 		"suffrage", suffrage,
+		"config", config,
 	)
 
 	return n, nil
@@ -117,4 +125,19 @@ func (no Node) Stop() error {
 	no.Log().Debug("stop Node")
 	_ = no.homeState.SetState(node.StateStopped)
 	return no.st.Stop()
+}
+
+func newProposalValidator(policy isaac.Policy, c map[string]interface{}) (isaac.ProposalValidator, error) {
+	switch name := c["name"].(string); name {
+	case "isaac.TestProposalValidator":
+		duration := time.Second * 1
+		if d, ok := c["duration"]; ok {
+			duration = d.(time.Duration)
+		}
+
+		log.Debug("TestProposalValidator is loaded", "c", c)
+		return isaac.NewTestProposalValidator(policy, duration), nil
+	default:
+		return nil, xerrors.Errorf("unknown ProposalValidator; name=%q", name)
+	}
 }

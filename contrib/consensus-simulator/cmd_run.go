@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -61,7 +61,7 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 }
 
-func run() error {
+func runNodes() error {
 	// create homes
 	var homes []node.Node
 	for i := uint(0); i < globalConfig.NumberOfNodes; i++ {
@@ -74,11 +74,11 @@ func run() error {
 	currentBlock := newRandomBlock(globalConfig.Global.Block.StartHeight, globalConfig.Global.Block.StartRound)
 
 	var nodes []Node
-	for _, home := range homes {
+	for i, home := range homes {
 		homeState := isaac.NewHomeState(home.(node.Home), previousBlock)
 		homeState.SetBlock(currentBlock)
 
-		n, err := NewNode(homeState, homes)
+		n, err := NewNode(fmt.Sprintf("n%d", i), homeState, homes)
 		if err != nil {
 			return err
 		}
@@ -104,25 +104,34 @@ func run() error {
 			err := n.Start()
 			errChan <- err
 		}(n)
-		defer func(n Node) {
-			if err := n.Stop(); err != nil {
-				n.Log().Error("failed to stop Node", "error", err)
-			}
-		}(n)
+		/*
+			defer func(n Node) {
+				if err := n.Stop(); err != nil {
+					n.Log().Error("failed to stop Node", "error", err)
+				}
+			}(n)
+		*/
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(nodes))
 	go func() {
 		for err := range errChan {
 			if err != nil {
 				log.Error("failed to start Node", "error", err)
+				os.Exit(1)
 			}
-			wg.Done()
 		}
 	}()
 
-	wg.Wait()
+	return nil
+}
+
+func run() error {
+	go func() {
+		if err := runNodes(); err != nil {
+			log.Error("failed to start nodes", "error", err)
+			os.Exit(1)
+		}
+	}()
 
 	if globalConfig.ExitAfter == 0 {
 		select {}
@@ -132,7 +141,6 @@ func run() error {
 			break
 		}
 	}
-	defer log.Debug("exited")
 
 	return nil
 }
