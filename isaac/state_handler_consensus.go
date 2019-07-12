@@ -133,10 +133,12 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 	switch vr.Result() {
 	case NotYetMajority, FinishedGotMajority:
 	case JustDraw:
+		cs.Log().Debug("got majority", "vr", vr)
 		if err := cs.moveToNextRound(vr, vr.Round()+1); err != nil {
 			return err
 		}
 	case GotMajority:
+		cs.Log().Debug("got majority", "vr", vr)
 		checker := common.NewChainChecker(
 			"showme-checker",
 			context.Background(),
@@ -206,8 +208,6 @@ func (cs *ConsensusStateHandler) receiveProposal(proposal Proposal) error {
 }
 
 func (cs *ConsensusStateHandler) gotMajority(vr VoteResult) error {
-	cs.Log().Debug("got majority", "vr", vr)
-
 	switch vr.Stage() {
 	case StageINIT:
 		// TODO NextBlock() is same with the expected, checks
@@ -298,7 +298,7 @@ func (cs *ConsensusStateHandler) moveToNextBlock(vr VoteResult) error {
 }
 
 func (cs *ConsensusStateHandler) moveToNextRound(vr VoteResult, round Round) error {
-	cs.Log().Debug("move to next round", "vr", vr)
+	cs.Log().Debug("move to next round", "vr", vr, "next-round", round)
 
 	if err := cs.startTimeoutINITBallot(); err != nil {
 		return err
@@ -307,12 +307,12 @@ func (cs *ConsensusStateHandler) moveToNextRound(vr VoteResult, round Round) err
 	// broadcast INITBallot for next round
 	ballot, err := NewBallot(
 		cs.homeState.Home().Address(),
-		vr.Height(),
+		cs.homeState.PreviousHeight(),
 		round,
 		StageINIT,
-		vr.Proposal(),
-		vr.CurrentBlock(),
-		vr.NextBlock(),
+		cs.homeState.Proposal(),
+		cs.homeState.PreviousBlock().Hash(),
+		cs.homeState.Block().Hash(),
 	)
 	if err != nil {
 		return err

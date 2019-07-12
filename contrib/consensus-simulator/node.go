@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/contrib/consensus-simulator/modules"
 	"github.com/spikeekips/mitum/isaac"
 	"github.com/spikeekips/mitum/network"
 	"github.com/spikeekips/mitum/node"
@@ -25,7 +27,7 @@ func NewNode(name string, homeState *isaac.HomeState, homes []node.Node) (Node, 
 
 	alias := homeState.Home().Alias()
 
-	policy, err := newPolicy()
+	policy, err := newPolicy(config.Policy)
 	if err != nil {
 		return Node{}, err
 	}
@@ -36,17 +38,16 @@ func NewNode(name string, homeState *isaac.HomeState, homes []node.Node) (Node, 
 
 	ballotbox := isaac.NewBallotbox(policy.Threshold)
 
-	suffrage := isaac.NewSuffrageTest(
-		homes,
-		func(height isaac.Height, round isaac.Round, nodes []node.Node) []node.Node {
-			return homes
-		},
-	)
+	suffrage, err := newSuffrage(homes, config.Modules.Suffrage)
+	if err != nil {
+		return Node{}, err
+	}
+
 	log.Debug("suffrage created", "suffrage", suffrage)
 
 	voteCompiler := isaac.NewVoteCompiler(homeState, suffrage, ballotbox)
 
-	proposalValidator, err := newProposalValidator(policy, config.Modules.ProposalValidator)
+	proposalValidator, err := newProposalValidator(config.Modules.ProposalValidator)
 	if err != nil {
 		return Node{}, err
 	}
@@ -127,17 +128,69 @@ func (no Node) Stop() error {
 	return no.st.Stop()
 }
 
-func newProposalValidator(policy isaac.Policy, c map[string]interface{}) (isaac.ProposalValidator, error) {
+func newProposalValidator(c map[string]interface{}) (isaac.ProposalValidator, error) {
 	switch name := c["name"].(string); name {
-	case "isaac.TestProposalValidator":
-		duration := time.Second * 1
-		if d, ok := c["duration"]; ok {
-			duration = d.(time.Duration)
+	case "DurationProposalValidator":
+		d, ok := c["duration"]
+		if !ok {
+			return nil, xerrors.Errorf("duration should be set")
 		}
 
-		log.Debug("TestProposalValidator is loaded", "c", c)
-		return isaac.NewTestProposalValidator(policy, duration), nil
+		duration, ok := d.(time.Duration)
+		if !ok {
+			return nil, xerrors.Errorf("invalid duration; duration=%q", d)
+		}
+
+		log.Debug("DurationProposalValidator is loaded", "c", c)
+		return modules.NewDurationProposalValidator(duration), nil
+	case "WrongBlockProposalValidator":
+		d, ok := c["duration"]
+		if !ok {
+			return nil, xerrors.Errorf("duration should be set")
+		}
+
+		duration, ok := d.(time.Duration)
+		if !ok {
+			return nil, xerrors.Errorf("invalid duration; duration=%q", d)
+		}
+
+		hs, ok := c["heights"]
+		if !ok {
+			return nil, xerrors.Errorf("heights should be set")
+		}
+
+		heights, ok := hs.([]isaac.Height)
+		if !ok {
+			return nil, xerrors.Errorf("invalid heights; heights=%q", hs)
+		}
+
+		log.Debug("WrongBlockProposalValidator is loaded", "c", c)
+		return modules.NewWrongBlockProposalValidator(heights, duration), nil
 	default:
 		return nil, xerrors.Errorf("unknown ProposalValidator; name=%q", name)
+	}
+}
+
+func newSuffrage(nodes []node.Node, c map[string]interface{}) (isaac.Suffrage, error) {
+	switch name := c["name"].(string); name {
+	case "FixedProposerSuffrage":
+		var index int
+		_, _ = fmt.Sscanf(c["proposer"].(string), "n%d", &index)
+
+		var proposer node.Node
+		for i, n := range nodes {
+			if i == index {
+				proposer = n
+				break
+			}
+		}
+
+		log.Debug("FixedProposerSuffrage is loaded", "c", c)
+		return modules.NewFixedProposerSuffrage(proposer, nodes), nil
+	case "RandomSuffrage":
+		log.Debug("RandomSuffrage is loaded", "c", c)
+		return modules.NewRandomSuffrage(nodes), nil
+	default:
+		return nil, xerrors.Errorf("unknown Suffrage; name=%q", name)
 	}
 }

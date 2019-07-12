@@ -122,6 +122,7 @@ func (vc *VoteCompiler) receiveSeal(v interface{}) error {
 	// TODO remove; checking IsValid() should be already done in previous
 	// process
 	if err := sl.IsValid(); err != nil {
+		vc.Log().Error("invalid seal", "seal", sl, "error", err)
 		return err
 	}
 
@@ -230,10 +231,13 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	}
 
 	switch vr.Result() {
+	case JustDraw:
+		_ = vc.setLastRound(vr.Round()) // set lastRound
+		log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result)
 	case GotMajority:
 		if vr.Stage() == StageINIT {
 			_ = vc.setLastRound(vr.Round()) // set lastRound
-			log_.Debug("set LastRound", "round", vc.LastRound())
+			log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result)
 		}
 	}
 

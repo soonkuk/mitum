@@ -27,6 +27,7 @@ func (af ActingSuffrage) Proposer() node.Node {
 }
 
 func (af ActingSuffrage) Nodes() []node.Node {
+	// TODO nodes should be sorted by it's address
 	return af.nodes
 }
 
@@ -45,4 +46,9 @@ func (af ActingSuffrage) MarshalJSON() ([]byte, error) {
 		"proposer": af.proposer,
 		"nodes":    af.nodes,
 	})
+}
+
+func (af ActingSuffrage) String() string {
+	b, _ := json.Marshal(af)
+	return string(b)
 }

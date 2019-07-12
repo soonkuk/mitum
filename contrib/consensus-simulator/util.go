@@ -147,13 +147,13 @@ func (h *closingHandler) Close() error {
 	return nil
 }
 
-func newPolicy() (isaac.Policy, error) {
+func newPolicy(config NodesPolicyConfig) (isaac.Policy, error) {
 	policy := isaac.NewTestPolicy()
-	policy.TimeoutINITBallot = globalConfig.Global.Policy.TimeoutINITBallot
-	policy.IntervalINITBallotOfJoin = globalConfig.Global.Policy.IntervalINITBallotOfJoin
-	policy.BasePercent = 67
+	policy.TimeoutINITBallot = config.TimeoutINITBallot
+	policy.IntervalINITBallotOfJoin = config.IntervalINITBallotOfJoin
+	policy.BasePercent = config.BasePercent
 
-	threshold, err := isaac.NewThreshold(globalConfig.NumberOfNodes, policy.BasePercent)
+	threshold, err := isaac.NewThreshold(config.numberOfNodes, policy.BasePercent)
 	if err != nil {
 		return isaac.Policy{}, err
 	}
@@ -176,4 +176,21 @@ func newHome(n uint) node.Home {
 	address := node.Address{Hash: h}
 
 	return node.NewHome(address, pk)
+}
+
+func mergeMap(a, b map[string]interface{}) map[string]interface{} {
+	n := map[string]interface{}{}
+	for k, v := range a {
+		n[k] = v
+	}
+
+	for k, v := range b {
+		if _, found := a[k]; found {
+			continue
+		}
+
+		n[k] = v
+	}
+
+	return n
 }

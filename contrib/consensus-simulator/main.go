@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/pprof"
 	"syscall"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/spikeekips/mitum/account"
 	"github.com/spikeekips/mitum/big"
 	"github.com/spikeekips/mitum/common"
+	"github.com/spikeekips/mitum/contrib/consensus-simulator/modules"
 	"github.com/spikeekips/mitum/encode"
 	"github.com/spikeekips/mitum/hash"
 	"github.com/spikeekips/mitum/isaac"
@@ -33,7 +35,22 @@ var rootCmd = &cobra.Command{
 		// set logging
 		var handler log15.Handler
 		if len(FlagLogOut) > 0 {
-			handler = LogFileByNodeHandler(FlagLogOut, common.LogFormatter(flagLogFormat.f), flagQuiet)
+			logOutput := filepath.Join(FlagLogOut, common.Now().Format("20060102150405"))
+			handler = LogFileByNodeHandler(
+				logOutput,
+				common.LogFormatter(flagLogFormat.f),
+				flagQuiet,
+			)
+
+			latest := filepath.Join(FlagLogOut, "latest")
+			if _, err := os.Lstat(latest); err == nil {
+				if err := os.Remove(latest); err != nil {
+					cmd.Println("Error:", err.Error())
+					os.Exit(1)
+				}
+			}
+
+			os.Symlink(logOutput, latest)
 		} else {
 			handler, _ = common.LogHandler(common.LogFormatter(flagLogFormat.f), FlagLogOut)
 		}
@@ -53,6 +70,7 @@ var rootCmd = &cobra.Command{
 			node.Log(),
 			seal.Log(),
 			transaction.Log(),
+			modules.Log(),
 		}
 		for _, l := range logs {
 			common.SetLogger(l, flagLogLevel.lvl, handler)
