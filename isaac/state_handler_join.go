@@ -147,6 +147,7 @@ func (js *JoinStateHandler) receiveVoteResult(vr VoteResult) error {
 	case JustDraw:
 		js.Log().Debug("just draw, wait another INIT VoteResult", "vr", vr)
 	case GotMajority:
+		js.Log().Debug("got majority", "vr", vr)
 		if err := js.gotMajority(vr); err != nil {
 			return err
 		}

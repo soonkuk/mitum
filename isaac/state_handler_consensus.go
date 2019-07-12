@@ -133,7 +133,7 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 	switch vr.Result() {
 	case NotYetMajority, FinishedGotMajority:
 	case JustDraw:
-		cs.Log().Debug("got majority", "vr", vr)
+		cs.Log().Debug("just draw", "vr", vr)
 		if err := cs.moveToNextRound(vr, vr.Round()+1); err != nil {
 			return err
 		}
