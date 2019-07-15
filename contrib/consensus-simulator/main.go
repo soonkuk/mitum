@@ -33,9 +33,10 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// set logging
+		var logOutput string
 		var handler log15.Handler
 		if len(FlagLogOut) > 0 {
-			logOutput := filepath.Join(FlagLogOut, common.Now().Format("20060102150405"))
+			logOutput = filepath.Join(FlagLogOut, common.Now().Format("20060102150405"))
 			handler = LogFileByNodeHandler(
 				logOutput,
 				common.LogFormatter(flagLogFormat.f),
@@ -77,6 +78,10 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Debug("parsed flags", "flags", printFlags(cmd, flagLogFormat.f))
+
+		if len(logOutput) > 0 {
+			log.Debug("output log", "directory", logOutput)
+		}
 
 		if len(flagCPUProfile) > 0 {
 			f, err := os.Create(flagCPUProfile)

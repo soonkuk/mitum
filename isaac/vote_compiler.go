@@ -233,17 +233,16 @@ func (vc *VoteCompiler) receiveBallot(ballot Ballot) error {
 	switch vr.Result() {
 	case JustDraw:
 		_ = vc.setLastRound(vr.Round()) // set lastRound
-		log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result)
+		log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result())
 	case GotMajority:
 		if vr.Stage() == StageINIT {
 			_ = vc.setLastRound(vr.Round()) // set lastRound
-			log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result)
+			log_.Debug("set LastRound", "round", vc.LastRound(), "result", vr.Result())
 		}
 	}
 
 	// NOTE notify to state handler
-
-	vc.sendResult(vr)
+	vc.sendResult(vr.SetLastRound(vc.LastRound()))
 
 	return nil
 }

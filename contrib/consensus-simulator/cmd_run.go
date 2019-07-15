@@ -71,7 +71,7 @@ func runNodes() error {
 	}
 
 	previousBlock := newRandomBlock(globalConfig.Global.Block.StartHeight, globalConfig.Global.Block.StartRound)
-	currentBlock := newRandomBlock(globalConfig.Global.Block.StartHeight.Add(1), globalConfig.Global.Block.StartRound+1)
+	currentBlock := newRandomBlock(globalConfig.Global.Block.StartHeight+1, globalConfig.Global.Block.StartRound+1)
 
 	var nodes []Node
 	for i, home := range homes {

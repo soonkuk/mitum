@@ -11,6 +11,7 @@
     "csv-stringify": "^5.3.0",
     "highlight.js": "^9.15.6",
     "jss": "^10.0.0-alpha.16",
+    "lodash": "^4.17.14",
     "markdown": "^0.5.0",
     "mui-virtualized-table": "^2.2.3",
     "notistack": "^0.8.2",

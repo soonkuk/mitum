@@ -100,7 +100,7 @@ func JsonFormatEx() log15.Format {
 			props[k] = formatLogJSONValue(r.Ctx[i+1])
 		}
 
-		b, err := json.Marshal(props)
+		b, err := EncodeJSON(props, false, false)
 		if err != nil {
 			b, _ = json.Marshal(map[string]string{
 				errorKey: err.Error(),

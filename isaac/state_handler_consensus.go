@@ -22,6 +22,7 @@ type ConsensusStateHandler struct {
 	chanState         chan<- context.Context
 	ctx               context.Context
 	timer             common.Timer
+	lastVoteResult    VoteResult
 }
 
 func NewConsensusStateHandler(
@@ -104,11 +105,28 @@ func (cs *ConsensusStateHandler) start() error {
 		vr, ok := cs.ctx.Value("vr").(VoteResult)
 		if ok {
 			cs.Log().Debug("start with VoteResult", "vr", vr)
+			_ = cs.setLastVoteResult(vr)
 			go cs.gotMajority(vr)
 		}
 	}
 
 	return nil
+}
+
+func (cs *ConsensusStateHandler) LastVoteResult() VoteResult {
+	cs.RLock()
+	defer cs.RUnlock()
+
+	return cs.lastVoteResult
+}
+
+func (cs *ConsensusStateHandler) setLastVoteResult(vr VoteResult) *ConsensusStateHandler {
+	cs.Lock()
+	defer cs.Unlock()
+
+	cs.lastVoteResult = vr
+
+	return cs
 }
 
 func (cs *ConsensusStateHandler) receive(v interface{}) error {
@@ -134,6 +152,9 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 	case NotYetMajority, FinishedGotMajority:
 	case JustDraw:
 		cs.Log().Debug("just draw", "vr", vr)
+
+		_ = cs.setLastVoteResult(vr)
+
 		if err := cs.moveToNextRound(vr, vr.Round()+1); err != nil {
 			return err
 		}
@@ -160,6 +181,8 @@ func (cs *ConsensusStateHandler) receiveVoteResult(vr VoteResult) error {
 			}
 			return err
 		}
+
+		_ = cs.setLastVoteResult(vr)
 
 		if err := cs.gotMajority(vr); err != nil {
 			return err
@@ -394,7 +417,7 @@ func (cs *ConsensusStateHandler) whenTimeoutINITBallot(timer common.Timer) error
 	ballot, err := NewBallot(
 		cs.homeState.Home().Address(),
 		cs.homeState.PreviousHeight(),
-		cs.homeState.Block().Round()+1,
+		cs.LastVoteResult().LastRound()+1,
 		StageINIT,
 		cs.homeState.Proposal(),
 		cs.homeState.PreviousBlock().Hash(),

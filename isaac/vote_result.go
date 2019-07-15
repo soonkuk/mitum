@@ -44,6 +44,7 @@ type VoteResult struct {
 	nextBlock    hash.Hash
 	records      VoteRecords
 	result       CheckMajorityResult
+	lastRound    Round
 }
 
 func NewVoteResult(
@@ -67,6 +68,7 @@ func (vr VoteResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"height":       vr.height,
 		"round":        vr.round,
+		"last_round":   vr.lastRound,
 		"stage":        vr.stage,
 		"proposal":     vr.proposal,
 		"currentBlock": vr.currentBlock,
@@ -82,6 +84,15 @@ func (vr VoteResult) Height() Height {
 
 func (vr VoteResult) Round() Round {
 	return vr.round
+}
+
+func (vr VoteResult) LastRound() Round {
+	return vr.lastRound
+}
+
+func (vr VoteResult) SetLastRound(round Round) VoteResult {
+	vr.lastRound = round
+	return vr
 }
 
 func (vr VoteResult) Stage() Stage {
