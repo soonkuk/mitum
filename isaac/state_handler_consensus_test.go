@@ -2,6 +2,7 @@ package isaac
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -298,6 +299,14 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 	t.NoError(err)
 	defer sc.Stop()
 
+	_ = sc.setLastVoteResult(NewVoteResult(
+		t.homeState.Block().Height(),
+		t.homeState.Block().Round()+1,
+		StageINIT,
+		t.homeState.Block().Proposal(),
+		VoteRecords{},
+	))
+
 	chanEnd := make(chan Ballot)
 	go func() {
 		n := t.networks[t.homeState.Home().Address()]
@@ -320,6 +329,7 @@ func (t *testConsensusStateHandler) TestVoteToINITTimeout() {
 
 	t.Equal(StageINIT, ballot.Stage())
 	t.True(ballot.Height().Equal(t.homeState.PreviousBlock().Height()))
+	fmt.Println(">>>>>>>", t.homeState.Block().Round()+1, ballot.Round())
 	t.Equal(t.homeState.Block().Round()+1, ballot.Round())
 	t.True(ballot.CurrentBlock().Equal(t.homeState.PreviousBlock().Hash()))
 	t.True(ballot.NextBlock().Equal(t.homeState.Block().Hash()))
